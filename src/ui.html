@@ -521,7 +521,8 @@ const RACK = [
     { f: 'vcfEnv', label: 'Env', def: .5, fmt: pct },
     { f: 'vcfMod', label: 'Mod', def: 0, fmt: pct },
     { f: 'kybd', label: 'Kybd', def: .5, fmt: pct },
-    { f: 'drive', label: 'Drive', def: .4, fmt: pct } ] },
+    { f: 'drive', label: 'Drive', def: .4, fmt: pct },
+    { f: 'accVcf', label: 'Acc', def: 0, fmt: v => v < .005 ? 'off' : '+' + (v * 4).toFixed(1) + 'oct' } ] },
   { id: 'env', name: 'Envelope', sub: 'RC ADSR', items: [
     { f: 'attack', label: 'A', def: 0, fmt: v => ms(0.0015 * Math.pow(4 / 0.0015, v)) },
     { f: 'decay', label: 'D', def: .4, fmt: v => ms(0.002 * Math.pow(5000, v)) },
@@ -535,8 +536,7 @@ const RACK = [
     { f: 'glide', label: 'Porta', def: .3, fmt: v => v < .01 ? 'off' : ms(0.003 * Math.pow(5 / 0.003, v)) },
     { s: 'glideMode', label: 'Porta', opts: ['Off', 'Auto', 'On'], def: 1 },
     { f: 'slide', label: 'Slide', def: .25, fmt: v => ((0.02 + v * 0.28) * 1000).toFixed(0) + 'ms' },
-    { f: 'accent', label: 'Accent', def: .6, fmt: pct },
-    { s: 'accVcf', label: 'Acc→VCF', opts: ['Env', 'Always'], def: 0 } ] },
+    { f: 'accent', label: 'Accent', def: .6, fmt: pct } ] },
 ];
 const BENDER = [
   { f: 'bendVco', label: 'VCO', def: .3, fmt: v => '±' + (v * 12).toFixed(1) + 'st' },
@@ -586,13 +586,13 @@ function parsePat(str) {
   });
 }
 const PRESETS = {
-  'Acid line': { bpm: 126, p: { saw: .85, pulse: 0, sub: .25, noise: 0, cutoff: .3, reso: .8, drive: .55, vcfEnv: .6, kybd: .5, attack: 0, decay: .38, sustain: 0, release: .22, vcaMode: 0, accent: .75, slide: .22, glideMode: 1, range: 1, swing: .12, gateLen: .5 },
+  'Acid line': { bpm: 126, p: { accVcf: 0.45, saw: .85, pulse: 0, sub: .25, noise: 0, cutoff: .3, reso: .8, drive: .55, vcfEnv: .6, kybd: .5, attack: 0, decay: .38, sustain: 0, release: .22, vcaMode: 0, accent: .75, slide: .22, glideMode: 1, range: 1, swing: .12, gateLen: .5 },
     pat: 'C a, C, C+ s, C, D# a, ., F s, G, C a, _, A#-, C s, D#+ a, C+ s, G, A# a' },
-  'Sub bass': { bpm: 118, p: { saw: .3, pulse: .55, sub: .85, subType: 0, noise: 0, cutoff: .34, reso: .25, drive: .6, vcfEnv: .35, kybd: .5, attack: 0, decay: .45, sustain: .35, release: .2, vcaMode: 0, accent: .4, pw: .15, pwmSrc: 1, range: 0, swing: .08, gateLen: .6 },
+  'Sub bass': { bpm: 118, p: { accVcf: 0.25, saw: .3, pulse: .55, sub: .85, subType: 0, noise: 0, cutoff: .34, reso: .25, drive: .6, vcfEnv: .35, kybd: .5, attack: 0, decay: .45, sustain: .35, release: .2, vcaMode: 0, accent: .4, pw: .15, pwmSrc: 1, range: 0, swing: .08, gateLen: .6 },
     pat: 'C, ., C, C+, ., C, A#-, C, C, ., D#, C, ., C+ s, C, G-' },
-  'PWM arp': { bpm: 132, p: { saw: 0, pulse: .85, sub: .3, subType: 2, noise: 0, cutoff: .45, reso: .45, drive: .4, vcfEnv: .45, kybd: .5, attack: 0, decay: .35, sustain: .3, release: .35, vcaMode: 0, accent: .4, pw: .7, pwmSrc: 0, lfoRate: .45, lfoWave: 0, range: 1, swing: 0, gateLen: .45 },
+  'PWM arp': { bpm: 132, p: { accVcf: 0.25, saw: 0, pulse: .85, sub: .3, subType: 2, noise: 0, cutoff: .45, reso: .45, drive: .4, vcfEnv: .45, kybd: .5, attack: 0, decay: .35, sustain: .3, release: .35, vcaMode: 0, accent: .4, pw: .7, pwmSrc: 0, lfoRate: .45, lfoWave: 0, range: 1, swing: 0, gateLen: .45 },
     pat: 'C, D#, G, C+, D#+, G, C+ s, D#+, A#-, D, F, A#, D+, F, A# s, D+' },
-  'Starved & bent': { bpm: 104, p: { saw: .8, pulse: .3, sub: .4, noise: 0, cutoff: .4, reso: .7, drive: .6, vcfEnv: .45, kybd: .4, attack: 0, decay: .4, sustain: .3, release: .3, vcaMode: 0, accent: .6, lfoRate: .35, lfoWave: 1, range: 1, swing: .1, gateLen: .6 },
+  'Starved & bent': { bpm: 104, p: { accVcf: 0.375, saw: .8, pulse: .3, sub: .4, noise: 0, cutoff: .4, reso: .7, drive: .6, vcfEnv: .45, kybd: .4, attack: 0, decay: .4, sustain: .3, release: .3, vcaMode: 0, accent: .6, lfoRate: .35, lfoWave: 1, range: 1, swing: .1, gateLen: .6 },
     bend: { vBatt: 5.6, rBatt: 4, tReset: 0.00008, rDis: 900, cf1: 680e-12, otaOff: 0.018 },
     br: { 'LFOTRI>VCOCV': .2, 'VCFOUT>VCOCV': .55, 'SAW>ENVCAP': .3, 'FINGER>VCFIN': .3 },
     pat: 'C, _, C+, ., G, _ s, C a, ., D#, _, C+ s, C, F, _, G, A#' },

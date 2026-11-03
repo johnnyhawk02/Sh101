@@ -182,7 +182,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'lfoWave': P.lfoWave = v | 0; break;
       case 'glide': P.glide = v < 0.01 ? 0 : 0.003 * Math.pow(5 / 0.003, v); break; // up to 5 s
       case 'glideMode': P.glideMode = v | 0; break;
-      case 'accVcf': P.accVcf = v | 0; break;
+      case 'accVcf': P.accVcf = v; break;
       case 'slide': P.slide = 0.02 + v * 0.28; break;
     }
   }
@@ -392,11 +392,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // ---- VCF control: expo converter for Iabc, per-stage cap sets each pole ----
       const fcOct = sm.cutoff * 10.966 - 6.644                          // 10 Hz .. 20 kHz re 1 kHz
         + sm.lever * sm.bendVcf * 4
-        // Accent is not on a real 101 (it comes with the 303-style sequencer). Its filter push rides on the
-        // ENV pot (VR19 into R189), the only envelope route into the IC18b summer, so ENV at 0 leaves the
-        // cutoff still; the VCA part of accent is unaffected. ACC→VCF 'Always' brings back the 303-style push
-        // that ignores the ENV slider.
-        + sm.vcfEnv * env * VCF_ENV_OCT + this.accCap * P.accent * (P.accVcf ? 2.5 : 4 * sm.vcfEnv)
+        // Accent is not on a real 101 (it comes with the 303-style sequencer). Its filter push has its own
+        // depth fader (ACC, up to +4 oct), so at 0 the IC18b summer only sees cutoff, ENV, KYBD, MOD and bender.
+        + sm.vcfEnv * env * VCF_ENV_OCT + this.accCap * (P.accVcf || 0) * 4
         + lfo * ((Math.pow(10, 2 * sm.vcfMod) - 1) / 99) * VCF_MOD_OCT   // MOD pot is audio taper (100kA)
         + (this.pitch - 60) / 12 * sm.kybd
         + clamp(inj[3] * 100e3, -8, 8);
