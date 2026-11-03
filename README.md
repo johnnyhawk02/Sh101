@@ -85,6 +85,7 @@ The version shows next to the name at the top of the synth and comes from `packa
 - **0.9.0**: tidy pass on every tab: one heading style, labels on one line so value rows line up, tempo and preset labels inline in the header, Perform tab laid out like the rack, ruled groups on the Bend board, and faders and the piano roll use the spare height on desktop and phone.
 - **0.9.1**: yellow-green backlit LCD glass (#b9cc3c).
 - **0.9.2**: more contrast (brighter glass, darker ink, firmer rules and grid). Fixed the install pop-up never showing in the browser once the page had gone fullscreen. Header menu (≡) with Install app (uses the browser prompt, or shows how to install from the browser menu when the prompt is held back), Check for update and the version.
+- **0.9.3**: the piano roll always fits its width, so all 64 steps are on screen with no sideways scroll.
 - **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
 - **0.3.0**: LCD look; CEM3340 VCO model.
 - **0.2.0**: full SH-101 feature set (arpeggio, 100-step sequencer, bender, transpose) and schematic values from the service manual.
