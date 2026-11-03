@@ -77,6 +77,7 @@ The version shows next to the name at the top of the synth and comes from `packa
 - **0.6.0**: 8 pattern slots above the sequencer, as in the 303 app's banks: edits save to the selected slot, Copy/Paste between slots, ctrl/right-click or long-press to chain slots. Saved presets now hold all 8 slots and the chain; "Sound only" still loads just the sound.
 - **0.6.1**: fixed the "sandpaper" noise with cutoff and resonance both near full. The resonance loop gain now rolls off near the top of the range, as the IR3109's OTAs do, so self-oscillation fades out above about 10 kHz instead of folding back from above Nyquist as broadband noise.
 - **0.6.2**: accent's filter push now goes through the VCF ENV slider (the 101's only envelope route into the VCF CV summer), so with ENV and KYBD at 0 the cutoff stays put. Accent still lifts the VCA.
+- **0.6.3**: ACC→VCF switch in Perform: Env (default, filter push follows the ENV slider) or Always (the old 303-style push).
 - **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
 - **0.3.0**: LCD look; CEM3340 VCO model.
 - **0.2.0**: full SH-101 feature set (arpeggio, 100-step sequencer, bender, transpose) and schematic values from the service manual.
