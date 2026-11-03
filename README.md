@@ -68,7 +68,7 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Versions
 
-The version shows next to the name at the top of the synth and comes from `package.json`; each release is tagged in git.
+The version shows next to the name at the top of the synth and comes from `package.json`. Bump it there for each release.
 
 - **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
 - **0.3.0**: LCD look; CEM3340 VCO model.
