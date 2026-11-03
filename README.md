@@ -81,6 +81,7 @@ The version shows next to the name at the top of the synth and comes from `packa
 - **0.6.4**: the ACC→VCF switch is replaced by an ACC depth fader on the VCF (0 = off as on a real 101, up to +4 octaves per accent, independent of ENV).
 - **0.7.0**: renamed Shyoy (was Kestrel MS-1); the oscilloscope is removed. Saved presets and settings carry over.
 - **0.8.0**: desktop uses the same tabs as the phone (Synth, Sequencer, Bend board, Bridges, FX, Perform) and fills the window with no page scroll; faders and piano roll scale with the window height; keyboard help moved to the Perform tab.
+- **0.8.1**: Randomise on the Bridges tab with a Depth slider: 1 bridge at 0% up to 8 at 100%, and stronger (lower-resistance) bridges as depth rises.
 - **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
 - **0.3.0**: LCD look; CEM3340 VCO model.
 - **0.2.0**: full SH-101 feature set (arpeggio, 100-step sequencer, bender, transpose) and schematic values from the service manual.
