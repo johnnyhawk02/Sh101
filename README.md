@@ -32,7 +32,7 @@ These are read from the synth board (OPH177-2) and control board schematics in t
 - LFO integrator cap C9 = 0.1 µF.
 - Battery power goes through a DC/DC converter, so the rails hold up until the cells are nearly flat.
 
-What is still approximate: the CEM3340's reset dead time, the BA662 VCA gain staging, the exact resonance-loop gain, the noise transistor spectrum, and the bender travel. These either aren't fully legible in the scan or come from inside an IC.
+The VCA input now uses the real R130 150k / R139 1k divider into the BA662 (read from the high-res scan). What is still approximate: the CEM3340 reset dead time, the BA662 control-current scaling (TR28 and R133 12k set it, but the transfer is inside the IC), the exact resonance-loop gain, the noise transistor spectrum, and the bender lever voltage swing. The bender path itself is known: IC3a scales by 100k/150k and feeds the CEM3340 summing node through 100k, against 91.6k for the 1 V/oct key CV.
 
 ## Bend board
 
