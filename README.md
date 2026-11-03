@@ -1,4 +1,4 @@
-# Kestrel MS-1
+# Shyoy (formerly Kestrel MS-1)
 
 A circuit-modelled monosynth for the browser, with a 303-style step sequencer and a bend board for circuit-bending the model while it plays. Its architecture follows the classic single-VCO battery monosynth (VCO with sub-oscillator, 4-pole OTA filter, one envelope, LFO). It is an independent design: no Roland code, artwork or branding is used.
 
@@ -79,6 +79,7 @@ The version shows next to the name at the top of the synth and comes from `packa
 - **0.6.2**: accent's filter push now goes through the VCF ENV slider (the 101's only envelope route into the VCF CV summer), so with ENV and KYBD at 0 the cutoff stays put. Accent still lifts the VCA.
 - **0.6.3**: ACC→VCF switch in Perform: Env (default, filter push follows the ENV slider) or Always (the old 303-style push).
 - **0.6.4**: the ACC→VCF switch is replaced by an ACC depth fader on the VCF (0 = off as on a real 101, up to +4 octaves per accent, independent of ENV).
+- **0.7.0**: renamed Shyoy (was Kestrel MS-1); the oscilloscope is removed. Saved presets and settings carry over.
 - **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
 - **0.3.0**: LCD look; CEM3340 VCO model.
 - **0.2.0**: full SH-101 feature set (arpeggio, 100-step sequencer, bender, transpose) and schematic values from the service manual.
