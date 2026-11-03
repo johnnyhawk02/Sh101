@@ -391,7 +391,10 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // ---- VCF control: expo converter for Iabc, per-stage cap sets each pole ----
       const fcOct = sm.cutoff * 10.966 - 6.644                          // 10 Hz .. 20 kHz re 1 kHz
         + sm.lever * sm.bendVcf * 4
-        + env * sm.vcfEnv * VCF_ENV_OCT + this.accCap * P.accent * 2.5
+        // Accent is not on a real 101 (it comes with the 303-style sequencer). Its filter push rides on the
+        // ENV pot (VR19 into R189), the only envelope route into the IC18b summer, so ENV at 0 leaves the
+        // cutoff still; the VCA part of accent is unaffected.
+        + sm.vcfEnv * (env * VCF_ENV_OCT + this.accCap * P.accent * 4)
         + lfo * ((Math.pow(10, 2 * sm.vcfMod) - 1) / 99) * VCF_MOD_OCT   // MOD pot is audio taper (100kA)
         + (this.pitch - 60) / 12 * sm.kybd
         + clamp(inj[3] * 100e3, -8, 8);
