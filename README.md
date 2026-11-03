@@ -24,7 +24,7 @@ Every stage in `src/dsp.js` runs in physical units (volts, amps, farads, ohms, k
 
 These are read from the synth board (OPH177-2) and control board schematics in the service manual. In `src/dsp.js` they are marked `[SM]`.
 
-- VCO timing cap C41 = 1000 pF on the CEM3340. The CEM3340 compensates temperature on chip, so heat only causes a small residual drift.
+- VCO timing cap C41 = 1000 pF on the CEM3340. These figures come from the CEM3340/AS3340 datasheet: a 0 to 10 V saw; a pulse that is an open-emitter output reaching V+ − 1.3 V; cap charge current capped at about 570 µA, which limits how hard a bend can push the core; and on-chip temperature compensation, with about 50 ppm/°C residual drift.
 - IR3109 filter caps C47, C48, C50 and C51 = 240 pF. Each OTA input is fed through a 68k / 560 Ω divider, which sets how hard the stages saturate.
 - The filter expo has an SDT-1000 thermistor (TH1) for temperature compensation. D30 and D31 clamp the resonance loop.
 - Filter CV summer: an op-amp with 33k feedback. FREQ comes in via 200k, ENV via 100k, MOD via 100k (on an audio-taper pot) and KYBD via 150k, which works out to 0.22 V per octave at the summer.
@@ -32,7 +32,7 @@ These are read from the synth board (OPH177-2) and control board schematics in t
 - LFO integrator cap C9 = 0.1 µF.
 - Battery power goes through a DC/DC converter, so the rails hold up until the cells are nearly flat.
 
-What is still approximate: the CEM3340 internals, the BA662 VCA gain staging, the exact resonance-loop gain, the noise transistor spectrum, and the bender travel. These either aren't fully legible in the scan or come from inside an IC.
+What is still approximate: the CEM3340's reset dead time, the BA662 VCA gain staging, the exact resonance-loop gain, the noise transistor spectrum, and the bender travel. These either aren't fully legible in the scan or come from inside an IC.
 
 ## Bend board
 

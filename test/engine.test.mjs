@@ -36,10 +36,10 @@ const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
     assert.ok(finite(b));
     assert.ok(Math.abs(1200 * Math.log2(got / want)) < 10, `note ${n}: ${got.toFixed(1)} Hz vs ${want.toFixed(1)}`);
   }
-  // heat: the CEM3340 compensates on chip, so a 33 C rise leaves only a small flat drift
+  // heat: the CEM3340 compensates on chip (~50 ppm/C), so a 33 C rise barely moves pitch
   send({ type: 'bend', b: { tempC: 60 } }); send({ type: 'noteOn', n: 93 });
   const cents = 1200 * Math.log2(hz(render(p, 1)) / 884);
-  assert.ok(cents < -5 && cents > -40, `hot VCO drift ${cents.toFixed(1)} cents`);
+  assert.ok(Math.abs(cents) < 6, `hot VCO drift ${cents.toFixed(1)} cents`);
 }
 // filter self-oscillates at full resonance
 {

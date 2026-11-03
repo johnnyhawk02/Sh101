@@ -35,7 +35,9 @@ const ENV_TH = 15 * 33 / (82 + 33); // [SM] attack comparator from R158 82k / R1
 const VCF_V_OCT = 0.22;          // [SM] CV summer (R192 33k fb): KYBD via R193 150k -> 0.22 V per octave
 const VCF_ENV_OCT = ENV_TH * (33 / 100) / VCF_V_OCT;  // [SM] ENV via R189 100k: ~6.5 oct at full
 const VCF_MOD_OCT = 5 * (33 / 100) / VCF_V_OCT;       // [SM] MOD via R191 100k: LFO +-5 V -> +-7.5 oct
-const VCO_TC = 0.1;              // CEM3340 is temperature compensated on chip: ~10% residual
+const VCO_PPM = 50e-6;           // CEM3340 datasheet: on-chip tempco cancellation, drift ~50 ppm/C typ
+const I_CAP_MAX = 570e-6;        // CEM3340 datasheet: max timing-cap charge current ~570 uA typ
+const V_PULSE = 15 - 1.3;        // CEM3340 pulse: open-emitter output, high = V+ - 1.3 V
 const VCF_TC = 0.15;             // [SM] SDT-1000 thermistor (TH1) compensates the IR3109 expo
 const RES_DIODE = 1.6;           // [SM] D30/D31 clamp in the resonance loop (normalised OTA units)
 
@@ -363,9 +365,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const octCV = (this.pitch - 69) / 12 + P.range + sm.tune + lfo * lfoAmt * 0.5 + sm.lever * sm.bendVco + this.drift * P.drift * 0.0125
         + clamp(inj[1] * 100e3, -6, 6);
       // matched pair cancels Is; Vt scales the exponent around the trim point (C4)
-      const octEff = (octCV + 0.75) * (1 + (tsc - 1) * VCO_TC) - 0.75;
+      const octEff = octCV + Math.log2(1 + VCO_PPM * (sm.tempC - 27));
       const Ic = 442 * Math.pow(2, octEff) * CT_NOM * VTH * rail;  // amps
-      const dV = (Ic + inj[0]) / C.ct * dto;                      // volts per oversampled tick
+      const dV = clamp(Ic + inj[0], -I_CAP_MAX, I_CAP_MAX) / C.ct * dto;                      // volts per oversampled tick
       // PW reference voltage (pulse is high while saw > Vpw)
       let duty;
       if (P.pwmSrc === 0) duty = 0.5 - sm.pw * 0.5 * (lfo + 1) / 2;   // PWM 50% .. 0%
@@ -441,7 +443,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
         if (cmpNow !== this.cmp) {
           if (cmpNow === 1) dP = clamp((vc - vpw) / Math.max(1e-9, vc - vPrev), 0, 1);
           else dP = ev >= 0 ? ev : 0.5;
-          evP = (cmpNow - this.cmp) * 5;
+          evP = (cmpNow - this.cmp) * V_PULSE * rail;
           this.cmp = cmpNow;
         }
         const subNow = subWave(subType, this.subC) * vdd;
@@ -454,13 +456,13 @@ class KestrelProcessor extends AudioWorkletProcessor {
           if (evS) { outSub += evS * a; this.cSub -= evS * b; }
         }
         if (dP >= 0) { outPul += evP * dP * dP * 0.5; this.cPul -= evP * (1 - dP) * (1 - dP) * 0.5; }
-        this.oSaw = vc; this.oPul = cmpNow * 5; this.oSub = subNow;
+        this.oSaw = vc; this.oPul = cmpNow * V_PULSE * rail; this.oSub = subNow;
 
         // ===== noise (reverse-biased junction, amplified, pinked) =====
         this.pink = this.pink * 0.7 + this.rand() * 0.3;
 
         // ===== mixer: inverting summer, rails, coupling cap =====
-        let mix = (outSaw - VTH / 2) * 0.5 * lvSaw + (outPul - 2.5) * lvPul + (outSub - vdd * 0.5) * lvSub + this.pink * 3 * lvNoi;
+        let mix = (outSaw - VTH / 2) * 0.5 * lvSaw + (outPul - V_PULSE * rail * 0.5) * (5 / V_PULSE) * lvPul + (outSub - vdd * 0.5) * lvSub + this.pink * 3 * lvNoi;
         mix = railV * tanh(-mix / railV);
         const hp = mix - this.hpx + 0.9997 * this.hpy; this.hpx = mix; this.hpy = hp;
 
