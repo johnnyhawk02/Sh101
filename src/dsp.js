@@ -115,6 +115,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
     this.y4 = 0; this.y2 = 0; this.out = 0; this.clockPending = false; this.fcLast = 1000;
+    this.fxc = new FxChain(sampleRate); // effects from the 303 app (src/fx.js, loaded ahead of this file)
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
@@ -122,7 +123,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
 
   onMsg(m) {
     switch (m.type) {
-      case 'param': this.setParam(m.id, m.v); break;
+      case 'param': if (m.id in FX_KNOB_DEFS) this.fxc.setKnob(m.id, m.v); else this.setParam(m.id, m.v); break;
       case 'params': for (const k in m.p) this.setParam(k, m.p[k]); break;
       case 'bend': for (const k in m.b) this.setBend(k, m.b[k]); break;
       case 'bridges':
@@ -134,7 +135,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
         break;
       case 'noteOn': this.keyOn(m.n); break;
       case 'noteOff': this.keyOff(m.n); break;
-      case 'seq': Object.assign(this.seq, m.seq); break;
+      case 'seq': Object.assign(this.seq, m.seq); if (m.seq.bpm) this.fxc.setBpm(m.seq.bpm); break;
+      case 'fx': this.fxc.setFx(m.name, m.on); break;
+      case 'fxknobs': for (const k in m.k) this.fxc.knobs[k] = m.k[k]; this.fxc.derive(); break;
       case 'mode': {
         const was = this.arp || this.seqMode === 2;
         if ('arp' in m) this.arp = m.arp | 0;
@@ -296,6 +299,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const eD = 1 - Math.exp(-dt / (P.dec / (4 * CE_NOM) * C.ce));
     const eR = 1 - Math.exp(-dt / (P.rel / (4 * CE_NOM) * C.ce));
 
+    const fxc = this.fxc, fxOn = fxc.fx.rat || fxc.fx.lex || fxc.fx.dly;
+    if (fxOn) fxc.flush();
     for (let j = 0; j < n; j++) {
       if (this.running) {
         if (this.t >= this.nextStepAt) this.seqStep();
@@ -506,8 +511,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // output coupling cap + level
       const dcOut = y - this.dcx + 0.9995 * this.dcy; this.dcx = y; this.dcy = dcOut;
       this.out = dcOut;
-      const o = clamp(dcOut * sm.level, -1, 1);
-      L[j] = o; if (R) R[j] = o;
+      if (fxOn) { fxc.run(dcOut * sm.level); L[j] = clamp(fxc.L, -1, 1); if (R) R[j] = clamp(fxc.R, -1, 1); }
+      else { const o = clamp(dcOut * sm.level, -1, 1); L[j] = o; if (R) R[j] = o; }
     }
     this.meterAt += n;
     if (this.meterAt >= 2048) {

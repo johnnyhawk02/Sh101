@@ -9,7 +9,7 @@ let Proc;
 globalThis.AudioWorkletProcessor = class { constructor() { this.port = { postMessage: (m) => this._last = m, onmessage: null }; } };
 globalThis.registerProcessor = (_, c) => { Proc = c; };
 const dir = mkdtempSync(join(tmpdir(), 'kestrel-'));
-writeFileSync(join(dir, 'dsp.mjs'), readFileSync(new URL('../src/dsp.js', import.meta.url), 'utf8'));
+writeFileSync(join(dir, 'dsp.mjs'), readFileSync(new URL('../src/fx.js', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/dsp.js', import.meta.url), 'utf8'));
 await import(join(dir, 'dsp.mjs'));
 
 const make = () => { const p = new Proc(); return [p, (m) => p.port.onmessage({ data: m })]; };
@@ -82,3 +82,23 @@ const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
   assert.deepEqual(seen.slice(0, 6), [0, 1, 2, 3, 0, 1]);
 }
 console.log('engine tests passed');
+
+// effects from the 303 app: RAT, delay and 224 all on stay finite, make a stereo tail after the note, and keep up
+{
+  const [p, send] = make();
+  send({ type: 'params', p: { saw: 1, cutoff: .5, reso: .5, vcaMode: 1 } });
+  for (const name of ['rat', 'dly', 'lex']) send({ type: 'fx', name, on: true });
+  send({ type: 'param', id: 'lexmix', v: .8 }); send({ type: 'param', id: 'dlymix', v: .6 });
+  send({ type: 'noteOn', n: 60 });
+  const L = new Float32Array(48000), R = new Float32Array(48000), t0 = performance.now();
+  for (let o = 0; o < 24000; o += 128) p.process([], [[L.subarray(o, o + 128), R.subarray(o, o + 128)]]);
+  send({ type: 'noteOff', n: 60 });
+  for (let o = 24000; o < 48000; o += 128) p.process([], [[L.subarray(o, o + 128), R.subarray(o, o + 128)]]);
+  const ms = performance.now() - t0;
+  assert.ok(finite(L) && finite(R), 'fx output finite');
+  const tail = (b) => peak(b.subarray(36000));
+  assert.ok(tail(L) > 1e-3 && tail(R) > 1e-3, 'reverb and delay leave a tail after the note');
+  let diff = 0; for (let i = 0; i < L.length; i++) diff = Math.max(diff, Math.abs(L[i] - R[i]));
+  assert.ok(diff > 1e-3, 'returns are stereo');
+  console.log(`fx chain: 1 s rendered in ${ms.toFixed(0)} ms`);
+}
