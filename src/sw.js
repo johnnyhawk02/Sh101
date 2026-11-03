@@ -7,7 +7,8 @@ self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) =
 self.addEventListener('fetch', (e) => {
   const req = e.request; if (req.method !== 'GET') return;
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then((r) => {
+    // bypass the browser's HTTP cache (GitHub Pages sends max-age=600) so a new build shows up on the next launch
+    e.respondWith(fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then((r) => {
       if (r.ok && !r.redirected) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('./', copy)); }
       return r;
     }).catch(() => caches.match('./')));
