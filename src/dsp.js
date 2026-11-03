@@ -262,7 +262,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
   }
 
   seqStep() {
-    const S = this.seq, len = Math.max(1, Math.min(16, S.length | 0));
+    const S = this.seq, len = Math.max(1, Math.min(64, S.length | 0, S.steps.length || 1));
     if (this.stepIdx >= len) this.stepIdx = 0;
     const i = this.stepIdx, st = S.steps[i] || { m: 'R' }, nx = S.steps[(i + 1) % len] || { m: 'R' };
     const base = this.fs * 60 / S.bpm / 4, sw = S.swing * 0.5;
