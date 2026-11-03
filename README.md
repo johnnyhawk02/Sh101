@@ -27,7 +27,23 @@ The component values are typical for these circuit topologies. They have not yet
 - **Component values:** VCO timing cap, reset pulse width and discharge resistance; each VCF stage capacitor; OTA offset; resonance loop polarity; envelope cap and attack comparator threshold; LFO cap and Schmitt hysteresis; temperature; battery voltage and internal resistance.
 - **Bridges:** connect any tap node (saw cap, pulse comparator, sub flip-flop, noise, LFO, envelope cap, VCF stage 2, VCF out, VCA out, or your finger with mains hum) to any injection point (VCO cap, VCO CV, PW reference, VCF CV, VCF input, VCF stage-2 cap, envelope cap, LFO integrator, VCA CV) through a resistor from 10 MΩ to 1 kΩ. Each injection is applied physically: current into a cap or a summing node.
 
-## Sequencer
+## Matching the SH-101
+
+These values follow the SH-101 service manual's specifications and calibration targets:
+- Tune ±50 cents. The VCO is tuned to A4 = 442 Hz at 8' with transpose on Mid, the factory adjustment target.
+- PWM from 50% down to 0%, where the pulse goes silent. The PWM source is LFO, manual or envelope.
+- Cutoff 10 Hz to 20 kHz. Key follow 0 to 100%.
+- Attack 1.5 ms to 4 s. Decay and release 2 ms to 10 s.
+- LFO 0.1 Hz to 30 Hz with triangle, square, random and noise. Random is a new value on each LFO clock edge, like the original's CPU-generated random.
+- Envelope trigger modes Gate+Trig, Gate and LFO.
+- Portamento 0 to 5 s with Off, Auto and On.
+- 32-key keyboard from F to C, with Low/Mid/High transpose.
+- Bender section with VCO, VCF and LFO-mod amounts, a spring-return lever and a mod push.
+- Arpeggio (Up, Up&Down, Down) and a 100-step Load/Play sequencer. Both are clocked by the LFO, one step per LFO cycle, with Hold, rests, legato steps and key transpose.
+
+Bender travel (±12 semitones and ±4 octaves at full) is an assumption; the manual text doesn't give it. Component values inside each stage are not yet traced from the schematic, as noted above.
+
+## 303-style sequencer
 
 16 steps with note, octave, tie, rest, accent and slide, plus swing and gate length. Sequencing runs inside the audio thread, so it is sample-accurate. While it runs, keys transpose the pattern.
 

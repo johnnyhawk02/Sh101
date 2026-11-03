@@ -59,7 +59,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
       cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, vcfMod: 0, kybd: 0.5,
       att: 0.002, dec: 0.3, sus: 0, rel: 0.1, trig: 0,
       vcaMode: 0, level: 0.7, lfoRate: 2, lfoWave: 0,
-      glide: 0.05, glideMode: 1, slide: 0.06, accent: 0.6, modwheel: 0, drive: 0.4,
+      glide: 0.05, glideMode: 1, slide: 0.06, accent: 0.6, drive: 0.4,
+      bendVco: 0.3, bendVcf: 0, lfoMod: 0.3, lever: 0, modPush: 0, transpose: 0,
     };
     // components (bend board)
     this.C = {
@@ -67,7 +68,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       fbInv: 0, otaOff: 0, ce: CE_NOM, envTh: ENV_TH, hys: 5, cl: CL_NOM,
       tempC: 27, vBatt: 9, rBatt: 0.4,
     };
-    this.sm = { cutoff: 0.35, reso: 0.6, saw: 0.8, pulse: 0, sub: 0.4, noise: 0, pw: 0.3, level: 0.7, drive: 0.4, vcfEnv: 0.5, vcfMod: 0, kybd: 0.5, vcoMod: 0, modwheel: 0, tune: 0, tempC: 27, vBatt: 9 };
+    this.sm = { cutoff: 0.35, reso: 0.6, saw: 0.8, pulse: 0, sub: 0.4, noise: 0, pw: 0.3, level: 0.7, drive: 0.4, vcfEnv: 0.5, vcfMod: 0, kybd: 0.5, vcoMod: 0, lever: 0, modPush: 0, bendVco: 0.3, bendVcf: 0, lfoMod: 0.3, tune: 0, tempC: 27, vBatt: 9 };
     this.smc = 1 - Math.exp(-8 / (0.01 * fs));
     this.bridges = [];
     // VCO state
@@ -95,11 +96,13 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.dec1 = biquadLP(0.42 * fs, this.fso, 0.5412); this.dec2 = biquadLP(0.42 * fs, this.fso, 1.3066);
     this.keys = [];
     this.seq = { steps: [], length: 16, bpm: 120, swing: 0, gateLen: 0.5 };
+    this.arp = 0; this.seqMode = 0; this.hold = false; this.arpNotes = []; this.arpIdx = -1; this.arpDir = 1; this.allUp = true;
+    this.s101 = []; this.s101Idx = 0; this.s101Tr = 0;
     this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.transpose = 0;
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
-    this.y4 = 0; this.y2 = 0; this.out = 0; this.fcLast = 1000;
+    this.y4 = 0; this.y2 = 0; this.out = 0; this.clockPending = false; this.fcLast = 1000;
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
@@ -120,6 +123,17 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'noteOn': this.keyOn(m.n); break;
       case 'noteOff': this.keyOff(m.n); break;
       case 'seq': Object.assign(this.seq, m.seq); break;
+      case 'mode': {
+        const was = this.arp || this.seqMode === 2;
+        if ('arp' in m) this.arp = m.arp | 0;
+        if ('seq' in m) this.seqMode = m.seq | 0;
+        if ('hold' in m) { this.hold = !!m.hold; if (!this.hold && !this.keys.length) { this.arpNotes = []; if (this.arp) this.gateOff(); } }
+        const now = this.arp || this.seqMode === 2;
+        if (now && !was) { this.arpIdx = -1; this.s101Idx = 0; this.lfoReset(); }
+        if (!now && was) this.gateOff();
+        break;
+      }
+      case 'seq101': this.s101 = m.steps || []; if (this.s101Idx >= this.s101.length) this.s101Idx = 0; break;
       case 'run':
         if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; }
         else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.transpose = 0; }
@@ -133,13 +147,15 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const P = this.P;
     switch (id) {
       case 'range': P.range = v - 1; break;                    // octaves
-      case 'tune': P.tune = (v - 0.5) * 2 / 12; break;
+      case 'tune': P.tune = (v - 0.5) / 12; break;              // +-50 cents
       case 'vcoMod': P.vcoMod = v * v; break;
       case 'pw': P.pw = v; break;
       case 'pwmSrc': P.pwmSrc = v | 0; break;
       case 'drift': P.drift = v; break;
       case 'saw': case 'pulse': case 'sub': case 'noise': case 'cutoff': case 'reso': case 'drive':
-      case 'vcfEnv': case 'vcfMod': case 'kybd': case 'level': case 'accent': case 'modwheel': P[id] = v; break;
+      case 'vcfEnv': case 'vcfMod': case 'kybd': case 'level': case 'accent': P[id] = v; break;
+      case 'bendVco': case 'bendVcf': case 'lfoMod': case 'lever': case 'modPush': P[id] = v; break;
+      case 'transpose': P.transpose = (v | 0) - 1; break;   // L / M / H
       case 'subType': P.subType = v | 0; break;
       case 'attack': P.att = 0.0015 * Math.pow(4 / 0.0015, v); break;
       case 'decay': P.dec = 0.002 * Math.pow(5000, v); break;
@@ -149,7 +165,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'vcaMode': P.vcaMode = v | 0; break;
       case 'lfoRate': P.lfoRate = Math.pow(2, -3.32 + v * 8.23); break;
       case 'lfoWave': P.lfoWave = v | 0; break;
-      case 'glide': P.glide = v < 0.01 ? 0 : 0.003 * Math.pow(500, v); break;
+      case 'glide': P.glide = v < 0.01 ? 0 : 0.003 * Math.pow(5 / 0.003, v); break; // up to 5 s
       case 'glideMode': P.glideMode = v | 0; break;
       case 'slide': P.slide = 0.02 + v * 0.28; break;
     }
@@ -167,8 +183,20 @@ class KestrelProcessor extends AudioWorkletProcessor {
   }
   trigger(acc) { this.stage = 1; this.gate = true; this.accOn = acc ? 1 : 0; }
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
+  lfoReset() { this.ltri = -this.C.hys * this.rail; this.lsq = -1; this.clockPending = true; }
+  clockedMode() { return this.arp > 0 || this.seqMode === 2; }
   keyOn(n) {
+    n += this.P.transpose * 12;
     if (this.running) { this.transpose = n - 60; return; }
+    if (this.seqMode === 2) { this.s101Tr = n - 60; return; }
+    if (this.arp) {
+      if (this.hold && this.keys.length === 0) this.arpNotes = [];
+      this.keys.push(n);
+      if (!this.arpNotes.includes(n)) this.arpNotes.push(n);
+      this.arpNotes.sort((a, b) => a - b);
+      if (this.keys.length === 1 && this.arpIdx < 0 || this.keys.length === 1 && !this.hold) { this.arpIdx = -1; this.arpDir = 1; this.lfoReset(); }
+      return;
+    }
     const legato = this.keys.length > 0 && this.gate;
     this.keys = this.keys.filter(k => k !== n); this.keys.push(n);
     const gm = this.P.glideMode;
@@ -176,10 +204,51 @@ class KestrelProcessor extends AudioWorkletProcessor {
     if (!legato || this.P.trig === 0) this.trigger(false);
   }
   keyOff(n) {
-    if (this.running) return;
+    n += this.P.transpose * 12;
+    if (this.running || this.seqMode === 2) return;
+    if (this.arp) {
+      this.keys = this.keys.filter(k => k !== n);
+      if (!this.hold) { this.arpNotes = this.arpNotes.filter(k => k !== n); if (!this.arpNotes.length) { this.gateOff(); this.arpIdx = -1; } }
+      return;
+    }
     this.keys = this.keys.filter(k => k !== n);
     if (this.keys.length) { this.setPitch(this.keys[this.keys.length - 1] - 12, this.P.glideMode ? this.P.glide : 0); if (this.P.trig === 0) this.trigger(false); }
-    else this.gateOff();
+    else if (!this.hold) this.gateOff();
+  }
+
+  // LFO-clocked arpeggiator and 100-step sequencer (one step per LFO cycle, gate = high half)
+  clockRise() {
+    if (this.arp && this.arpNotes.length) {
+      const N = this.arpNotes.length;
+      if (this.arp === 1) this.arpIdx = (this.arpIdx + 1) % N;
+      else if (this.arp === 3) this.arpIdx = this.arpIdx <= 0 ? N - 1 : this.arpIdx - 1;
+      else {
+        if (N === 1) this.arpIdx = 0;
+        else { let i = this.arpIdx + this.arpDir; if (i >= N) { this.arpDir = -1; i = N - 2; } if (i < 0) { this.arpDir = 1; i = 1; } this.arpIdx = i; }
+      }
+      if (this.arpIdx >= N) this.arpIdx = 0;
+      this.setPitch(this.arpNotes[this.arpIdx] - 12, this.P.glideMode === 2 ? this.P.glide : 0);
+      this.trigger(false);
+      this.port.postMessage({ type: 'arp', i: this.arpIdx });
+    } else if (this.seqMode === 2 && this.s101.length) {
+      if (this.s101Idx >= this.s101.length) this.s101Idx = 0;
+      const st = this.s101[this.s101Idx];
+      if (st.r) this.gateOff();
+      else {
+        const n = st.n + this.s101Tr - 12;
+        if (st.l && this.gate) this.setPitch(n, this.P.glideMode ? this.P.glide : 0);
+        else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(false); }
+      }
+      this.port.postMessage({ type: 's101', i: this.s101Idx });
+      this.s101Idx = (this.s101Idx + 1) % this.s101.length;
+    }
+  }
+  clockFall() {
+    if (this.arp && this.arpNotes.length) this.gateOff();
+    else if (this.seqMode === 2 && this.s101.length) {
+      const nx = this.s101[this.s101Idx % this.s101.length];
+      if (!(nx && nx.l && !nx.r)) this.gateOff();
+    }
   }
 
   seqStep() {
@@ -239,8 +308,13 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const kInt = P.lfoRate * 4 * 5 * (CL_NOM / C.cl);          // V/s for nominal hysteresis 5 V
       this.ltri += (this.lsq > 0 ? 1 : -1) * kInt * (vsat / 10) * dt + inj[7] / C.cl * dt;
       const hys = C.hys * rail;
-      if (this.ltri > hys) { this.ltri = hys; this.lsq = -1; }
-      else if (this.ltri < -hys) { this.ltri = -hys; this.lsq = 1; this.rnd = this.rand(); }
+      if (this.ltri > hys && this.lsq > 0) { this.ltri = hys; this.lsq = -1; if (this.clockedMode()) this.clockFall(); }
+      else if ((this.ltri < -hys && this.lsq < 0) || this.clockPending) {
+        this.clockPending = false;
+        this.ltri = Math.max(this.ltri, -hys); this.lsq = 1; this.rnd = this.rand();
+        if (this.clockedMode()) this.clockRise();
+        else if (P.trig === 2 && this.gate) this.stage = 1;              // env retriggered by LFO
+      }
       this.ltri = clamp(this.ltri, -vsat, vsat);
       this.lnoise += (this.rand() - this.lnoise) * 0.02;
       let lfo;
@@ -277,27 +351,29 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // ---- VCO control: summed CV in octaves, expo converter with Vt(T) ----
       if ((this.t & 255) === 0) this.driftT += (this.rand() * 0.6 - this.driftT) * 0.05;
       this.drift += (this.driftT - this.drift) * 0.0005;
-      const lfoAmt = clamp(sm.vcoMod + sm.modwheel * 0.3, 0, 1.3);
-      const octCV = (this.pitch - 69) / 12 + P.range + sm.tune + lfo * lfoAmt + this.drift * P.drift * 0.0125
+      const lfoAmt = clamp(sm.vcoMod + sm.modPush * sm.lfoMod, 0, 2);
+      const octCV = (this.pitch - 69) / 12 + P.range + sm.tune + lfo * lfoAmt * 0.5 + sm.lever * sm.bendVco + this.drift * P.drift * 0.0125
         + clamp(inj[1] * 100e3, -6, 6);
       // matched pair cancels Is; Vt scales the exponent around the trim point (C4)
       const octEff = (octCV + 0.75) * tsc - 0.75;
-      const Ic = 440 * Math.pow(2, octEff) * CT_NOM * VTH * rail;  // amps
+      const Ic = 442 * Math.pow(2, octEff) * CT_NOM * VTH * rail;  // amps
       const dV = (Ic + inj[0]) / C.ct * dto;                      // volts per oversampled tick
       // PW reference voltage (pulse is high while saw > Vpw)
       let duty;
-      if (P.pwmSrc === 0) duty = 0.5 - sm.pw * 0.45 * (lfo + 1) / 2;
-      else if (P.pwmSrc === 1) duty = 0.5 - sm.pw * 0.45;
-      else duty = 0.5 - sm.pw * 0.45 * Math.min(1, env);
+      if (P.pwmSrc === 0) duty = 0.5 - sm.pw * 0.5 * (lfo + 1) / 2;   // PWM 50% .. 0%
+      else if (P.pwmSrc === 1) duty = 0.5 - sm.pw * 0.5;
+      else duty = 0.5 - sm.pw * 0.5 * Math.min(1, env);
       let vpw = VTH * (1 - duty);
             vpw = clamp(vpw + inj[2] * 10e3, 0.05, VTH * 1.2);
+      if (duty <= 0.004) vpw = VTH * 1.2;                           // 0% width: pulse silent
       const disTau = C.rDis * C.ct;
       const fastReset = C.tReset < dto * 0.5;
       const resid = fastReset ? VTH * Math.exp(-C.tReset / disTau) : 0;
       const decay1 = Math.exp(-dto / disTau);
 
       // ---- VCF control: expo converter for Iabc, per-stage cap sets each pole ----
-      const fcOct = sm.cutoff * 9.8 - 5.6                               // relative to 1 kHz-ish
+      const fcOct = sm.cutoff * 10.966 - 6.644                          // 10 Hz .. 20 kHz re 1 kHz
+        + sm.lever * sm.bendVcf * 4
         + env * sm.vcfEnv * 8 + this.accCap * P.accent * 2.5
         + lfo * sm.vcfMod * 3 + (this.pitch - 60) / 12 * sm.kybd
         + clamp(inj[3] * 100e3, -8, 8);

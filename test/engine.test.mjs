@@ -26,19 +26,19 @@ function hz(buf) {
 const finite = (b) => b.every(Number.isFinite);
 const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
 
-// pitch tracks 1 V/oct at the calibration temperature
+// pitch tracks 1 V/oct at the calibration temperature, A4 = 442 Hz like the factory trim
 {
   const [p, send] = make();
   send({ type: 'params', p: { saw: 1, sub: 0, cutoff: 1, reso: 0, vcaMode: 1, kybd: 0, vcfEnv: 0, drift: 0 } });
   for (const n of [48, 60, 69, 81]) {
     send({ type: 'noteOn', n: n + 12 }); const b = render(p, 1); send({ type: 'noteOff', n: n + 12 });
-    const want = 440 * 2 ** ((n - 69) / 12), got = hz(b);
+    const want = 442 * 2 ** ((n - 69) / 12), got = hz(b);
     assert.ok(finite(b));
     assert.ok(Math.abs(1200 * Math.log2(got / want)) < 10, `note ${n}: ${got.toFixed(1)} Hz vs ${want.toFixed(1)}`);
   }
   // heating the expo converter detunes high notes flat
   send({ type: 'bend', b: { tempC: 60 } }); send({ type: 'noteOn', n: 93 });
-  assert.ok(hz(render(p, 1)) < 860, 'hot expo converter should go flat above the trim point');
+  assert.ok(hz(render(p, 1)) < 865, 'hot expo converter should go flat above the trim point');
 }
 // filter self-oscillates at full resonance
 {
@@ -58,5 +58,26 @@ const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
   send({ type: 'bridges', br });
   const b = render(p, 3);
   assert.ok(finite(b), 'bent circuit produced NaN'); assert.ok(peak(b) <= 1);
+}
+// LFO-clocked arpeggiator walks held notes up and down
+{
+  const [p, send] = make(); const seen = [];
+  p.port.postMessage = (m) => { if (m.type === 'arp') seen.push(m.i); };
+  send({ type: 'params', p: { lfoRate: .6 } }); send({ type: 'mode', arp: 2 });
+  for (const n of [60, 64, 67]) send({ type: 'noteOn', n });
+  const b = render(p, 3);
+  assert.ok(finite(b));
+  assert.ok(seen.length > 8, `arp only stepped ${seen.length} times`);
+  assert.deepEqual(seen.slice(0, 6), [0, 1, 2, 1, 0, 1]);
+}
+// 100-step sequencer plays rests and legato steps
+{
+  const [p, send] = make(); const seen = [];
+  p.port.postMessage = (m) => { if (m.type === 's101') seen.push(m.i); };
+  send({ type: 'params', p: { lfoRate: .6 } });
+  send({ type: 'seq101', steps: [{ n: 60 }, { n: 63, l: true }, { r: true }, { n: 67 }] });
+  send({ type: 'mode', seq: 2 });
+  assert.ok(finite(render(p, 2)));
+  assert.deepEqual(seen.slice(0, 6), [0, 1, 2, 3, 0, 1]);
 }
 console.log('engine tests passed');
