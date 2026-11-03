@@ -71,6 +71,7 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 The version shows next to the name at the top of the synth and comes from `package.json`. Bump it there for each release.
 
 - **0.5.0**: preset system and effects brought over from tb303-circuit-model: grouped, searchable preset menu with favourites, prev/next, save/delete, name generator, sound-only loading and export/import; RAT distortion, tempo delay, Lexicon 224 reverb and the Compactor ducking the returns (new FX tab). Installs as an app (install pop-up, offline, full-screen landscape).
+- **0.5.1**: on-screen keyboard removed; the freed space goes to the panels. Notes still come from the computer keyboard and the sequencers.
 - **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
 - **0.3.0**: LCD look; CEM3340 VCO model.
 - **0.2.0**: full SH-101 feature set (arpeggio, 100-step sequencer, bender, transpose) and schematic values from the service manual.
