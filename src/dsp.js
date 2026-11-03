@@ -24,12 +24,20 @@
 const T0 = 300.15;               // calibration temperature (27 C)
 const VT0 = 0.025865;            // thermal voltage at T0
 const CT_NOM = 1e-9;             // VCO timing cap
-const VTH = 5;                   // VCO reset threshold (saw peak)
-const CF_NOM = 10e-9;            // VCF stage caps
-const CE_NOM = 1e-6;             // envelope cap
-const CL_NOM = 1e-6;             // LFO integrator cap
-const ENV_TH = 8;                // envelope attack comparator (V)
-const ENV_SUP = 12;              // envelope charge rail (V)
+// Values marked [SM] are read from the SH-101 service manual schematic (synth board OPH177-2).
+const VTH = 10;                  // CEM3340 saw peak (0..10 V ramp)
+const CF_NOM = 240e-12;          // [SM] IR3109 stage caps C47, C48, C50, C51 = 240 pF
+const OTA_DIV = 68560 / 560;     // [SM] 68k / 560R divider in front of each IR3109 OTA input
+const CE_NOM = 10e-6;            // [SM] envelope timing cap C58 = 10 uF
+const CL_NOM = 0.1e-6;           // [SM] LFO integrator cap C9 = 0.1 uF
+const ENV_SUP = 15;              // envelope charges from the +15 V rail
+const ENV_TH = 15 * 33 / (82 + 33); // [SM] attack comparator from R158 82k / R161 33k divider (~4.3 V)
+const VCF_V_OCT = 0.22;          // [SM] CV summer (R192 33k fb): KYBD via R193 150k -> 0.22 V per octave
+const VCF_ENV_OCT = ENV_TH * (33 / 100) / VCF_V_OCT;  // [SM] ENV via R189 100k: ~6.5 oct at full
+const VCF_MOD_OCT = 5 * (33 / 100) / VCF_V_OCT;       // [SM] MOD via R191 100k: LFO +-5 V -> +-7.5 oct
+const VCO_TC = 0.1;              // CEM3340 is temperature compensated on chip: ~10% residual
+const VCF_TC = 0.15;             // [SM] SDT-1000 thermistor (TH1) compensates the IR3109 expo
+const RES_DIODE = 1.6;           // [SM] D30/D31 clamp in the resonance loop (normalised OTA units)
 
 const NODES = ['SAW', 'PULSE', 'SUB', 'NOISE', 'LFOTRI', 'LFOSQ', 'ENVCAP', 'VCF2', 'VCFOUT', 'VCAOUT', 'FINGER'];
 const INJ = ['VCOCAP', 'VCOCV', 'PWREF', 'VCFCV', 'VCFIN', 'VCFC2', 'ENVCAP', 'LFOINT', 'VCACV'];
@@ -66,7 +74,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.C = {
       ct: CT_NOM, tReset: 0.5e-6, rDis: 50, cf: [CF_NOM, CF_NOM, CF_NOM, CF_NOM],
       fbInv: 0, otaOff: 0, ce: CE_NOM, envTh: ENV_TH, hys: 5, cl: CL_NOM,
-      tempC: 27, vBatt: 9, rBatt: 0.4,
+      tempC: 27, vBatt: 9, rBatt: 0.9,
     };
     this.sm = { cutoff: 0.35, reso: 0.6, saw: 0.8, pulse: 0, sub: 0.4, noise: 0, pw: 0.3, level: 0.7, drive: 0.4, vcfEnv: 0.5, vcfMod: 0, kybd: 0.5, vcoMod: 0, lever: 0, modPush: 0, bendVco: 0.3, bendVcf: 0, lfoMod: 0.3, tune: 0, tempC: 27, vBatt: 9 };
     this.smc = 1 - Math.exp(-8 / (0.01 * fs));
@@ -280,7 +288,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const accUp = 1 - Math.exp(-1 / (0.02 * fs)), accDn = 1 - Math.exp(-1 / (0.15 * fs));
     const gateC = 1 - Math.exp(-1 / (0.0015 * fs));
     const loadC = 1 - Math.exp(-1 / (0.05 * fs));
-    const eA = 1 - Math.exp(-dt / (P.att / (1.0986 * CE_NOM) * C.ce));
+    const eA = 1 - Math.exp(-dt / (P.att / (Math.log(ENV_SUP / (ENV_SUP - ENV_TH)) * CE_NOM) * C.ce));
     const eD = 1 - Math.exp(-dt / (P.dec / (4 * CE_NOM) * C.ce));
     const eR = 1 - Math.exp(-dt / (P.rel / (4 * CE_NOM) * C.ce));
 
@@ -293,9 +301,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
       if ((this.t & 7) === 0) { for (const k in sm) sm[k] += ((k in P ? P[k] : C[k]) - sm[k]) * smc; }
 
       // ---- power supply: battery -> internal R -> regulator with ~1.2 V dropout ----
-      this.load += (0.15 + Math.abs(this.out) * 0.6 + this.ve * 0.03 - this.load) * loadC;
+      this.load += (0.11 + Math.abs(this.out) * 0.08 + this.ve * 0.004 - this.load) * loadC; // amps (~1 W total)
       const vIn = sm.vBatt - this.load * C.rBatt;
-      this.rail = clamp((vIn - 1.2) / 7.0, 0.05, 1);   // 1.0 = regulated (needs >= 8.2 V in)
+      this.rail = clamp((vIn - 0.6) / 5.4, 0.05, 1);   // [SM] DC/DC converter holds the rails down to ~6 V in
       const rail = this.rail;
       const Tk = 273.15 + sm.tempC, tsc = T0 / Tk;
 
@@ -355,7 +363,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const octCV = (this.pitch - 69) / 12 + P.range + sm.tune + lfo * lfoAmt * 0.5 + sm.lever * sm.bendVco + this.drift * P.drift * 0.0125
         + clamp(inj[1] * 100e3, -6, 6);
       // matched pair cancels Is; Vt scales the exponent around the trim point (C4)
-      const octEff = (octCV + 0.75) * tsc - 0.75;
+      const octEff = (octCV + 0.75) * (1 + (tsc - 1) * VCO_TC) - 0.75;
       const Ic = 442 * Math.pow(2, octEff) * CT_NOM * VTH * rail;  // amps
       const dV = (Ic + inj[0]) / C.ct * dto;                      // volts per oversampled tick
       // PW reference voltage (pulse is high while saw > Vpw)
@@ -374,15 +382,16 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // ---- VCF control: expo converter for Iabc, per-stage cap sets each pole ----
       const fcOct = sm.cutoff * 10.966 - 6.644                          // 10 Hz .. 20 kHz re 1 kHz
         + sm.lever * sm.bendVcf * 4
-        + env * sm.vcfEnv * 8 + this.accCap * P.accent * 2.5
-        + lfo * sm.vcfMod * 3 + (this.pitch - 60) / 12 * sm.kybd
+        + env * sm.vcfEnv * VCF_ENV_OCT + this.accCap * P.accent * 2.5
+        + lfo * ((Math.pow(10, 2 * sm.vcfMod) - 1) / 99) * VCF_MOD_OCT   // MOD pot is audio taper (100kA)
+        + (this.pitch - 60) / 12 * sm.kybd
         + clamp(inj[3] * 100e3, -8, 8);
-      const fcBase = 1000 * Math.pow(2, fcOct * tsc) * rail;
+      const fcBase = 1000 * Math.pow(2, fcOct * (1 + (tsc - 1) * VCF_TC)) * rail;
       if ((this.t & 1) === 0 || Math.abs(fcBase - this.fcLast) > this.fcLast * 0.02) {
         this.fcLast = fcBase;
         for (let i = 0; i < 4; i++) { const w = Math.PI * Math.min(fcBase * CF_NOM / C.cf[i], fso * 0.45) / fso; g[i] = w < 0.3 ? w * (1 + w * w * (1 / 3 + w * w * 2 / 15)) : Math.tan(w); }
       }
-      const k = sm.reso * 4.3 * (C.fbInv ? -1 : 1);
+      const k0 = sm.reso * 4.3 * (C.fbInv ? -1 : 1);
       const att = 0.004 + sm.drive * 0.03;                               // input divider into OTA
       const offN = C.otaOff / (2 * VT0);
       const c2inj = inj[5] * dto / (C.cf[1] * 2 * VT0) * 2;
@@ -451,7 +460,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
         this.pink = this.pink * 0.7 + this.rand() * 0.3;
 
         // ===== mixer: inverting summer, rails, coupling cap =====
-        let mix = (outSaw - 2.5) * lvSaw + (outPul - 2.5) * lvPul + (outSub - vdd * 0.5) * lvSub + this.pink * 3 * lvNoi;
+        let mix = (outSaw - VTH / 2) * 0.5 * lvSaw + (outPul - 2.5) * lvPul + (outSub - vdd * 0.5) * lvSub + this.pink * 3 * lvNoi;
         mix = railV * tanh(-mix / railV);
         const hp = mix - this.hpx + 0.9997 * this.hpy; this.hpx = mix; this.hpy = hp;
 
@@ -461,6 +470,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
         const a0 = G0 / (1 + G0), a1 = G1 / (1 + G1), a2 = G2 / (1 + G2), a3 = G3 / (1 + G3);
         const b0 = s[0] / (1 + G0), b1 = s[1] / (1 + G1), b2 = s[2] / (1 + G2), b3 = s[3] / (1 + G3);
         const A = a0 * a1 * a2 * a3, B = ((b0 * a1 + b1) * a2 + b2) * a3 + b3;
+        const y4p = this.y4, kd = Math.abs(y4p) < 1e-4 ? 1 : RES_DIODE * tanh(y4p / RES_DIODE) / y4p;
+        const k = k0 * kd;                                   // diode-limited resonance feedback
         const y4e = (A * xin + B) / (1 + k * A);
         const x0 = xin - k * y4e;
         const y1 = a0 * x0 + b0, y2 = a1 * y1 + b1, y3 = a2 * y2 + b2, y4 = a3 * y3 + b3;
@@ -482,7 +493,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // node voltages for bend bridges (volts)
       node[0] = this.oSaw; node[1] = this.oPul; node[2] = this.oSub; node[3] = this.pink;
       node[4] = this.ltri; node[5] = this.lsq * vsat; node[6] = this.ve;
-      node[7] = this.y2 * 2 * VT0 * 20; node[8] = this.y4 * 2 * VT0 * 20; node[9] = this.out * 4;
+      node[7] = this.y2 * 2 * VT0 * OTA_DIV; node[8] = this.y4 * 2 * VT0 * OTA_DIV; node[9] = this.out * 4;
       this.humPh += 50 / fs; if (this.humPh >= 1) this.humPh -= 1;
       node[10] = 0.4 * Math.sin(2 * Math.PI * this.humPh) + 0.12 * Math.sin(6 * Math.PI * this.humPh) + this.rand() * 0.05;
 
