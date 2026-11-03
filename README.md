@@ -65,3 +65,12 @@ A piano roll (modelled on tb303-circuit-model) of up to 64 steps: octave lanes, 
 npm test        # runs the engine headless in Node: pitch tracking, self-oscillation, stability under heavy bending
 npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 ```
+
+## Versions
+
+The version shows next to the name at the top of the synth and comes from `package.json`; each release is tagged in git.
+
+- **0.4.0**: piano-roll sequencer (up to 64 steps), tabbed panels, phones lock to landscape and the whole synth fits one screen on a Pixel 9a (915 x 412). VCA input level now taken from the schematic (R130 150k / R139 1k). Full check against the high-res service manual.
+- **0.3.0**: LCD look; CEM3340 VCO model.
+- **0.2.0**: full SH-101 feature set (arpeggio, 100-step sequencer, bender, transpose) and schematic values from the service manual.
+- **0.1.0**: first circuit-modelled build with the bend board and 303-style sequencer.

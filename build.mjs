@@ -3,7 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const ui = readFileSync(new URL('./src/ui.html', import.meta.url), 'utf8');
 const dsp = readFileSync(new URL('./src/dsp.js', import.meta.url), 'utf8');
 if (dsp.includes('</script')) throw new Error('dsp.js must not contain a closing script tag');
-const body = ui.replace('/*DSP*/', () => dsp);
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const body = ui.replace('/*DSP*/', () => dsp).replaceAll('__VERSION__', version);
 const page = `<!doctype html>
 <html lang="en">
 <head>
@@ -16,4 +17,4 @@ ${body}
 </html>
 `;
 writeFileSync(new URL('./index.html', import.meta.url), page);
-console.log('wrote index.html', page.length, 'bytes');
+console.log('wrote index.html', 'v' + version, page.length, 'bytes');
