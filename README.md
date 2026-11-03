@@ -57,7 +57,7 @@ Bender travel (±12 semitones and ±4 octaves at full) is an assumption; the man
 
 ## 303-style sequencer
 
-16 steps with note, octave, tie, rest, accent and slide, plus swing and gate length. Sequencing runs inside the audio thread, so it is sample-accurate. While it runs, keys transpose the pattern.
+A piano roll (modelled on tb303-circuit-model) of up to 64 steps: octave lanes, key rows, tie, slide and accent, with length, gate, swing, shift and transpose steppers. Phones lock to landscape. Sequencing runs inside the audio thread, so it is sample-accurate. While it runs, keys transpose the pattern.
 
 ## Develop
 
