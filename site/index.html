@@ -271,7 +271,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .sq-side { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) calc(var(--gap) + 6px); }
 .acts { display: flex; gap: var(--gap-s); }
 .rnd { display: flex; align-items: center; gap: var(--gap-s) var(--gap); padding-left: calc(var(--gap) + 6px); border-left: var(--rule); }
-.rnd .acts button { min-width: 3em; }
+.rnd .acts button { min-width: 0; padding: 0 6px; text-transform: uppercase; }
 .rnd-lab { text-transform: lowercase; margin-left: 6px; }
 .sq-msg { flex: 1 1 200px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; }
 .sq-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
@@ -392,7 +392,7 @@ body > .hint { display: none; }
   .br-depth { grid-template-columns: auto 90px 2.2em; }
   .sld input::-webkit-slider-runnable-track { height: 9px; } .sld input::-webkit-slider-thumb { width: 9px; height: 16px; margin-top: -5px; }
   .rnd { padding-left: 10px; }
-  .rnd .acts button { min-width: 2.6em; }
+  .rnd .acts button { min-width: 0; padding: 0 4px; }
   .slots button::after { top: -6px; right: -4px; font-size: 9px; }
   .roll { grid-template-columns: 30px repeat(var(--steps, 32), minmax(0, 1fr)); }
   .roll .rh { padding-left: 3px; }
@@ -476,18 +476,18 @@ body > .hint { display: none; }
             <label class="sld rnd-depth" title="How much Randomise and Alter change: Randomise re-deals that share of steps, Alter flips a few (about half as many)"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
             <span class="rnd-lab">rnd</span>
             <div class="acts">
-              <button id="r-oct" title="Randomise octaves only; notes stay">oct</button>
-              <button id="r-slide" title="Randomise slides only">slide</button>
               <button id="r-acc" title="Randomise accents only">acc</button>
+              <button id="r-slide" title="Randomise slides only">sld</button>
+              <button id="r-oct" title="Randomise octaves only; notes stay">oct</button>
               <button id="r-tie" title="Randomise ties only; press again for another set">tie</button>
             </div>
           </div>
           <div class="rnd alt" role="group" aria-label="Alter one row">
             <span class="rnd-lab">alter</span>
             <div class="acts">
-              <button id="a-oct" title="Alter a few octaves: nudge some notes up or down one octave">oct</button>
-              <button id="a-slide" title="Alter a few slides: flip some on or off">slide</button>
               <button id="a-acc" title="Alter a few accents: flip some on or off">acc</button>
+              <button id="a-slide" title="Alter a few slides: flip some on or off">sld</button>
+              <button id="a-oct" title="Alter a few octaves: nudge some notes up or down one octave">oct</button>
               <button id="a-tie" title="Alter a few ties: flip some on or off">tie</button>
             </div>
           </div>
