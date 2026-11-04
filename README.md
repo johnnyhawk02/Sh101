@@ -37,3 +37,11 @@ The component values are typical for these circuit topologies. They have not yet
 npm test        # runs the engine headless in Node: pitch tracking, self-oscillation, stability under heavy bending
 npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 ```
+
+## Live app (Shyoy)
+
+`site/` holds the current Shyoy build (v0.9.5), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+
+```
+npx wrangler pages deploy site --project-name shyoy --branch main
+```
