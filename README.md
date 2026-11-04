@@ -40,11 +40,17 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.10.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.11.1), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Buchla 259 folder level and folding (v0.11.1)
+
+The folder had the same fault the TB-303 app fixed in its v89: below the first fold the 259 curve has a gain of 5, so Timbre mostly made quiet signals louder (+20 dB from Timbre 0 to 1 on the Kestrel) while only each note's loudest part folded. Ported the 303 app's fix around the unchanged circuit maths: a peak follower on the folder input (instant attack, 200 ms release, 5 mV floor) scales every note to Timbre's depth at the cells and puts its envelope back on the output, the curve's rest value f(off) is subtracted so Symmetry leaves no DC thump, and the output is level-compensated from the curve's small-signal gain and peak swing.
+
+The compensation was re-fitted to the Kestrel rather than copied: `norm = taper(Level) * 4.2 / ((5 * gain)^0.32 * pk^0.19)` (the 303 uses 6.7 / ((5 * gain)^0.3 * pk^0.7)). Measured on three patterns (decaying, sustained, low octave) at Symmetry 0, 0.5 and 1, Level at noon, the output stays within ±2.9 dB of the dry synth across Timbre (it was -4.7 to +16.1 dB), and brightness rises from about 355 to 840 Hz on the default pattern (it was 351 to 435 Hz). Silence in gives silence out at every setting, no NaN, CPU unchanged.
 
 ### Compactor (v0.10.0)
 
