@@ -261,7 +261,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .fxrow { flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; align-content: stretch; gap: var(--gap); }
 .fxu { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s); border: var(--bw) solid var(--ink); border-radius: calc(var(--r) + 1px); opacity: .55; }
 .fxu.on { opacity: 1; }
-.fxu:nth-child(3) { order: 4; flex-basis: 100%; }   /* lexicon gets its own row: rat, delay and compactor share the first */
+.fxu.rv { order: 4; flex-basis: 100%; }   /* the reverb slot gets its own row: folder, drive, delay and compactor share the first */
 .fxu .ctrls, .mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
 .fxu .fxh { justify-content: flex-start; padding-left: 3px; }
 .fxu .fxh b { font-weight: 400; }
@@ -441,7 +441,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.10.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.11.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -465,7 +465,7 @@ body > .hint { display: none; }
         <div class="menu-pop" id="menuPop" role="menu" hidden>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.10.0</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.11.0</span>
         </div>
       </div>
     </div>
@@ -1326,9 +1326,189 @@ class Compactor {
   }
 }
 
-// The chain after the Kestrel's output stage: RAT in series, then the 224 and the delay as parallel returns,
-// both ducked by the Compactor keyed from the dry synth, then a soft clip. Same order as the 303 app.
+// ---------------------------------------------------------------------------
+// Three more units from published schematics (Shyoy v0.11.0): a Boss DS-1 and an Ibanez TS808 Tube Screamer on the
+// drive slot beside the RAT, and the Buchla 259 timbre wavefolder ahead of it. Part values are from ElectroSmash's
+// circuit analyses (electrosmash.com/boss-ds1-analysis, /tube-screamer-analysis) and from Esqueda, Pöntynen,
+// Välimäki & Parker, "Virtual Analog Buchla 259 Wavefolder" (DAFx-17). Each runs at 4x the host rate like the RAT,
+// with the RAT's 22 kHz decimation filter and 5 Hz DC block. Input is taken as volts, as for the RAT.
+const DIODE_1N4148 = { Is: 2.52e-9, n: 1.752 }; // 1N4148 / 1N914 SPICE values
+const PEDAL_PARTS = {
+  // Boss DS-1 (ElectroSmash part list, "DS1-A")
+  DS_C3: 47e-9, DS_R5: 100e3,            // booster input HPF, 33 Hz
+  DS_GAIN: 56, DS_R7: 470e3, DS_C4: 250e-12, // Q2 2SC2240: 10k/22R with R7||C4 collector-base feedback, 35 dB
+  DS_VC: 5.8, DS_VSAT: 0.3,              // Q2 collector bias and saturation, on a 9 V rail
+  DS_C5: 68e-9, DS_R10: 100e3,           // op-amp input HPF, 23 Hz
+  DS_R13: 4.7e3, DS_C8: 0.47e-6, DS_VR1: 100e3, DS_C7: 100e-12, // gain 1 + VR1/(R13 + 1/sC8), C7 across VR1
+  DS_OPHI: 3.0, DS_OPLO: 4.3,            // NJM2904 output swing about the 4.5 V bias (not rail to rail)
+  DS_R14: 2.2e3, DS_C10: 10e-9,          // series R into D4/D5 1N4148 to AC ground, with C10 across them
+  DS_R16: 6.8e3, DS_C12: 0.1e-6,         // tone LPF, 234 Hz
+  DS_C11: 22e-9, DS_R17: 6.8e3,          // tone HPF, 1063 Hz
+  // Ibanez TS808 (ElectroSmash)
+  TS_C2: 1e-6, TS_R5: 10e3,              // input coupling to the 4.5 V bias, 16 Hz
+  TS_R4: 4.7e3, TS_C3: 47e-9,            // gain leg to the bias, 720 Hz
+  TS_R6: 51e3, TS_P1: 500e3, TS_C4: 51e-12, // feedback: R6 + Drive (500k log) || C4 || D1/D2
+  TS_RAIL: 3.5,                          // JRC4558 swing about 4.5 V
+  TS_R7: 1e3, TS_C5: 0.22e-6,            // passive LPF, 723 Hz
+  TS_P2: 20e3, TS_R8: 220, TS_C6: 0.22e-6, TS_RF: 1e3, // tone: wiper to ground through 220R + 0.22u, 1k feedback
+  // Buchla 259 (DAFx-17, Table 1): [R1, R2, R3] per folding cell, Vs = 6 V CA3160 rails
+  B259_VS: 6,
+  B259_CELLS: [[10e3, 100e3, 100e3], [49.9e3, 100e3, 43.2e3], [91e3, 100e3, 56e3], [30e3, 100e3, 68e3], [68e3, 100e3, 33e3]],
+  B259_W: [-12.000, -27.777, -21.428, 17.647, 36.363], B259_WIN: 5.000, // mixer weights, Eq. 18
+  B259_RF2: 1.2e6, B259_C: 100e-12,      // output pole, 1.33 kHz
+};
+const PEDAL_OS = 4; // 4x the host rate, as the RAT
+
+// shared by the three: linear upsampling, a third-order 22 kHz Butterworth down filter and a DC block
+class OsUnit {
+  constructor(fs) {
+    this.fs = fs; this.fo = fs * PEDAL_OS; this.dt = 1 / this.fo; this.xp = 0; this.dco = 0; this.dci = 0;
+    const w = 2 * Math.PI * 22000 / this.fo, cs = Math.cos(w);
+    this.lp = [0.5176, 0.7071, 1.9319].map(Q => { const al = Math.sin(w) / (2 * Q), a0 = 1 + al; return { b0: (1 - cs) / 2 / a0, b1: (1 - cs) / a0, b2: (1 - cs) / 2 / a0, a1: -2 * cs / a0, a2: (1 - al) / a0, x1: 0, x2: 0, y1: 0, y2: 0 }; });
+    this.dcA = Math.exp(-2 * Math.PI * 5 / fs);
+  }
+  e(tau) { return Math.exp(-this.dt / Math.max(tau, 1e-12)); } // one-pole coefficient for a time constant
+  run(x) {
+    const x0 = this.xp; this.xp = x; let y = 0;
+    for (let i = 1; i <= PEDAL_OS; i++) {
+      let z = this.core(x0 + (x - x0) * (i / PEDAL_OS));
+      for (const q of this.lp) { const o = q.b0 * z + q.b1 * q.x1 + q.b2 * q.x2 - q.a1 * q.y1 - q.a2 * q.y2; q.x2 = q.x1; q.x1 = z; q.y2 = q.y1; q.y1 = o; z = o; }
+      y = z;
+    }
+    this.dco = this.dcA * (this.dco + y - this.dci); this.dci = y;
+    return this.dco;
+  }
+}
+// implicit (backward Euler) node with a 1N4148 pair to ground: solves g(w - v) + i0 = C(v - vp)/dt + 2 Is sinh(v/nVt)
+// for v by the RAT's safeguarded Newton (bracketed, bisects when a step would leave the bracket).
+// gw: conductance times drive voltage plus any injected current; G: total linear conductance to the node
+function diodeNode(gw, G, vp, Is, nVt) {
+  const lin = gw / G; // the root lies between 0 and the diodes-off solution
+  let lo = lin < 0 ? lin : 0, hi = lin < 0 ? 0 : lin, v = Math.min(hi, Math.max(lo, vp));
+  for (let i = 0; i < 40; i++) {
+    const t = Math.min(Math.max(v / nVt, -80), 80), ex = Math.exp(t), ei = 1 / ex;
+    const f = gw - G * v - Is * (ex - ei), df = -G - Is * (ex + ei) / nVt;
+    if (f > 0) lo = v; else hi = v;
+    let nv = v - f / df;
+    if (!(nv > lo && nv < hi)) nv = 0.5 * (lo + hi);
+    const dv = nv - v; v = nv;
+    if (dv < 1e-7 && dv > -1e-7) break;
+  }
+  return v;
+}
+// smooth limit into [-lo, hi] (a transistor or op-amp running into its rails)
+const softRail = (v, hi, lo) => v > 0 ? hi * Math.tanh(v / hi) : lo * Math.tanh(v / lo);
+
+// Boss DS-1: Q2 booster, op-amp gain stage, R14 into a diode pair to ground with C10, the Big Muff-style tone, level
+class BossDS1 extends OsUnit {
+  constructor(fs) { super(fs); this.s = { h0: 0, x0: 0, b: 0, h1: 0, x1: 0, hl: 0, xl: 0, vf: 0, v: 0, lp: 0, hp: 0, xh: 0 }; }
+  derive(k) {
+    const c = PEDAL_PARTS;
+    this.aIn = this.e(c.DS_C3 * c.DS_R5);
+    this.aB = this.e(c.DS_R7 * c.DS_C4);
+    this.aOp = this.e(c.DS_C5 * c.DS_R10);
+    this.aLeg = this.e(c.DS_R13 * c.DS_C8);
+    this.vr1 = c.DS_VR1 * k.dsdist + 1;                 // VR1 100KB, linear
+    this.aF = this.e(this.vr1 * c.DS_C7);
+    this.gC = 1 / c.DS_R14; this.cdt = c.DS_C10 / this.dt;
+    this.aLp = this.e(c.DS_R16 * c.DS_C12); this.aHp = this.e(c.DS_C11 * c.DS_R17);
+    this.tone = k.dstone;                               // VR3 20KB: LPF output at 0, HPF output at full
+    this.level = audioTaper(k.dslevel) * 12;            // VR2 100KB into the output buffer; set so it sits as loud as the RAT
+    this.nVt = DIODE_1N4148.n * FX_VT;
+  }
+  core(x) {
+    const s = this.s, c = PEDAL_PARTS;
+    s.h0 = this.aIn * (s.h0 + x - s.x0); s.x0 = x;                 // C3/R5 into Q2's base
+    const tb = -c.DS_GAIN * s.h0;                                  // inverting common emitter, 35 dB
+    s.b = tb + this.aB * (s.b - tb);                               // R7 || C4 feedback rolls off the top
+    const q = softRail(s.b, 9 - c.DS_VC, c.DS_VC - c.DS_VSAT);     // collector swings between the 9 V rail and saturation
+    s.h1 = this.aOp * (s.h1 + q - s.x1); s.x1 = q;                 // C5/R10 to the op-amp + input
+    const u = s.h1;
+    s.hl = this.aLeg * (s.hl + u - s.xl); s.xl = u;                // gain leg R13 + C8: current = hl / R13
+    const vf = s.hl / c.DS_R13 * this.vr1;                         // across VR1, with C7 in parallel
+    s.vf = vf + this.aF * (s.vf - vf);
+    const o = softRail(u + s.vf, c.DS_OPHI, c.DS_OPLO);
+    s.v = diodeNode(this.gC * o + this.cdt * s.v, this.gC + this.cdt, s.v, DIODE_1N4148.Is, this.nVt); // R14, C10, D4/D5
+    s.lp = s.v + this.aLp * (s.lp - s.v);                          // R16/C12
+    s.hp = this.aHp * (s.hp + s.v - s.xh); s.xh = s.v;             // C11/R17
+    return ((1 - this.tone) * s.lp + this.tone * s.hp) * this.level;
+  }
+}
+
+// Ibanez TS808: non-inverting clipping amp with D1/D2 in the feedback, R7/C5, the active tone stage, level
+class TubeScreamer extends OsUnit {
+  constructor(fs) { super(fs); this.s = { h0: 0, x0: 0, hl: 0, xl: 0, vf: 0, z1: 0, z2: 0, w1: 0, w2: 0 }; }
+  derive(k) {
+    const c = PEDAL_PARTS, fo = this.fo;
+    this.aIn = this.e(c.TS_C2 * c.TS_R5);
+    this.aLeg = this.e(c.TS_R4 * c.TS_C3);
+    this.rf = c.TS_R6 + c.TS_P1 * audioTaper(k.tsdrive); // Drive 500k log
+    this.gF = 1 / this.rf; this.cdt = c.TS_C4 / this.dt;
+    this.nVt = DIODE_1N4148.n * FX_VT;
+    // R7/C5 into the second op-amp (+), the tone pot between its (+) and (-) inputs, the wiper to ground through R8 + C6,
+    // RF from the output to (-). With the inputs at one voltage the two pot halves Ra (+ side) and Rb (- side) share the
+    // wiper current: the Ra part loads the (+) node, the Rb part comes through RF and lifts the output. Solved in s:
+    //   H(s) = (1 + s C6 (Rs + kb RF)) / ((1 + s C5 R7)(1 + s C6 Rs) + ka s C6 R7),  Rs = Ra || Rb + R8,
+    //   ka = Rb / P2, kb = Ra / P2.  Tone at 0 (bass end, Ra = 0) adds a low-pass; at full (Rb = 0) a treble shelf.
+    const t = Math.min(0.999, Math.max(0.001, k.tstone)), Ra = c.TS_P2 * t, Rb = c.TS_P2 * (1 - t);
+    const Rs = Ra * Rb / (Ra + Rb) + c.TS_R8, ka = Rb / c.TS_P2, kb = Ra / c.TS_P2;
+    const R7 = c.TS_R7, C5 = c.TS_C5, C6 = c.TS_C6;
+    const n0 = 1, n1 = C6 * (Rs + kb * c.TS_RF), n2 = 0;
+    const d0 = 1, d1 = C5 * R7 + C6 * Rs + ka * C6 * R7, d2 = C5 * R7 * C6 * Rs;
+    const K = 2 * fo, K2 = K * K, a0 = d0 + d1 * K + d2 * K2; // bilinear
+    this.tb = [(n0 + n1 * K + n2 * K2) / a0, (2 * n0 - 2 * n2 * K2) / a0, (n0 - n1 * K + n2 * K2) / a0];
+    this.ta = [(2 * d0 - 2 * d2 * K2) / a0, (d0 - d1 * K + d2 * K2) / a0];
+    this.level = audioTaper(k.tslevel) * 9;             // Level 100k into the output buffer; set so it sits as loud as the RAT
+  }
+  core(x) {
+    const s = this.s, c = PEDAL_PARTS;
+    s.h0 = this.aIn * (s.h0 + x - s.x0); s.x0 = x;                 // C2/R5
+    const u = s.h0;
+    s.hl = this.aLeg * (s.hl + u - s.xl); s.xl = u;                // R4 + C3: the leg current is hl / R4
+    const i = s.hl / c.TS_R4;                                      // ...and all of it flows through the feedback network
+    s.vf = diodeNode(i + this.cdt * s.vf, this.gF + this.cdt, s.vf, DIODE_1N4148.Is, this.nVt); // (R6 + Drive) || C4 || D1/D2
+    const o = softRail(u + s.vf, c.TS_RAIL, c.TS_RAIL);
+    const b = this.tb, a = this.ta;                                 // tone stage, transposed direct form II
+    const y = b[0] * o + s.z1; s.z1 = b[1] * o - a[0] * y + s.z2; s.z2 = b[2] * o - a[1] * y;
+    return y * this.level;
+  }
+}
+
+// Buchla 259 timbre circuit: five CA3160 folding cells and a direct path summed (Eq. 18), then RF2·C (1.33 kHz).
+// Timbre is the input gain into the cells (the paper sweeps 0..10 V peak); Symmetry adds a DC offset ahead of them,
+// as the 259's own Symmetry control does. First-order antiderivative anti-aliasing on top of the 4x oversampling.
+class Buchla259 extends OsUnit {
+  constructor(fs) {
+    super(fs); this.s = { xa: 0, Fa: 0, y: 0 };
+    const c = PEDAL_PARTS, Vs = c.B259_VS;
+    // cell k: 0 inside |v| <= T, else a v - b sgn(v) (continuous, a T = b); weights folded in, plus the direct path
+    this.cells = c.B259_CELLS.map(([R1, R2, R3], i) => {
+      const D = R1 * R3 + R2 * R3 + R1 * R2, a = R2 * R3 / D, b = R1 * R3 * Vs / D, T = R1 / R2 * Vs, w = c.B259_W[i];
+      return { T, a: w * a, b: w * b, C: w * (a * T * T / 2 - b * T) };
+    });
+  }
+  f(v) { let y = PEDAL_PARTS.B259_WIN * v; for (const q of this.cells) { const m = v < 0 ? -v : v; if (m > q.T) y += q.a * v - (v < 0 ? -q.b : q.b); } return y; }
+  F(v) { let y = 0.5 * PEDAL_PARTS.B259_WIN * v * v; for (const q of this.cells) { const m = v < 0 ? -v : v; if (m > q.T) y += q.a * v * v / 2 - q.b * m - q.C; } return y; }
+  derive(k) {
+    const c = PEDAL_PARTS;
+    this.gain = 0.5 + 9.5 * k.fldtimbre * k.fldtimbre;  // 0.5 .. 10 V per volt in
+    this.off = (k.fldsym - 0.5) * 4;                     // ±2 V
+    this.aOut = this.e(c.B259_RF2 * c.B259_C);
+    this.level = audioTaper(k.fldlevel) * 1.7;          // the folder holds its own output near 1.5 V, so no gain tracking needed
+  }
+  core(x) {
+    const s = this.s, v = x * this.gain + this.off, Fv = this.F(v), d = v - s.xa;
+    const y = (d > 1e-6 || d < -1e-6) ? (Fv - s.Fa) / d : this.f(0.5 * (v + s.xa));
+    s.xa = v; s.Fa = Fv;
+    s.y = y + this.aOut * (s.y - y);                               // RF2 with C, 1.33 kHz
+    return s.y * this.level;
+  }
+}
+
+// The chain after the Kestrel's output stage: the Buchla 259 folder, then the drive slot (RAT, DS-1 or TS808) in series,
+// then the 224 and the delay as parallel returns, both ducked by the Compactor keyed from the dry synth, then a soft clip.
 const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
+  drvtype: 0, dsdist: 0.5, dstone: 0.5, dslevel: 0.5, tsdrive: 0.5, tstone: 0.5, tslevel: 0.5, fldtimbre: 0.5, fldsym: 0.5, fldlevel: 0.5,
   lexprog: 0.125, lexbass: 0.3, lexmid: 0.27, lexxover: 0.443, lextreble: 0.834, lexdepth: 0.5, lexdiff: 0.55, lexpre: 0.2, lexme: 0.5, lexpitch: 0.2, lexmix: 0.5,
   revtype: 0, plateprog: 0.5, platepre: 0.2, platedecay: 0.45, platedamp: 0.6, platebw: 0.75, platelo: 0.35, platediff: 0.88, platemod: 0.5, platemix: 0.5,
   sprprog: 2 / 3, sprdwell: 0.4, sprdecay: 0.5, sprtension: 0.5, sprtone: 0.5, sprlo: 0.4, sprmix: 0.5,
@@ -1338,7 +1518,8 @@ const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
 class FxChain {
   constructor(fs) {
     this.fs = fs; this.c = { ...FX_PARTS }; this.knobs = { ...FX_KNOB_DEFS };
-    this.fx = { rat: false, lex: false, dly: false }; this.bpm = 120;
+    this.fx = { rat: false, lex: false, dly: false, fold: false }; this.bpm = 120;
+    this.ds = new BossDS1(fs); this.ts = new TubeScreamer(fs); this.b259 = new Buchla259(fs); this.drvT = 0;
     this.lex = new Lexicon224(fs); this.dly = new DigitalDelay(fs);
     this.plate = new DattorroPlate(fs); this.spring = new SpringReverb(fs); this.conv = new ConvReverb(fs); this.revT = 0; this.cmp = new Compactor(fs);
     this.rt = { hin: 0, xin: 0, h1: 0, h2: 0, x1: 0, fb: 0, y: 0, hc: 0, xc: 0, v: 0, f: 0, xp: 0, dco: 0, dci: 0 };
@@ -1351,6 +1532,8 @@ class FxChain {
   derive() {
     const c = this.c, k = this.knobs;
     this.cmp.derive(k); this.dly.derive(k, this.bpm);
+    this.ds.derive(k); this.ts.derive(k); this.b259.derive(k);
+    this.drvT = Math.max(0, Math.min(2, Math.round((k.drvtype || 0) * 2))); // drive slot: 0 = RAT, 1 = DS-1, 2 = TS808
     // RAT runs at RAT_OS x 2 the host rate here (the 303 voice is already 2x oversampled)
     const fs = this.fs * 2 * RAT_OS, e = (tau) => Math.exp(-1 / (Math.max(tau, 1e-12) * fs));
     this.ratN2 = 2 * RAT_OS;
@@ -1426,7 +1609,9 @@ class FxChain {
   }
   // one host-rate sample in; sets this.L / this.R
   run(x) {
-    let y = this.fx.rat ? 0.95 * Math.tanh(this._rat(x) / 0.95) : x;
+    if (this.fx.fold) x = this.b259.run(x);
+    let y = x;
+    if (this.fx.rat) { const d = this.drvT === 1 ? this.ds.run(x) : this.drvT === 2 ? this.ts.run(x) : this._rat(x); y = 0.95 * Math.tanh(d / 0.95); }
     if (!(this.fx.lex || this.fx.dly)) { this.L = this.R = y; return; }
     let wl = 0, wr = 0;
     if (this.fx.lex) { const r = this.rev; r.run(y); wl += r.wet * r.L; wr += r.wet * r.R; }
@@ -1435,9 +1620,9 @@ class FxChain {
     this.L = 0.98 * Math.tanh((y + this.cmp.l * g) / 0.98);
     this.R = 0.98 * Math.tanh((y + this.cmp.r * g) / 0.98);
   }
-  flush() { fxFlushTiny(this, 0); fxFlushTiny(this.lex, 0); fxFlushTiny(this.plate, 0); fxFlushTiny(this.spring, 0); fxFlushTiny(this.conv, 0); fxFlushTiny(this.dly, 0); fxFlushTiny(this.cmp, 0); }
+  flush() { fxFlushTiny(this, 0); fxFlushTiny(this.lex, 0); fxFlushTiny(this.plate, 0); fxFlushTiny(this.spring, 0); fxFlushTiny(this.conv, 0); fxFlushTiny(this.dly, 0); fxFlushTiny(this.cmp, 0); fxFlushTiny(this.ds.s, 0); fxFlushTiny(this.ts.s, 0); fxFlushTiny(this.b259.s, 0); }
 }
-const FX_FLUSH_SKIP = new Set(['c', 'knobs', 'fx', 'lex', 'plate', 'spring', 'conv', 'mem', 'buf', 'bufR', 'L', 'R', 'dly', 'cmp']);
+const FX_FLUSH_SKIP = new Set(['c', 'knobs', 'fx', 'lex', 'plate', 'spring', 'conv', 'mem', 'buf', 'bufR', 'L', 'R', 'dly', 'cmp', 'ds', 'ts', 'b259']);
 function fxFlushTiny(o, depth) {
   if (Array.isArray(o) || ArrayBuffer.isView(o)) {
     if (o.length > 64) return;
@@ -1754,7 +1939,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const eD = 1 - Math.exp(-dt / (P.dec / (4 * CE_NOM) * C.ce));
     const eR = 1 - Math.exp(-dt / (P.rel / (4 * CE_NOM) * C.ce));
 
-    const fxc = this.fxc, fxOn = fxc.fx.rat || fxc.fx.lex || fxc.fx.dly;
+    const fxc = this.fxc, fxOn = fxc.fx.rat || fxc.fx.lex || fxc.fx.dly || fxc.fx.fold;
     if (fxOn) fxc.flush();
     for (let j = 0; j < n; j++) {
       if (this.running) {
@@ -2078,6 +2263,7 @@ const BENDER = [
   { f: 'lfoMod', label: 'LFO mod', def: .3, fmt: pct } ];
 
 // ---------- effects (the 303 app's RAT, delay, Lexicon 224 and Compactor) ----------
+const DRV_NAMES = ['RAT', 'DS-1', 'TS808'], DRV_IDS = ['rat', 'ds', 'ts'], DRV_SUBS = ['LM308 + diodes', 'op-amp into diodes to ground', 'JRC4558, diodes in the feedback'];
 const DLY_DIV_NAMES = ['1/32', '1/16T', '1/16', '1/8T', '1/16D', '1/8', '1/4T', '1/8D', '1/4', '1/4D', '1/2'];
 // the reverb slot's programs, mirrored from the engine's tables (LEX_PROGRAMS, PLATE_PROGRAMS, SPRING_PROGRAMS, CNV_PROGRAMS)
 const REV_TYPE_NAMES = ['224', 'Plate', 'Spring', 'Conv'], REV_IDS = ['lex', 'plate', 'spring', 'conv'];
@@ -2105,8 +2291,18 @@ function migrateCmp(p) {
   return p;
 }
 const FX = [
-  { id: 'rat', name: 'RAT', sub: 'LM308 + diodes', items: [
-    { f: 'dist', label: 'Dist', def: .5, fmt: pct }, { f: 'filter', label: 'Filter', def: .4, fmt: pct }, { f: 'ratvol', label: 'Level', def: .5, fmt: pct } ] },
+  // the Buchla 259 timbre folder, ahead of the drive slot
+  { id: 'fold', name: 'Folder', sub: 'Buchla 259', items: [
+    { f: 'fldtimbre', label: 'Timbre', def: .5, fmt: v => (0.5 + 9.5 * v * v).toFixed(1) + 'V' },
+    { f: 'fldsym', label: 'Symm', def: .5, fmt: v => { const o = (v - .5) * 4; return (o > 0.05 ? '+' : '') + o.toFixed(1) + 'V'; } },
+    { f: 'fldlevel', label: 'Level', def: .5, fmt: pct } ] },
+  // the drive slot: one switch picks the pedal (fx.rat still switches the slot on, so older sounds keep their RAT);
+  // drv: which pedal a fader belongs to
+  { id: 'rat', name: 'Drive', sub: 'LM308 + diodes', dv: true, items: [
+    { s: 'drvtype', label: 'Pedal', opts: DRV_NAMES, def: 0, val: i => i / 2 },
+    { f: 'dist', drv: 'rat', label: 'Dist', def: .5, fmt: pct }, { f: 'filter', drv: 'rat', label: 'Filter', def: .4, fmt: pct }, { f: 'ratvol', drv: 'rat', label: 'Level', def: .5, fmt: pct },
+    { f: 'dsdist', drv: 'ds', label: 'Dist', def: .5, fmt: pct }, { f: 'dstone', drv: 'ds', label: 'Tone', def: .5, fmt: pct }, { f: 'dslevel', drv: 'ds', label: 'Level', def: .5, fmt: pct },
+    { f: 'tsdrive', drv: 'ts', label: 'Drive', def: .5, fmt: pct }, { f: 'tstone', drv: 'ts', label: 'Tone', def: .5, fmt: pct }, { f: 'tslevel', drv: 'ts', label: 'Level', def: .5, fmt: pct } ] },
   { id: 'dly', name: 'Delay', sub: 'tempo synced', items: [
     { f: 'dlytime', label: 'Time', def: .7, fmt: v => DLY_DIV_NAMES[Math.round(v * 10)] }, { f: 'dlyfb', label: 'Fdbk', def: .35, fmt: v => Math.round(v * 95) + '%' },
     { f: 'dlylo', label: 'Lo cut', def: .3, fmt: v => hz(20 * Math.pow(50, v)) }, { f: 'dlyhi', label: 'Hi cut', def: .55, fmt: v => hz(1000 * Math.pow(20, v)) },
@@ -2187,7 +2383,7 @@ function presetState(name) {
   const P = PRESETS[name];
   const bend = stockBend();
   for (const k in (P.bend || {})) { const b = BEND_ITEMS.find(x => x.id === k || x.sw === k); bend[k] = b.sw ? P.bend[k] : toNorm(b, P.bend[k]); }
-  return { params: { ...defaults, ...P.p }, bend, br: { ...(P.br || {}) }, steps: parsePat(P.pat), bpm: P.bpm, preset: name, fx: { rat: false, dly: false, lex: false, ...(P.fx || {}) } };
+  return { params: { ...defaults, ...P.p }, bend, br: { ...(P.br || {}) }, steps: parsePat(P.pat), bpm: P.bpm, preset: name, fx: { rat: false, dly: false, lex: false, fold: false, ...(P.fx || {}) } };
 }
 try { state = JSON.parse(localStorage.getItem('kestrel-ms1-v2')); } catch (e) { state = null; }
 if (!state || state.v !== 2 || !state.params || !Array.isArray(state.steps) || !state.steps.length || state.steps.length > 64) state = presetState('Acid line');
@@ -2195,7 +2391,7 @@ if (state.len) { state.steps = state.steps.slice(0, Math.max(1, state.len)); del
 for (const st of state.steps) { while (st.n >= 12) { st.n -= 12; st.o++; } st.o = Math.max(-2, Math.min(2, st.o | 0)); }
 state.v = 2; state.bend = { ...stockBend(), ...(state.bend || {}) }; state.br = state.br || {};
 state.params = { ...defaults, ...migrateCmp(state.params) };
-state.fx = { rat: false, dly: false, lex: false, ...(state.fx || {}) };
+state.fx = { rat: false, dly: false, lex: false, fold: false, ...(state.fx || {}) };
 // pattern slots (from the 303 app's banks): 8 patterns, edits save to the selected slot, ctrl/right-click or long-press chains them
 const SLOTS = 8;
 const slotOf = st => ({ steps: JSON.parse(JSON.stringify(st.steps)), swing: st.params ? st.params.swing : 0, gateLen: st.params ? st.params.gateLen : .5 });
@@ -2240,7 +2436,7 @@ function seqMsg() {
   }
   return { type: 'seq', seq: { steps, length: steps.length, bpm: state.bpm, swing: p.swing, gateLen: 0.1 + p.gateLen * 0.85 } };
 }
-function pushFx() { post({ type: 'fxknobs', k: fxKnobs(state.params) }); for (const n of ['rat', 'dly', 'lex']) post({ type: 'fx', name: n, on: !!state.fx[n] }); }
+function pushFx() { post({ type: 'fxknobs', k: fxKnobs(state.params) }); for (const n of ['rat', 'dly', 'lex', 'fold']) post({ type: 'fx', name: n, on: !!state.fx[n] }); }
 function pushAll() { pushFx(); post({ type: 'seq101', steps: state.s101 || [] }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); post(seqMsg()); }
 
 // ---------- UI: faders ----------
@@ -2414,6 +2610,12 @@ for (const u of FX) {
       `<div class="rv-progs" id="rvProgs" role="radiogroup" aria-label="Program"></div><div class="ctrls"></div><p class="rv-note" id="rvNote"></p>`;
     const c = el.querySelector('.ctrls');
     for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.rev = it.rev; }
+  } else if (u.dv) {
+    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type dv-type" role="radiogroup" aria-label="Pedal">` +
+      DRV_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n}</button>`).join('') + `</span><small id="dvSub">${u.sub}</small></div><div class="ctrls"></div>`;
+    const c = el.querySelector('.ctrls');
+    for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.drv = it.drv; }
+    el.querySelector('.dv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); const i = +b.dataset.t; state.params.drvtype = i; post({ type: 'param', id: 'drvtype', v: FX_SW.drvtype.val(i) }); save(); drawDrv(); });
   } else {
     el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><small>${u.sub}</small></div><div class="ctrls"></div>`;
     const c = el.querySelector('.ctrls');
@@ -2431,7 +2633,7 @@ let rvShown = '';
 function setRev(id, i) { // a type or program button: these switch at once (like the 303 app, no slewing)
   const it = FX_SW[id]; state.params[id] = i; post({ type: 'param', id, v: it.val(i) }); save(); drawRev();
 }
-document.querySelector('.rv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { boot(); setRev('revtype', +b.dataset.t); } });
+fxBox.lex.querySelector('.rv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { boot(); setRev('revtype', +b.dataset.t); } });
 rvProgs.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) { boot(); setRev(RV_PROG[REV_IDS[state.params.revtype | 0] || 'lex'].s, +b.dataset.i); } });
 const LEX_CHORUS_NAMES = { lexbass: 'Pair 1', lexmid: 'Pair 2', lexxover: 'Pair 3', lextreble: 'Pair 4', lexdepth: 'Wander' };
 const fdrLabel = id => document.querySelector(`label[for="f-${id}"]`);
@@ -2454,7 +2656,7 @@ function revNote(T, i) {
 function drawRev() {
   const t = Math.max(0, Math.min(3, state.params.revtype | 0)), T = REV_IDS[t], pit = RV_PROG[T], n = pit.opts.length;
   const sel = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0));
-  for (const b of document.querySelectorAll('.rv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
+  for (const b of fxBox.lex.querySelectorAll('.rv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
   if (rvShown !== T) {
     rvShown = T;
     rvProgs.style.setProperty('--n', n);
@@ -2490,11 +2692,19 @@ async function loadIRs() {
   }
 }
 for (const id of ['revtype', 'lexprog', 'plateprog', 'sprprog', 'cnvprog']) ui[id] = () => drawRev(); // preset loads redraw the slot
+// the drive slot: the pedal switch shows that pedal's three faders and its circuit in the strip
+function drawDrv() {
+  const t = Math.max(0, Math.min(2, state.params.drvtype | 0)), T = DRV_IDS[t];
+  for (const b of fxBox.rat.querySelectorAll('.dv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
+  for (const f of fxBox.rat.querySelectorAll('.fdr[data-drv]')) f.hidden = f.dataset.drv !== T;
+  document.getElementById('dvSub').textContent = DRV_SUBS[t];
+}
+ui.drvtype = () => drawDrv();
 function renderFx() {
-  for (const n of ['rat', 'dly', 'lex']) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'on' : 'off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
+  for (const n of ['rat', 'dly', 'lex', 'fold']) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'on' : 'off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
   fxBox.cmp.classList.toggle('on', !!(state.fx.dly || state.fx.lex));
 }
-renderFx(); drawRev();
+renderFx(); drawRev(); drawDrv();
 
 // Randomise: depth sets how many bridges (1 at 0%, 8 at 100%) and how strong they can be (lower resistance)
 const brDepthEl = document.getElementById('brDepth'), brDepthOut = document.getElementById('o-brDepth');
@@ -3155,7 +3365,7 @@ function projectSnap() { storeSlot(); return { sound: soundSnap(), pattern: patt
 function applySound(x) {
   if (!x || typeof x !== 'object') return;
   state.params = { ...defaults, ...migrateCmp({ ...(x.params || {}) }) }; state.bend = { ...stockBend(), ...(x.bend || {}) };
-  state.br = { ...(x.br || {}) }; state.fx = { rat: false, dly: false, lex: false, ...(x.fx || {}) };
+  state.br = { ...(x.br || {}) }; state.fx = { rat: false, dly: false, lex: false, fold: false, ...(x.fx || {}) };
   for (const k in ui) ui[k](state.params[k]);
   for (const k in bui) bui[k](state.bend[k]);
   Object.values(cells).forEach(r => r()); renderFx();
