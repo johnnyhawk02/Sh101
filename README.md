@@ -40,11 +40,17 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.9.9), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.10.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Compactor (v0.10.0)
+
+The Compactor (the sidechain that ducks the delay and reverb returns under the dry synth) has two dials, as in the TB-303 app (tb303-circuit-model at 5275b1e, `cmpamt` and `cmprel`, ported unchanged): **Amount** (how deep and how easily it ducks, 0 = off) and **Release** (0 to 1 s). Every built-in sound uses Amount 40% and Release 20 ms. A session or saved preset from before v0.10.0 also gets 40% / 20 ms; its old Threshold, Range, Attack, Hold, Mix and Detect settings are dropped, not mapped.
+
+There is no plug-in version of Shyoy, only the web app.
 
 ### Reverb slot (v0.9.9)
 

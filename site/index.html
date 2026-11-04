@@ -119,6 +119,14 @@ select.btn option { color: #000; }
 .fdr label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
 .fdr output { font-size: var(--fs-xs); color: var(--muted); min-height: 1em; line-height: 1; white-space: nowrap; text-shadow: none; font-variant-numeric: tabular-nums; }
 .fdr.bend output.off { color: var(--ink); text-decoration: underline; }
+.dial { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1 1 0; min-width: 0; min-height: 0; }
+.dial .knob { flex: 1 1 0; min-height: var(--trk-min); width: 100%; max-width: 150px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }
+.dial .knob svg { height: 100%; max-width: 100%; aspect-ratio: 1; display: block; overflow: visible; }
+.dial .knob .trk { fill: var(--ghost); }
+.dial .knob .arc { fill: var(--ink); }
+.dial .knob:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.dial label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
+.dial output { font-size: var(--fs-s); color: var(--ink); min-height: 1em; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* switches: an LED list, the chosen one inverted */
 .sw { display: flex; flex-direction: column; gap: 2px; }
@@ -433,7 +441,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.9</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.10.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -457,7 +465,7 @@ body > .hint { display: none; }
         <div class="menu-pop" id="menuPop" role="menu" hidden>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.9.9</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.10.0</span>
         </div>
       </div>
     </div>
@@ -1281,59 +1289,34 @@ class DigitalDelay {
 }
 
 // Sidechain on the effect returns, after the Kilohearts Compactor (a limiter/ducker that works at sample
-// level). The key is the dry synth. Threshold is the key level that ducks the returns to silence;
-// Range shapes how the key maps onto that (below 100% quieter key levels are ignored, above 100% they
-// duck harder, like a soft clipper on the key). Attack is lookahead: the returns are delayed by it and the
-// ducking ramps in ahead of the transient. Hold keeps full ducking after the key drops, Release brings it
-// back. Mode picks the detector: per-sample Peak, inter-sample peaks (ISP), or RMS. Mix blends in the
-// unducked returns. With Attack and Release at 0 the gain follows the key waveform: ring-mod sidechaining.
+// level). The key is the dry synth. Two controls: Amount and Release. Amount sets both how deep the duck
+// goes (0 = off, about 70% = full duck) and how sensitive it is (the key level that ducks fully goes from
+// -10 dB to -30 dB). The rest is fixed: a linear key law, 3 ms lookahead (the returns are delayed by it
+// so the ramp lands ahead of the transient), no hold, and a per-sample peak detector.
+// Release brings the returns back (0 to 1 s); at 0 the gain follows the key waveform (ring-mod sidechaining).
 // Our reading of the published control descriptions; Kilohearts does not publish its gain law.
-const CMP_MODES = ['Peak', 'ISP', 'RMS'];
-const cmpThrDb = (p) => -40 + 40 * p;
-const cmpAtkMs = (p) => 10 * p;
-const cmpHoldMs = (p) => 500 * p * p;
+const cmpThrDb = (a) => -10 - 20 * a;       // key level that gives a full duck
+const cmpMix = (a) => Math.min(1, 1.4 * a); // duck depth
 const cmpRelMs = (p) => 1000 * p * p;
+const CMP_ATK_MS = 3;
 class Compactor {
   constructor(fs) {
     this.fs = fs; this.L = new Float32Array(Math.ceil(fs * 0.011)); this.R = new Float32Array(this.L.length); this.w = 0;
-    this.env = 0; this.hold = 0; this.ms = 0; this.k1 = 0; this.k2 = 0; this.k3 = 0; this.l = 0; this.r = 0; this.g = 1;
+    this.env = 0; this.l = 0; this.r = 0; this.g = 1;
   }
   derive(k) {
     const fs = this.fs;
-    this.thr = Math.pow(10, cmpThrDb(k.cmpthr) / 20);
-    this.rng = 2 * k.cmprng;
-    this.D = Math.min(this.L.length - 1, Math.round(cmpAtkMs(k.cmpatk) * 1e-3 * fs));
-    this.atkA = this.D > 0 ? 1 - Math.exp(-3 / this.D) : 1;
-    this.holdN = Math.round(cmpHoldMs(k.cmphold) * 1e-3 * fs);
+    this.inv = Math.pow(10, -cmpThrDb(k.cmpamt) / 20);
+    this.D = Math.min(this.L.length - 1, Math.round(CMP_ATK_MS * 1e-3 * fs));
+    this.atkA = 1 - Math.exp(-3 / this.D);
     const rel = cmpRelMs(k.cmprel) * 1e-3 * fs;
     this.relA = rel > 0.5 ? Math.exp(-1 / rel) : 0;
-    this.mode = Math.round(k.cmpmode * 2);
-    this.rmsA = Math.exp(-1 / (0.01 * fs));
-    this.mix = k.cmpmix;
-  }
-  // key -> duck amount 0..1 (1 = silence at threshold)
-  _amount(det) {
-    const x = det / this.thr, R = this.rng;
-    let a;
-    if (R <= 1) a = R > 0 ? (x - (1 - R)) / R : 0;
-    else { const s = R - 1; a = (1 - s) * x + s * Math.tanh(3 * x) / 0.99505; }
-    return a <= 0 ? 0 : a >= 1 ? 1 : a;
+    this.mix = cmpMix(k.cmpamt);
   }
   // key y, returns wl/wr: stores the delayed returns in l/r and gives the gain for them
   run(y, wl, wr) {
-    let det;
-    if (this.mode === 2) { this.ms = y * y + this.rmsA * (this.ms - y * y); det = Math.sqrt(this.ms * 2); } // sine peak = rms * sqrt 2
-    else {
-      det = Math.abs(y);
-      if (this.mode === 1) { // inter-sample peak: Catmull-Rom midpoint between the last two samples
-        const m = (-this.k3 + 9 * this.k2 + 9 * this.k1 - y) / 16; // Catmull-Rom midpoint of the previous two samples
-        if (Math.abs(m) > det) det = Math.abs(m);
-      }
-      this.k3 = this.k2; this.k2 = this.k1; this.k1 = y;
-    }
-    const a = this._amount(det);
-    if (a >= this.env) { this.env += (a - this.env) * this.atkA; this.hold = this.holdN; }
-    else if (this.hold > 0) this.hold--;
+    let a = Math.abs(y) * this.inv; if (a > 1) a = 1; // duck amount, 1 = silence at the threshold
+    if (a >= this.env) this.env += (a - this.env) * this.atkA;
     else this.env = a + (this.env - a) * this.relA;
     // lookahead: the returns come out D samples late, so the ramp lands on time
     const N = this.L.length; let ri = this.w - this.D; if (ri < 0) ri += N;
@@ -1350,7 +1333,7 @@ const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
   revtype: 0, plateprog: 0.5, platepre: 0.2, platedecay: 0.45, platedamp: 0.6, platebw: 0.75, platelo: 0.35, platediff: 0.88, platemod: 0.5, platemix: 0.5,
   sprprog: 2 / 3, sprdwell: 0.4, sprdecay: 0.5, sprtension: 0.5, sprtone: 0.5, sprlo: 0.4, sprmix: 0.5,
   cnvprog: 0, cnvpre: 0.2, cnvdecay: 1, cnvtone: 0.7, cnvlo: 0.3, cnvwidth: 2 / 3, cnvmix: 0.5,
-  cmpthr: 0.5, cmprng: 0.5, cmpatk: 0.3, cmphold: 0, cmprel: 0.4, cmpmix: 0.7, cmpmode: 0,
+  cmpamt: 0.4, cmprel: Math.sqrt(0.02), // 40%, 20 ms
   dlypp: 1, dlytime: 0.7, dlyfb: 0.35, dlylo: 0.3, dlyhi: 0.55, dlymix: 0.35 };
 class FxChain {
   constructor(fs) {
@@ -2111,6 +2094,16 @@ const SPRING_STAGES_UI = 48;
 const exr = (lo, hi, p) => lo * Math.pow(hi / lo, p);
 const hz = f => f >= 1000 ? (f / 1000).toFixed(f < 10000 ? 2 : 1) + 'k' : f.toFixed(0) + 'Hz';
 const sec = t => t < 10 ? t.toFixed(1) + 's' : t.toFixed(0) + 's';
+// Compactor defaults for every sound (Johnny): Amount 40%, Release 20 ms (the knob is 1000 ms × p², so p = √0.02)
+const CMP_AMT_DEF = 0.4, CMP_REL_DEF = Math.sqrt(0.02);
+const CMP_OLD = ['cmpthr', 'cmprng', 'cmpatk', 'cmphold', 'cmpmix', 'cmpmode'];
+// a sound saved before the two-dial Compactor gets 40% / 20 ms; its old settings are dropped, not mapped
+function migrateCmp(p) {
+  if (!p || typeof p !== 'object') return p;
+  if (!('cmpamt' in p)) { p.cmpamt = CMP_AMT_DEF; p.cmprel = CMP_REL_DEF; }
+  for (const k of CMP_OLD) delete p[k];
+  return p;
+}
 const FX = [
   { id: 'rat', name: 'RAT', sub: 'LM308 + diodes', items: [
     { f: 'dist', label: 'Dist', def: .5, fmt: pct }, { f: 'filter', label: 'Filter', def: .4, fmt: pct }, { f: 'ratvol', label: 'Level', def: .5, fmt: pct } ] },
@@ -2152,11 +2145,10 @@ const FX = [
     { f: 'cnvlo', rev: 'conv', label: 'Lo cut', def: .3, fmt: v => hz(exr(20, 1000, v)) },
     { f: 'cnvwidth', rev: 'conv', label: 'Width', def: 2 / 3, fmt: v => Math.round(150 * v) + '%' },
     { f: 'cnvmix', rev: 'conv', label: 'Return', def: .5, fmt: pct } ] },
+  // two dials, as in the 303 app: Amount (depth and sensitivity, 0 = off) and Release
   { id: 'cmp', name: 'Compactor', sub: 'ducks the returns', items: [
-    { f: 'cmpthr', label: 'Thresh', def: .5, fmt: v => (-40 + 40 * v).toFixed(0) + 'dB' }, { f: 'cmprng', label: 'Range', def: .5, fmt: v => Math.round(200 * v) + '%' },
-    { f: 'cmpatk', label: 'Attack', def: .3, fmt: v => (10 * v).toFixed(1) + 'ms' }, { f: 'cmphold', label: 'Hold', def: 0, fmt: v => Math.round(500 * v * v) + 'ms' },
-    { f: 'cmprel', label: 'Release', def: .4, fmt: v => Math.round(1000 * v * v) + 'ms' }, { f: 'cmpmix', label: 'Mix', def: .7, fmt: pct },
-    { s: 'cmpmode', label: 'Detect', opts: ['Peak', 'ISP', 'RMS'], def: 0, val: i => i / 2 } ] },
+    { f: 'cmpamt', label: 'Amount', dial: true, def: CMP_AMT_DEF, fmt: v => v <= 0 ? 'off' : Math.round(100 * v) + '%' },
+    { f: 'cmprel', label: 'Release', dial: true, def: CMP_REL_DEF, fmt: v => Math.round(1000 * v * v) + ' ms' } ] },
 ];
 const FX_SW = {}; for (const u of FX) for (const it of u.items) if (it.s) FX_SW[it.s] = it;
 // the engine takes every effect control as a 0..1 knob; switches are stored as their index
@@ -2202,7 +2194,7 @@ if (!state || state.v !== 2 || !state.params || !Array.isArray(state.steps) || !
 if (state.len) { state.steps = state.steps.slice(0, Math.max(1, state.len)); delete state.len; }
 for (const st of state.steps) { while (st.n >= 12) { st.n -= 12; st.o++; } st.o = Math.max(-2, Math.min(2, st.o | 0)); }
 state.v = 2; state.bend = { ...stockBend(), ...(state.bend || {}) }; state.br = state.br || {};
-state.params = { ...defaults, ...state.params };
+state.params = { ...defaults, ...migrateCmp(state.params) };
 state.fx = { rat: false, dly: false, lex: false, ...(state.fx || {}) };
 // pattern slots (from the 303 app's banks): 8 patterns, edits save to the selected slot, ctrl/right-click or long-press chains them
 const SLOTS = 8;
@@ -2286,6 +2278,47 @@ function fader(def, mount) {
   });
   mount.appendChild(el);
   (def.bend ? bui : ui)[id] = v => set(v, false);
+  set(get(), false);
+}
+// A dial (the 303 app's look): a ring of wedge segments lit up to the value, readout above, label below.
+// Vertical drag (Shift = fine), arrows / Page keys, Home/End, double-click resets.
+const DIAL_A0 = -150, DIAL_SWEEP = 300, DIAL_SEGS = 24, DIAL_RI = 17.5, DIAL_RO = 28.5, DIAL_GAP = 2.6;
+const dialSeg = (i) => {
+  const w = DIAL_SWEEP / DIAL_SEGS, a0 = DIAL_A0 + i * w + DIAL_GAP / 2, a1 = DIAL_A0 + (i + 1) * w - DIAL_GAP / 2;
+  const pt = (deg, r) => { const t = (deg - 90) * Math.PI / 180; return `${(32 + r * Math.cos(t)).toFixed(2)} ${(32 + r * Math.sin(t)).toFixed(2)}`; };
+  return `M${pt(a0, DIAL_RO)}A${DIAL_RO} ${DIAL_RO} 0 0 1 ${pt(a1, DIAL_RO)}L${pt(a1, DIAL_RI)}A${DIAL_RI} ${DIAL_RI} 0 0 0 ${pt(a0, DIAL_RI)}Z`;
+};
+const DIAL_ALL = Array.from({ length: DIAL_SEGS }, (_, i) => dialSeg(i));
+const DIAL_LIT = DIAL_ALL.map((_, i) => DIAL_ALL.slice(0, i + 1).join(''));
+function dial(def, mount) {
+  const id = def.f, get = () => state.params[id];
+  const el = document.createElement('div'); el.className = 'dial';
+  el.innerHTML = `<output></output><div class="knob" role="slider" tabindex="0" id="f-${id}" aria-label="${def.label}" aria-valuemin="0" aria-valuemax="100">` +
+    `<svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk" d="${DIAL_ALL.join('')}"/><path class="arc" d=""/></svg></div><label for="f-${id}">${def.label}</label>`;
+  const kn = el.querySelector('.knob'), arc = el.querySelector('.arc'), out = el.querySelector('output');
+  const set = (v, send = true) => {
+    v = Math.max(0, Math.min(1, v)); state.params[id] = v;
+    const n = Math.round(v * DIAL_SEGS); arc.setAttribute('d', n ? DIAL_LIT[n - 1] : '');
+    kn.setAttribute('aria-valuenow', Math.round(v * 100)); const t = def.fmt(v); out.textContent = t; kn.setAttribute('aria-valuetext', t);
+    if (send) { post({ type: 'param', id, v }); save(); }
+  };
+  let drag = null;
+  const end = () => { drag = null; el.classList.remove('active'); };
+  kn.addEventListener('pointerdown', e => { if (e.button !== 0) return; kn.setPointerCapture(e.pointerId); boot(); drag = { y: e.clientY, v: get(), id: e.pointerId }; el.classList.add('active'); });
+  kn.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (e.pointerType === 'mouse' && !(e.buttons & 1)) { end(); return; }
+    set(drag.v + (drag.y - e.clientY) / (e.shiftKey ? 600 : 160));
+  });
+  kn.addEventListener('pointerup', end); kn.addEventListener('pointercancel', end); kn.addEventListener('lostpointercapture', end);
+  kn.addEventListener('dblclick', () => set(def.def));
+  kn.addEventListener('keydown', e => {
+    const d = { ArrowUp: .02, ArrowRight: .02, ArrowDown: -.02, ArrowLeft: -.02, PageUp: .1, PageDown: -.1 }[e.key];
+    if (d) { e.preventDefault(); set(get() + (e.shiftKey ? d / 4 : d)); }
+    else if (e.key === 'Home') set(0); else if (e.key === 'End') set(1);
+  });
+  mount.appendChild(el);
+  ui[id] = v => set(v, false);
   set(get(), false);
 }
 const bui = {};
@@ -2384,7 +2417,7 @@ for (const u of FX) {
   } else {
     el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><small>${u.sub}</small></div><div class="ctrls"></div>`;
     const c = el.querySelector('.ctrls');
-    for (const it of u.items) it.f ? fader(it, c) : switcher(it, c);
+    for (const it of u.items) it.dial ? dial(it, c) : it.f ? fader(it, c) : switcher(it, c);
   }
   if (u.id === 'cmp') el.insertAdjacentHTML('beforeend', '<p class="fxnote">Keyed from the dry synth: it ducks the delay and reverb returns while you play, like the 303 app.</p>');
   fxrow.appendChild(el); fxBox[u.id] = el;
@@ -2850,6 +2883,10 @@ bpmEl.onchange = () => { state.bpm = Math.max(40, Math.min(240, +bpmEl.value || 
 // ---------- presets: menu, save bar and namer copied from tb303-circuit-model (presets.js, namer.js @2b6e821) ----------
 const store = { get(k, d) { try { const v = localStorage.getItem('kestrel.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('kestrel.' + k, JSON.stringify(v)); } catch (e) {} } };
 function loadStore(key) { const v = store.get(key, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
+// saved presets from before the two-dial Compactor: give each 40% / 20 ms and drop the old Compactor fields, once
+{ const u = loadStore('projectPresets'); let ch = false;
+  for (const n in u) { const p = u[n] && u[n].sound && u[n].sound.params; if (p && (!('cmpamt' in p) || CMP_OLD.some(k => k in p))) { migrateCmp(p); ch = true; } }
+  if (ch) store.set('projectPresets', u); }
 function presetBar(pre, storeKey, builtins, snap, apply, autoName) {
   const sel = document.getElementById(pre + '-preset'), nameEl = document.getElementById(pre + '-name');
   const delBtn = document.getElementById(pre + '-del'), msg = document.getElementById(pre + '-msg');
@@ -3117,7 +3154,7 @@ function patternSnap() { return { steps: clone(state.steps), s101: clone(state.s
 function projectSnap() { storeSlot(); return { sound: soundSnap(), pattern: patternSnap(), bpm: state.bpm, slots: clone(state.slots), slot: state.slot, chain: [...state.chain] }; }
 function applySound(x) {
   if (!x || typeof x !== 'object') return;
-  state.params = { ...defaults, ...(x.params || {}) }; state.bend = { ...stockBend(), ...(x.bend || {}) };
+  state.params = { ...defaults, ...migrateCmp({ ...(x.params || {}) }) }; state.bend = { ...stockBend(), ...(x.bend || {}) };
   state.br = { ...(x.br || {}) }; state.fx = { rat: false, dly: false, lex: false, ...(x.fx || {}) };
   for (const k in ui) ui[k](state.params[k]);
   for (const k in bui) bui[k](state.bend[k]);
