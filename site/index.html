@@ -18,7 +18,7 @@
    One ink for the segments, a faint ghost of the unlit ones, the offset shadow LCD type casts on its backplane,
    a pixel font throughout. Every panel is headed by an inverted label strip, like silkscreen on the hardware;
    buttons are outlined boxes that invert when on; faders are segmented bar graphs that grow to fill the view.
-   v0.9.7 design pass: one stylesheet, all sizes from the tokens below. Phones in landscape (sized on a Pixel 9a,
+   v0.9.8 design pass: one stylesheet, all sizes from the tokens below. Phones in landscape (sized on a Pixel 9a,
    915 x 412 css px) only swap the tokens and hide the long help text, so every tab is one screen with no scrolling. */
 :root {
   --case: #161815;
@@ -272,6 +272,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .acts { display: flex; gap: var(--gap-s); }
 .rnd { display: flex; align-items: center; gap: var(--gap-s) var(--gap); padding-left: calc(var(--gap) + 6px); border-left: var(--rule); }
 .rnd .acts button { min-width: 3em; }
+.rnd-lab { text-transform: lowercase; margin-left: 6px; }
 .sq-msg { flex: 1 1 200px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; }
 .sq-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
 .sq-bank { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
@@ -414,7 +415,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.7</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.8</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -438,7 +439,7 @@ body > .hint { display: none; }
         <div class="menu-pop" id="menuPop" role="menu" hidden>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.9.7</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.9.8</span>
         </div>
       </div>
     </div>
@@ -472,12 +473,22 @@ body > .hint { display: none; }
             <button id="p-undo" disabled>Undo</button>
           </div>
           <div class="rnd" role="group" aria-label="Randomise one row">
-            <label class="sld rnd-depth" title="How much each Randomise changes: share of steps that get an octave jump, slide, accent or tie"><span>Rnd depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
+            <label class="sld rnd-depth" title="How much Randomise and Alter change: Randomise re-deals that share of steps, Alter flips a few (about half as many)"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
+            <span class="rnd-lab">rnd</span>
             <div class="acts">
               <button id="r-oct" title="Randomise octaves only; notes stay">oct</button>
               <button id="r-slide" title="Randomise slides only">slide</button>
               <button id="r-acc" title="Randomise accents only">acc</button>
               <button id="r-tie" title="Randomise ties only; press again for another set">tie</button>
+            </div>
+          </div>
+          <div class="rnd alt" role="group" aria-label="Alter one row">
+            <span class="rnd-lab">alter</span>
+            <div class="acts">
+              <button id="a-oct" title="Alter a few octaves: nudge some notes up or down one octave">oct</button>
+              <button id="a-slide" title="Alter a few slides: flip some on or off">slide</button>
+              <button id="a-acc" title="Alter a few accents: flip some on or off">acc</button>
+              <button id="a-tie" title="Alter a few ties: flip some on or off">tie</button>
             </div>
           </div>
           <span class="sq-msg" id="sq-msg" role="status">Tap a note to set or rest a step. Drag to paint. Tap a step number, then play keys to write.</span>
@@ -2213,6 +2224,28 @@ function rndRow(kind) {
   }
   tail = []; stepChanged(); if (kind === 't') tieOut = JSON.stringify(state.steps);
 }
+// Alter one row: nudge the pattern instead of re-dealing it. Depth sets how many steps flip (about half the
+// Randomise share, at least one). Notes stay; a new tie takes the pitch of the note before it, as in the roll.
+function altRow(kind) {
+  const d = sqDepthEl.value / 100, P = state.steps, n = P.length;
+  const ok = i => kind === 'a' ? P[i].m === 'N' : kind === 't' ? i > 0 && P[i].m !== 'R' && P[i - 1].m !== 'R' : P[i].m !== 'R' && !(kind === 'o' && P[i].m === 'T');
+  const idx = []; for (let i = 0; i < n; i++) if (ok(i)) idx.push(i);
+  if (!idx.length) { say('Nothing in that row to alter yet.'); return; }
+  keepUndo();
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  const k = Math.max(1, Math.round(idx.length * d * 0.5)), pick = idx.slice(0, k);
+  for (const i of pick) {
+    const st = P[i];
+    if (kind === 'o') st.o = st.o === 0 ? (Math.random() < 0.5 ? 1 : -1) : Math.random() < 0.6 ? 0 : Math.max(-2, Math.min(2, st.o + Math.sign(st.o)));
+    else if (kind === 't') { if (st.m === 'T') st.m = 'N'; else { st.n = P[i - 1].n; st.o = P[i - 1].o; st.m = 'T'; } }
+    else st[kind] = !st[kind];
+  }
+  // ties hold the note before them, so they follow its octave
+  if (kind === 'o' || kind === 't') for (let i = 1; i < n; i++) if (P[i].m === 'T') { P[i].n = P[i - 1].n; P[i].o = P[i - 1].o; }
+  const name = { o: 'octave', s: 'slide', a: 'accent', t: 'tie' }[kind];
+  tail = []; stepChanged(); say(`Altered ${k} ${name}${k === 1 ? '' : 's'}. Tap again to keep nudging; Undo steps back.`);
+}
+[['a-oct', 'o'], ['a-slide', 's'], ['a-acc', 'a'], ['a-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => altRow(k); });
 [['r-oct', 'o'], ['r-slide', 's'], ['r-acc', 'a'], ['r-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => rndRow(k); });
 document.getElementById('p-clr').onclick = () => { keepUndo(); state.steps = state.steps.map(() => restStep()); tail = []; stepChanged(); say('Cleared. Undo brings it back.'); };
 document.getElementById('p-undo').onclick = () => {
