@@ -325,6 +325,8 @@ body { padding-block: 12px; margin: 0; }
 .sq-side .sld span { grid-column: auto; }
 .acts { display: flex; gap: 6px; margin: 0; } .acts button { padding: 0 10px; }
 .sq-msg { flex: 1 1 200px; min-height: 0; font-size: 15px; }
+.rnd { display: flex; align-items: center; gap: 6px 10px; }
+.rnd .acts button { min-width: 44px; }
 /* landscape phone (sized on a Pixel 9a, 915 x 412 css px): the whole instrument is one screen with no page scroll.
    Header, tabs and keyboard stay put; the space between shows one view: synth, sequencer, bend, bridges or perform. */
 @media (orientation: landscape) and (max-height: 520px) {
@@ -388,6 +390,7 @@ body { padding-block: 12px; margin: 0; }
   .sq-body { grid-template-columns: minmax(0, 1fr); gap: 3px; } .sq-side { gap: 3px 12px; }
   .sq-side .sld { grid-template-columns: auto 64px 30px; gap: 0 4px; font-size: 13px; } .sq-side .sld span { line-height: 1; }
   .acts button { padding: 0 6px; height: 20px; }
+  .rnd { gap: 3px 6px; } .rnd .acts button { min-width: 36px; }
   .rack .fdr .track { height: calc(min(100px, (100dvh - 190px) / 2)); }
   .bend-grp { padding: 0 10px; }
   .unit[data-view="tab-bend"] .fdr .track { height: calc(min(150px, 100dvh - 215px)); }
@@ -406,7 +409,7 @@ body { padding-block: 12px; margin: 0; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.5</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.6</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
       <label class="num">Tempo<input id="bpm" type="number" min="40" max="240" value="124"></label>
@@ -429,7 +432,7 @@ body { padding-block: 12px; margin: 0; }
         <div class="menu-pop" id="menuPop" role="menu" hidden>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.9.5</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.9.6</span>
         </div>
       </div>
     </div>
@@ -462,6 +465,15 @@ body { padding-block: 12px; margin: 0; }
             <button id="p-rnd" title="Make a new pattern">Random</button>
             <button id="p-clr">Clear</button>
             <button id="p-undo" disabled>Undo</button>
+          </div>
+          <div class="rnd" role="group" aria-label="Randomise one row">
+            <label class="sld rnd-depth" title="How much each Randomise changes: share of steps that get an octave jump, slide, accent or tie"><span>Rnd depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
+            <div class="acts">
+              <button id="r-oct" title="Randomise octaves only; notes stay">oct</button>
+              <button id="r-slide" title="Randomise slides only">slide</button>
+              <button id="r-acc" title="Randomise accents only">acc</button>
+              <button id="r-tie" title="Randomise ties only; press again for another set">tie</button>
+            </div>
           </div>
           <span class="sq-msg" id="sq-msg" role="status">Tap a note to set or rest a step. Drag to paint. Tap a step number, then play keys to write.</span>
         </div>
@@ -2151,6 +2163,52 @@ document.getElementById('p-rnd').onclick = () => {
   }
   state.steps = P; tail = []; stepChanged(); say(`New ${len}-step line. Undo brings the last one back.`);
 };
+// Randomise one row (oct / slide / acc / tie): the notes stay, only that row is dealt again, as wild as Rnd depth.
+// Ties take the pitch of the note before them, so repeated tie presses start again from the pattern before the first press.
+const sqDepthEl = document.getElementById('sqRndDepth'), sqDepthOut = document.getElementById('o-sqRndDepth');
+try { const d = localStorage.getItem('kestrel.sqRndDepth'); if (d != null) sqDepthEl.value = d; } catch (e) {}
+const showSqDepth = () => { sqDepthOut.textContent = sqDepthEl.value + '%'; };
+showSqDepth();
+sqDepthEl.addEventListener('input', e => { e.stopPropagation(); showSqDepth(); try { localStorage.setItem('kestrel.sqRndDepth', sqDepthEl.value); } catch (er) {} });
+let tieBase = null, tieOut = null;
+function rndRow(kind) {
+  const d = sqDepthEl.value / 100, P = state.steps, n = P.length, hit = (p) => Math.random() < p;
+  if (P.every(st => st.m === 'R')) { say('No notes to randomise yet.'); return; }
+  keepUndo(); let c = 0;
+  if (kind === 'o') {
+    // octave jumps on played notes; ties follow the note they hold
+    for (let i = 0; i < n; i++) {
+      const st = P[i];
+      if (st.m === 'T') { const pv = P[(i - 1 + n) % n]; st.o = pv.o; continue; }
+      if (st.m === 'R') continue;
+      st.o = !hit(d) ? 0 : hit(0.15 + 0.35 * d) ? (hit(0.5) ? 2 : -2) : (hit(0.6) ? 1 : -1);
+      if (st.o) c++;
+    }
+    say(`${c} note${c === 1 ? '' : 's'} moved up or down an octave.`);
+  } else if (kind === 's' || kind === 'a') {
+    for (let i = 0; i < n; i++) {
+      const st = P[i];
+      // accents only sound on struck notes, and lean to the downbeats like the Random pattern
+      const ok = kind === 'a' ? st.m === 'N' : st.m !== 'R';
+      st[kind] = ok && hit(kind === 'a' ? Math.min(1, d * (i % 4 === 0 ? 1.6 : 0.8)) : d);
+      if (st[kind]) c++;
+    }
+    say(`${c} ${kind === 'a' ? 'accent' : 'slide'}${c === 1 ? '' : 's'}.`);
+  } else {
+    const src = tieOut && tieBase && tieBase.length === n && JSON.stringify(P) === tieOut ? tieBase : clone(P);
+    tieBase = src;
+    const Q = src.map(st => ({ ...st }));
+    for (let i = 0; i < n; i++) {
+      const st = Q[i]; if (st.m === 'R') continue;
+      if (st.m === 'T') st.m = 'N';
+      if (i > 0 && Q[i - 1].m !== 'R' && hit(d)) { st.n = Q[i - 1].n; st.o = Q[i - 1].o; st.m = 'T'; c++; }
+    }
+    state.steps = Q; tieOut = JSON.stringify(Q);
+    say(`${c} tie${c === 1 ? '' : 's'}. Press again for another set; Undo brings back the last one.`);
+  }
+  tail = []; stepChanged(); if (kind === 't') tieOut = JSON.stringify(state.steps);
+}
+[['r-oct', 'o'], ['r-slide', 's'], ['r-acc', 'a'], ['r-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => rndRow(k); });
 document.getElementById('p-clr').onclick = () => { keepUndo(); state.steps = state.steps.map(() => restStep()); tail = []; stepChanged(); say('Cleared. Undo brings it back.'); };
 document.getElementById('p-undo').onclick = () => {
   if (!undoBuf) return; const u = JSON.parse(undoBuf); undoBuf = null; state.steps = u.steps; tail = u.tail; stepChanged(); say('Undone.');
