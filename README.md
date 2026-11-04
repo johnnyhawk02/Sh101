@@ -40,8 +40,14 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.9.8), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.9.9), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Reverb slot (v0.9.9)
+
+The FX tab's reverb is the TB-303 model's reverb slot (tb303-circuit-model at 13da3f5), ported unchanged so both apps sound the same: one switch picks **224** (Lexicon 224 model), **Plate** (Dattorro, JAES 1997), **Spring** (after Välimäki, Parker and Abel, JAES 2010) or **Conv** (partitioned FFT convolution). Old sounds have no `revtype`, which falls back to the 224, the only reverb before v0.9.9, so they sound as they did.
+
+The Conv impulse responses are in `site/irs/` (copied as they are from the TB-303 repo), with `irs.json` and `CREDITS.md`: the EMT 140 plate IRs are by Greg Hopkins (CC BY), the rest are Voxengo's free impulses (royalty-free for any use). The service worker caches them on first use.

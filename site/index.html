@@ -264,6 +264,24 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .fxu .fxnote { font-size: var(--fs-xs); color: var(--muted); max-width: 46ch; margin: 0; }
 .fxu .progs { display: grid; grid-template-columns: repeat(3, auto); gap: 2px 6px; align-content: start; }
 .fxu .progs .lab { grid-column: 1 / -1; }
+/* the reverb slot (from the 303 app): type switch and program readout in the strip, a full-width row of program buttons,
+   the selected unit's faders, a two-line note */
+.rv .fxh { justify-content: flex-start; gap: calc(var(--gap) - 2px); }
+.rv-type { display: inline-flex; }
+.rv-type button { appearance: none; background: none; border: var(--bw) solid var(--glass); border-right-width: 0; border-radius: 0; color: var(--glass);
+  height: calc(var(--fs-l) - 2px); padding: 0 calc(var(--gap-s) + 2px); font: inherit; font-size: var(--fs-xs); line-height: 1; text-transform: lowercase; cursor: pointer; }
+.rv-type button:first-child { border-radius: var(--r) 0 0 var(--r); } .rv-type button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
+.rv-type button[aria-checked="true"] { background: var(--glass); color: var(--ink); }
+.rv-lcd { font-size: var(--fs-s); letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rv-progs { flex: none; display: grid; grid-template-columns: repeat(var(--n, 9), minmax(0, 1fr)); gap: var(--gap-s); }
+.rv-progs button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink); min-width: 0;
+  padding: 2px 4px 3px; font: inherit; font-size: var(--fs-s); line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+.rv-progs button b { display: block; font-weight: 400; font-size: var(--fs); }
+.rv-progs button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+@media (hover: hover) { .rv-progs button:hover:not([aria-checked="true"]), .rv-type button:hover:not([aria-checked="true"]) { background: var(--tint); } }
+.fdr[hidden] { display: none; }
+.rv-note { flex: none; margin: 0; padding: 0 3px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; max-width: 150ch; }
 
 /* ---------- sequencer: controls in one strip, the piano roll fills the rest ---------- */
 .seq { gap: var(--gap-s); }
@@ -415,7 +433,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.8</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.9.9</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -439,7 +457,7 @@ body > .hint { display: none; }
         <div class="menu-pop" id="menuPop" role="menu" hidden>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.9.8</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.9.9</span>
         </div>
       </div>
     </div>
@@ -557,8 +575,9 @@ body > .hint { display: none; }
 </div>
 <p class="hint">Play from your computer keyboard: <kbd>A</kbd>–<kbd>K</kbd> white keys, <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> black keys, <kbd>Z</kbd>/<kbd>X</kbd> transpose low/high, <kbd>Space</kbd> run/stop. While a sequencer runs, keys transpose it. Arpeggio and the 100-step sequencer step once per LFO cycle, so the LFO rate is their tempo. In Load, each key adds a step; play the next key before releasing the last to tie them. Sound starts on your first click or key press. Your patch and pattern are kept in this browser.</p>
 
-<script type="text/plain" id="dsp-src">// Effects for Kestrel MS-1, ported from Johnny's tb303-circuit-model (tb303-model.js, commit 2b6e821):
-// ProCo RAT pedal, tempo-synced digital delay, Lexicon 224 reverb and the Compactor sidechain on the returns.
+<script type="text/plain" id="dsp-src">// Effects for Kestrel MS-1, ported from Johnny's tb303-circuit-model (tb303-model.js, commit 2b6e821; the reverb slot
+// from commit 13da3f5): ProCo RAT pedal, tempo-synced digital delay, the reverb slot (Lexicon 224, Dattorro plate,
+// spring tank, convolution) and the Compactor sidechain on the returns.
 // The classes below are copied from that file with only the wrapper (FxChain) new, so the two apps sound alike.
 // Runs inside the AudioWorklet; no DOM use.
 
@@ -861,6 +880,356 @@ class Lexicon224 {
 }
 
 
+// ---------------------------------------------------------------------------
+// The other reverbs on the reverb slot: a plate, a spring tank and a convolution reverb. Unlike the
+// 224 these are not models of one unit; they are well-known published algorithms, run clean at the
+// host rate. revType(k) picks one: 0 = Lexicon 224, 1 = plate, 2 = spring, 3 = convolution.
+const REV_TYPES = [{ id: 'lex', name: 'Lexicon 224', short: '224' }, { id: 'plate', name: 'Plate', short: 'Plate' }, { id: 'spring', name: 'Spring', short: 'Spring' }, { id: 'conv', name: 'Convolution', short: 'Conv' }];
+const revType = (k) => Math.max(0, Math.min(3, Math.round((k.revtype || 0) * 3)));
+const revProg = (p, n) => Math.max(0, Math.min(n - 1, Math.round(p * (n - 1))));
+const revEx = (lo, hi, p) => lo * Math.pow(hi / lo, p);
+const onePoleA = (fc, fs) => Math.exp(-2 * Math.PI * Math.min(fc, 0.45 * fs) / fs);
+
+// Plate: Jon Dattorro's network "in the style of Griesinger" (Effect Design Part 1, JAES 1997), as
+// published: a bandwidth filter, four input allpass diffusers, then a figure-eight tank of two halves,
+// each a modulated allpass, a delay, a damping filter, an allpass and a delay, with his output taps.
+// The programs scale every length (Medium = his own lengths). Low cut on the input keeps the 303's
+// bass out of the tank.
+const PLATE_PROGRAMS = [
+  { name: 'Tiny plate', short: 'Tiny', size: 0.5 }, { name: 'Small plate', short: 'Small', size: 0.72 },
+  { name: 'Medium plate (Dattorro)', short: 'Medium', size: 1 }, { name: 'Large plate', short: 'Large', size: 1.3 },
+  { name: 'Huge plate', short: 'Huge', size: 1.65 },
+];
+const PLATE_IN = [142, 107, 379, 277];
+function plateParams(k) {
+  const prog = revProg(k.plateprog, PLATE_PROGRAMS.length);
+  return {
+    prog, P: PLATE_PROGRAMS[prog],
+    pre: 250 * k.platepre * k.platepre, rt: revEx(0.3, 20, k.platedecay),
+    damp: revEx(1000, 20000, k.platedamp), bw: revEx(1000, 20000, k.platebw), lo: revEx(20, 1000, k.platelo),
+    diff: k.platediff, mod: 2 * k.platemod, wet: 2 * audioTaper(k.platemix),
+  };
+}
+class DattorroPlate {
+  constructor(fs) { this.fs = fs; this.prog = -1; this.L = 0; this.R = 0; }
+  derive(k) {
+    const q = plateParams(k), fs = this.fs;
+    if (q.prog !== this.prog) this._layout(q.prog);
+    this.q = q; this.wet = q.wet;
+    this.preD = Math.max(0, Math.round(q.pre * fs / 1000));
+    this.bwA = onePoleA(q.bw, fs); this.dmA = onePoleA(q.damp, fs); this.hpA = Math.exp(-2 * Math.PI * q.lo / fs);
+    this.g1 = 0.85 * q.diff; this.g2 = 0.708 * q.diff;
+    const th = (this.half[0] + this.half[1]) / 2 / fs; // seconds round one half of the tank
+    this.decay = Math.min(0.98, Math.pow(10, -1.5 * th / q.rt));
+    this.exc = q.mod * 16 * this.sc; // modulated allpass excursion in samples
+  }
+  _layout(prog) {
+    const fs = this.fs, sc = this.sc = fs / 29761 * PLATE_PROGRAMS[prog].size;
+    this.prog = prog;
+    const L = (n) => Math.max(2, Math.round(n * sc));
+    const line = (n) => ({ b: new Float64Array(n + 1), n, w: 0 });
+    this.pre = line(Math.ceil(0.25 * fs) + 2);
+    this.ind = PLATE_IN.map(n => line(L(n)));
+    this.len = LEX_TANK.map(L);
+    this.tk = this.len.map((n, i) => line(n + ((i & 3) === 0 ? Math.ceil(4 * 16 * sc) + 4 : 0)));
+    this.half = [0, 4].map(o => this.len[o] + this.len[o + 1] + this.len[o + 2] + this.len[o + 3]);
+    const tap = (t) => [t[0], Math.max(1, Math.round(t[1] * sc)), t[2]];
+    this.tapsL = LEX_TAPS_L.map(tap); this.tapsR = LEX_TAPS_R.map(tap);
+    this.reset();
+  }
+  reset() {
+    if (this.prog < 0) return;
+    for (const l of [this.pre, ...this.ind, ...this.tk]) { l.b.fill(0); l.w = 0; }
+    this.bwS = 0; this.hp = 0; this.hpIn = 0; this.dm = [0, 0]; this.fb = [0, 0]; this.ph = 0; this.L = this.R = 0;
+  }
+  // delay line: write x, read the sample d back (d <= n)
+  static _rd(l, d) { let i = l.w - d; if (i < 0) i += l.b.length; return l.b[i]; }
+  static _wr(l, x) { l.w = l.w + 1 === l.b.length ? 0 : l.w + 1; l.b[l.w] = x; }
+  static _ap(l, g, x) { const vd = DattorroPlate._rd(l, l.n); let w = x + g * vd; if (w < 1e-30 && w > -1e-30) w = 0; DattorroPlate._wr(l, w); return vd - g * w; }
+  run(x) {
+    const rd = DattorroPlate._rd, wr = DattorroPlate._wr, ap = DattorroPlate._ap;
+    this.hp = this.hpA * (this.hp + x - this.hpIn); this.hpIn = x;
+    wr(this.pre, this.hp);
+    let u = rd(this.pre, this.preD);
+    this.bwS = u + this.bwA * (this.bwS - u); u = this.bwS;
+    u = ap(this.ind[0], this.g1, u); u = ap(this.ind[1], this.g1, u); u = ap(this.ind[2], this.g2, u); u = ap(this.ind[3], this.g2, u);
+    this.ph += 0.9 / this.fs; if (this.ph >= 1) this.ph -= 1;
+    const lfo = [Math.sin(2 * Math.PI * this.ph), Math.cos(2 * Math.PI * this.ph)];
+    const tk = this.tk, len = this.len, dec = this.decay;
+    const f0 = this.fb[1], f1 = this.fb[0];
+    for (let s = 0; s < 2; s++) {
+      const o = s * 4;
+      let a = u + dec * (s ? f1 : f0);
+      // modulated allpass, read with linear interpolation
+      const m = tk[o], dl = len[o] + this.exc * (1 + lfo[s]), di = Math.floor(dl), fr = dl - di;
+      const vd = rd(m, di) * (1 - fr) + rd(m, di + 1) * fr, w = a - 0.7 * vd;
+      wr(m, w); a = vd + 0.7 * w;
+      wr(tk[o + 1], a);
+      let v = rd(tk[o + 1], len[o + 1]);
+      let d = v + this.dmA * (this.dm[s] - v); if (d < 1e-30 && d > -1e-30) d = 0; this.dm[s] = d; v = d * dec;
+      v = ap(tk[o + 2], 0.5, v);
+      wr(tk[o + 3], v);
+      this.fb[s] = rd(tk[o + 3], len[o + 3]);
+    }
+    const sum = (T) => { let y = 0; for (let i = 0; i < T.length; i++) { const t = T[i]; y += t[2] * rd(tk[t[0]], t[1]); } return y; };
+    this.L = 0.38 * sum(this.tapsL); this.R = 0.38 * sum(this.tapsR);
+  }
+}
+
+// Spring: a dispersive delay-line model after Välimäki, Parker and Abel ("Parametric spring
+// reverberation effect", JAES 2010). Each spring is a feedback loop around a delay (the transit time)
+// and a cascade of stretched first-order allpasses, A(z) = (a + z^-K) / (1 + a z^-K), which delays
+// high frequencies more than low ones: every trip round the loop smears the echo into the falling
+// "drip" chirp. K puts the chirp's top near 4.3 kHz, where real springs stop passing sound. Dwell is
+// the drive into the tank (as on a Fender reverb), Tension sets the allpass coefficient (longer chirp).
+const SPRING_PROGRAMS = [
+  { name: 'One spring', short: '1 spring', ms: [36] },
+  { name: 'Two springs', short: '2 springs', ms: [31.5, 37.3] },
+  { name: 'Three springs', short: '3 springs', ms: [33.1, 37.7, 41.9] },
+  { name: 'Long tank', short: 'Long tank', ms: [44.3, 51.1, 58.7] },
+];
+const SPRING_STAGES = 48;
+function springParams(k) {
+  const prog = revProg(k.sprprog, SPRING_PROGRAMS.length);
+  return {
+    prog, P: SPRING_PROGRAMS[prog],
+    dwell: revEx(0.5, 8, k.sprdwell), rt: revEx(0.4, 6, k.sprdecay), a: 0.45 + 0.33 * k.sprtension,
+    tone: revEx(1500, 6000, k.sprtone), lo: revEx(50, 1000, k.sprlo), wet: 2 * audioTaper(k.sprmix),
+  };
+}
+class SpringReverb {
+  constructor(fs) { this.fs = fs; this.K = Math.max(1, Math.round(fs / (2 * 4300))); this.prog = -1; this.L = 0; this.R = 0; }
+  derive(k) {
+    const q = springParams(k), fs = this.fs;
+    if (q.prog !== this.prog) this._layout(q.prog);
+    this.q = q; this.wet = q.wet;
+    this.dw = q.dwell; this.dwN = 1 / Math.sqrt(q.dwell);
+    this.a = q.a; this.lpA = onePoleA(q.tone, fs); this.hpA = Math.exp(-2 * Math.PI * q.lo / fs);
+    // loop time: the transit delay plus the chirp's mean group delay
+    const gd = SPRING_STAGES * this.K * 0.5 * ((1 - q.a) / (1 + q.a) + (1 + q.a) / (1 - q.a));
+    this.g = this.sp.map(s => Math.pow(10, -3 * (s.d + gd) / fs / q.rt));
+  }
+  _layout(prog) {
+    const fs = this.fs, K = this.K; this.prog = prog;
+    this.sp = SPRING_PROGRAMS[prog].ms.map(ms => {
+      const d = Math.round(ms * 0.001 * fs);
+      return { d, buf: new Float64Array(d + 1), w: 0, xh: new Float64Array(SPRING_STAGES * K), yh: new Float64Array(SPRING_STAGES * K), lp1: 0, lp2: 0, fb: 0 };
+    });
+    // the stretched allpasses repeat their pattern above fs / 2K; cut that mirror image off the output
+    const fc = 0.85 * fs / (2 * K);
+    this.olL = [lexLowpass(fc, 0.5412, fs), lexLowpass(fc, 1.3066, fs)]; this.olR = [lexLowpass(fc, 0.5412, fs), lexLowpass(fc, 1.3066, fs)];
+    this.reset();
+  }
+  reset() {
+    if (this.prog < 0) return;
+    for (const f of [...this.olL, ...this.olR]) f.x1 = f.x2 = f.y1 = f.y2 = 0;
+    for (const s of this.sp) { s.buf.fill(0); s.xh.fill(0); s.yh.fill(0); s.w = 0; s.lp1 = s.lp2 = s.fb = 0; }
+    this.j = 0; this.hp = 0; this.hpIn = 0; this.dc = [0, 0, 0, 0]; this.L = this.R = 0;
+  }
+  run(x) {
+    this.hp = this.hpA * (this.hp + x - this.hpIn); this.hpIn = x;
+    const u = Math.tanh(this.hp * this.dw) * this.dwN;
+    const K = this.K, a = this.a, j = this.j, lpA = this.lpA, n = this.sp.length;
+    let l = 0, r = 0;
+    for (let i = 0; i < n; i++) {
+      const s = this.sp[i], xh = s.xh, yh = s.yh;
+      let v = u + this.g[i] * s.fb;
+      for (let m = 0, o = j; m < SPRING_STAGES; m++, o += K) { let y = a * v + xh[o] - a * yh[o]; if (y < 1e-30 && y > -1e-30) y = 0; xh[o] = v; yh[o] = y; v = y; }
+      s.lp1 = v + lpA * (s.lp1 - v); s.lp2 = s.lp1 + lpA * (s.lp2 - s.lp1);
+      s.w = s.w + 1 === s.buf.length ? 0 : s.w + 1; s.buf[s.w] = s.lp2;
+      let ri = s.w - s.d; if (ri < 0) ri += s.buf.length;
+      s.fb = s.buf[ri];
+      if (n === 1) { l += s.fb; r += s.fb; } else if (i === 2) { l += 0.5 * s.fb; r += 0.5 * s.fb; } else if (i & 1) r += s.fb; else l += s.fb;
+    }
+    this.j = j + 1 === K ? 0 : j + 1;
+    // DC blockers on the outputs
+    this.dc[0] = 0.9995 * (this.dc[0] + l - this.dc[1]); this.dc[1] = l;
+    this.dc[2] = 0.9995 * (this.dc[2] + r - this.dc[3]); this.dc[3] = r;
+    this.L = 0.75 * lexBiq(this.olL, this.dc[0]); this.R = 0.75 * lexBiq(this.olR, this.dc[2]);
+  }
+}
+
+// Convolution: uniformly partitioned overlap-save FFT convolution (512-sample blocks), with the work
+// for the older partitions spread across each block so no single sample does it all. L and R share
+// one complex FFT (hL + i hR). The wet signal is one block (about 11 ms) late, which counts toward
+// the predelay. Two kinds of impulse response:
+//  - recorded ones (ir: an id in irs/irs.json), handed in with setIR() as decoded samples at the host
+//    rate and scaled by CNV_IR_GAIN; Length trims them (a fade over the last 30%), full at the top.
+//  - generated ones: seeded noise, band-split so the highs die first, a density build-up and early
+//    reflections, the same every time. Decay (or Gate) is applied per partition, so turning it is free.
+const CNV_B = 512, CNV_N = 1024, CNV_SECS = 3, CNV_BUILD = 8, CNV_IR_GAIN = 0.17752 * 1.15;
+const CNV_PROGRAMS = [
+  { name: 'EMT 140 plate', short: 'Plate 140', ir: 'plate140' },
+  { name: 'EMT 140 plate, bright', short: 'Plate 140 Br', ir: 'plate140b' },
+  { name: 'Drum room', short: 'Drum room', ir: 'drumroom' },
+  { name: 'Grain silo', short: 'Silo', ir: 'silo' },
+  { name: 'Concrete garage', short: 'Garage', ir: 'garage' },
+  { name: 'Musikverein, Vienna', short: 'Musikverein', ir: 'musikverein' },
+  { name: 'On a Star', short: 'On a Star', ir: 'star' },
+  { name: 'Church (generated)', short: 'Church', build: 0.08, hf: 0.33, er: [[29, 0.22, 0.4], [47, -0.2, -0.6], [71, 0.16, 0.7], [97, -0.12, -0.3]] },
+  { name: 'Gated, 1980s (generated)', short: 'Gated', build: 0.003, hf: 0.75, gate: true, er: [] },
+];
+function convParams(k) {
+  const prog = revProg(k.cnvprog, CNV_PROGRAMS.length), P = CNV_PROGRAMS[prog];
+  return {
+    prog, P, pre: 250 * k.cnvpre * k.cnvpre, full: !!P.ir && k.cnvdecay >= 0.99,
+    rt: P.ir ? revEx(0.2, 3, k.cnvdecay) : P.gate ? revEx(0.12, 1, k.cnvdecay) : revEx(0.2, 4, k.cnvdecay),
+    tone: revEx(1000, 20000, k.cnvtone), lo: revEx(20, 1000, k.cnvlo), width: 1.5 * k.cnvwidth, wet: 2 * audioTaper(k.cnvmix),
+  };
+}
+function cnvFFT(re, im, inv, cs, sn) { // in place, radix 2, N = re.length
+  const N = re.length;
+  for (let i = 1, j = 0; i < N; i++) {
+    let bit = N >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+  }
+  for (let len = 2; len <= N; len <<= 1) {
+    const h = len >> 1, st = N / len;
+    for (let i = 0; i < N; i += len) for (let k = 0; k < h; k++) {
+      const wr = cs[k * st], wi = inv ? sn[k * st] : -sn[k * st];
+      const a = i + k, b = a + h, xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+      re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+    }
+  }
+}
+class ConvReverb {
+  constructor(fs) { this.fs = fs; this.prog = -1; this.L = 0; this.R = 0; this.ready = false; this.P = Math.ceil(CNV_SECS * fs / CNV_B); this.rt = -1; this.mode = ''; this.ext = {}; }
+  // a recorded impulse response, decoded at the host rate (Float32Array per channel)
+  setIR(id, L, R) {
+    this.ext[id] = { L, R: R || L };
+    if (this.prog >= 0 && CNV_PROGRAMS[this.prog].ir === id) this.dirty = true;
+  }
+  derive(k) {
+    const q = convParams(k), fs = this.fs;
+    this.q = q; this.wet = q.wet;
+    if (q.prog !== this.prog) { this.prog = q.prog; this.dirty = true; }
+    this.preD = Math.max(0, Math.round(q.pre * fs / 1000 - CNV_B));
+    this.lpA = onePoleA(q.tone, fs); this.hpA = Math.exp(-2 * Math.PI * q.lo / fs); this.width = q.width;
+    const mode = q.P.ir ? (q.full ? 'full' : 'len') : q.P.gate ? 'gate' : 'exp';
+    if (q.rt !== this.rt || mode !== this.mode) {
+      this.rt = q.rt; this.mode = mode;
+      this.pg = this.pg || new Float64Array(this.P); let n = 0;
+      for (let p = 0; p < this.P; p++) {
+        const t = (p + 0.5) * CNV_B / fs;
+        const g = mode === 'full' ? 1 : mode === 'exp' ? Math.exp(-6.9078 * t / q.rt)
+          : mode === 'gate' ? (t < q.rt * 0.8 ? 1 : Math.max(0, 1 - (t - q.rt * 0.8) / (q.rt * 0.2)))
+          : (t < q.rt * 0.7 ? 1 : Math.max(0, 1 - (t - q.rt * 0.7) / (q.rt * 0.3)));
+        this.pg[p] = g; if (g > 1e-4) n = p + 1;
+      }
+      this.nG = n;
+    }
+  }
+  _alloc() {
+    const P = this.P, N = CNV_N;
+    this.cs = new Float64Array(N / 2); this.sn = new Float64Array(N / 2);
+    for (let i = 0; i < N / 2; i++) { this.cs[i] = Math.cos(2 * Math.PI * i / N); this.sn[i] = Math.sin(2 * Math.PI * i / N); }
+    this.hr = new Float32Array(P * N); this.hi = new Float32Array(P * N);
+    this.xr = new Float32Array(P * N); this.xi = new Float32Array(P * N);
+    this.ar = new Float64Array(N); this.ai = new Float64Array(N); this.fr = new Float64Array(N); this.fi = new Float64Array(N);
+    this.inb = new Float64Array(N); this.outL = new Float64Array(CNV_B); this.outR = new Float64Array(CNV_B);
+    this.pre = new Float64Array(Math.ceil(0.25 * this.fs) + 2);
+    this.ready = true; this.reset();
+  }
+  reset() {
+    if (!this.ready) return;
+    this.xr.fill(0); this.xi.fill(0); this.ar.fill(0); this.ai.fill(0); this.inb.fill(0); this.outL.fill(0); this.outR.fill(0); this.pre.fill(0);
+    this.i = 0; this.slot = 0; this.next = 1; this.nAct = 0; this.pw = 0; this.hp = 0; this.hpIn = 0; this.lpL = this.lpR = 0; this.L = this.R = 0;
+  }
+  // start a new impulse response; it is built a few partitions per block (see _buildSome)
+  _startIR() {
+    this.dirty = false; this.built = 0; this.seed = [0x9e3779b9 + this.prog * 7919, 0x85ebca6b + this.prog * 104729];
+    this.gs = [[0, 0], [0, 0]]; // per channel: two one-pole states for the band split
+    const fs = this.fs, P = CNV_PROGRAMS[this.prog];
+    // a recorded IR: nothing to build until its samples arrive (setIR marks it dirty again)
+    this.src = P.ir ? this.ext[P.ir] || null : null;
+    this.nIR = P.ir ? (this.src ? Math.min(this.P, Math.ceil(this.src.L.length / CNV_B)) : 0) : this.P;
+    if (P.ir) return;
+    this.g0 = Math.sqrt(13.8 * 3 / (fs * 1.5)); // unit energy at 1.5 s
+    this.aLo = onePoleA(400, fs); this.aHi = onePoleA(3500, fs);
+    this.hfK = 3.4539 * (1 / P.hf - 1); // the highs die faster: extra decay per second, relative to 2 s
+    this.erT = P.er.map(e => [Math.round(e[0] * 0.001 * fs), e[1] * 18 * this.g0, e[2]]);
+  }
+  _rand(c) { // mulberry32 per channel, -1..1
+    let t = this.seed[c] = (this.seed[c] + 0x6D2B79F5) >>> 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  }
+  _buildSome() {
+    const N = CNV_N, B = CNV_B, fs = this.fs, P = CNV_PROGRAMS[this.prog], fr = this.fr, fi = this.fi;
+    for (let c = 0; c < CNV_BUILD && this.built < this.nIR; c++) {
+      const p = this.built;
+      if (this.src) {
+        const sL = this.src.L, sR = this.src.R, o = p * B, m = Math.min(B, sL.length - o);
+        for (let n = 0; n < m; n++) { fr[n] = sL[o + n] * CNV_IR_GAIN; fi[n] = (o + n < sR.length ? sR[o + n] : 0) * CNV_IR_GAIN; }
+        for (let n = m; n < N; n++) { fr[n] = 0; fi[n] = 0; }
+        cnvFFT(fr, fi, false, this.cs, this.sn);
+        this.hr.set(fr, p * N); this.hi.set(fi, p * N);
+        this.built++;
+        continue;
+      }
+      for (let n = 0; n < B; n++) {
+        const s = p * B + n, t = s / fs;
+        const env = this.g0 * (1 - Math.exp(-t / P.build)), eh = Math.exp(-this.hfK * t);
+        for (let ch = 0; ch < 2; ch++) {
+          const u = this._rand(ch), g = this.gs[ch];
+          g[0] = u + this.aLo * (g[0] - u); g[1] = u + this.aHi * (g[1] - u);
+          let h = env * (g[1] + eh * (u - g[1]));
+          for (const e of this.erT) if (e[0] === s) h += e[1] * (ch ? 1 + e[2] : 1 - e[2]);
+          if (ch) fi[n] = h; else fr[n] = h;
+        }
+      }
+      for (let n = B; n < N; n++) { fr[n] = 0; fi[n] = 0; }
+      cnvFFT(fr, fi, false, this.cs, this.sn);
+      this.hr.set(fr, p * N); this.hi.set(fi, p * N);
+      this.built++;
+    }
+  }
+  _mac(p, s) { // acc += X(slot s) * H(p) * gain(p)
+    const N = CNV_N, P = this.P, g = this.pg[p];
+    if (s < 0) s += P;
+    const xo = s * N, ho = p * N, xr = this.xr, xi = this.xi, hr = this.hr, hi = this.hi, ar = this.ar, ai = this.ai;
+    for (let k = 0; k < N; k++) {
+      const a = xr[xo + k], b = xi[xo + k], c = hr[ho + k], d = hi[ho + k];
+      ar[k] += g * (a * c - b * d); ai[k] += g * (a * d + b * c);
+    }
+  }
+  run(x) {
+    if (!this.ready) this._alloc();
+    if (this.dirty) { this._startIR(); this.reset(); }
+    const B = CNV_B, N = CNV_N;
+    this.hp = this.hpA * (this.hp + x - this.hpIn); this.hpIn = x;
+    const pl = this.pre.length; this.pw = this.pw + 1 === pl ? 0 : this.pw + 1; this.pre[this.pw] = this.hp;
+    let ri = this.pw - this.preD; if (ri < 0) ri += pl;
+    const i = this.i;
+    this.inb[B + i] = this.pre[ri];
+    // the older partitions, a share each sample, for the output due at the end of this block
+    const target = 1 + Math.floor((i + 1) * (this.nAct - 1) / B);
+    while (this.next < target) { this._mac(this.next, this.slot + 1 - this.next); this.next++; }
+    let yl = this.outL[i], yr = this.outR[i];
+    if (++this.i === B) {
+      this.i = 0;
+      // new input spectrum from [last block, this block]
+      const fr = this.fr, fi = this.fi, inb = this.inb;
+      for (let n = 0; n < N; n++) { fr[n] = inb[n]; fi[n] = 0; }
+      for (let n = 0; n < B; n++) inb[n] = inb[B + n];
+      cnvFFT(fr, fi, false, this.cs, this.sn);
+      this.slot = this.slot + 1 === this.P ? 0 : this.slot + 1;
+      this.xr.set(fr, this.slot * N); this.xi.set(fi, this.slot * N);
+      if (this.nAct > 0) this._mac(0, this.slot);
+      const ar = this.ar, ai = this.ai;
+      for (let n = 0; n < N; n++) { fr[n] = ar[n]; fi[n] = ai[n]; ar[n] = 0; ai[n] = 0; }
+      cnvFFT(fr, fi, true, this.cs, this.sn);
+      for (let n = 0; n < B; n++) { this.outL[n] = fr[B + n] / N; this.outR[n] = fi[B + n] / N; }
+      if (this.built < this.nIR) this._buildSome();
+      this.nAct = Math.min(this.built, this.nG); this.next = 1;
+    }
+    // tone, then width (mid/side)
+    this.lpL = yl + this.lpA * (this.lpL - yl); this.lpR = yr + this.lpA * (this.lpR - yr);
+    const m = 0.5 * (this.lpL + this.lpR), sd = 0.5 * (this.lpL - this.lpR) * this.width;
+    this.L = m + sd; this.R = m - sd;
+  }
+}
+
 const RAT_OS = 2; // the RAT runs at 2x the voice rate (4x the host rate)
 
 // Simple digital delay (outside the circuit): tempo-synced time, feedback, and a low cut and high cut
@@ -978,13 +1347,17 @@ class Compactor {
 // both ducked by the Compactor keyed from the dry synth, then a soft clip. Same order as the 303 app.
 const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
   lexprog: 0.125, lexbass: 0.3, lexmid: 0.27, lexxover: 0.443, lextreble: 0.834, lexdepth: 0.5, lexdiff: 0.55, lexpre: 0.2, lexme: 0.5, lexpitch: 0.2, lexmix: 0.5,
+  revtype: 0, plateprog: 0.5, platepre: 0.2, platedecay: 0.45, platedamp: 0.6, platebw: 0.75, platelo: 0.35, platediff: 0.88, platemod: 0.5, platemix: 0.5,
+  sprprog: 2 / 3, sprdwell: 0.4, sprdecay: 0.5, sprtension: 0.5, sprtone: 0.5, sprlo: 0.4, sprmix: 0.5,
+  cnvprog: 0, cnvpre: 0.2, cnvdecay: 1, cnvtone: 0.7, cnvlo: 0.3, cnvwidth: 2 / 3, cnvmix: 0.5,
   cmpthr: 0.5, cmprng: 0.5, cmpatk: 0.3, cmphold: 0, cmprel: 0.4, cmpmix: 0.7, cmpmode: 0,
   dlypp: 1, dlytime: 0.7, dlyfb: 0.35, dlylo: 0.3, dlyhi: 0.55, dlymix: 0.35 };
 class FxChain {
   constructor(fs) {
     this.fs = fs; this.c = { ...FX_PARTS }; this.knobs = { ...FX_KNOB_DEFS };
     this.fx = { rat: false, lex: false, dly: false }; this.bpm = 120;
-    this.lex = new Lexicon224(fs); this.dly = new DigitalDelay(fs); this.cmp = new Compactor(fs);
+    this.lex = new Lexicon224(fs); this.dly = new DigitalDelay(fs);
+    this.plate = new DattorroPlate(fs); this.spring = new SpringReverb(fs); this.conv = new ConvReverb(fs); this.revT = 0; this.cmp = new Compactor(fs);
     this.rt = { hin: 0, xin: 0, h1: 0, h2: 0, x1: 0, fb: 0, y: 0, hc: 0, xc: 0, v: 0, f: 0, xp: 0, dco: 0, dci: 0 };
     this.L = 0; this.R = 0;
     this.derive();
@@ -1018,8 +1391,12 @@ class FxChain {
     this.ratIs = 1e-3 / Math.exp(c.RAT_VF / this.ratN);
     this.ratFltA = e((c.RAT_RF + 100e3 * k.filter) * c.RAT_CFLT);
     this.ratLevel = audioTaper(k.ratvol) * 6;
-    this.lex.derive(c, k);
+    this.lex.derive(c, k); this.plate.derive(k); this.spring.derive(k); this.conv.derive(k);
+    const t = revType(k);
+    if (t !== this.revT) { this.revT = t; this.rev.reset?.(); }
   }
+  // the unit on the reverb slot (fx.lex switches it on): 0 = Lexicon 224, 1 = plate, 2 = spring, 3 = convolution
+  get rev() { return this.revT === 1 ? this.plate : this.revT === 2 ? this.spring : this.revT === 3 ? this.conv : this.lex; }
   _rat(x) {
     const s = this.rt, x0 = s.xp, N = this.ratN2; s.xp = x;
     let y = 0;
@@ -1069,15 +1446,15 @@ class FxChain {
     let y = this.fx.rat ? 0.95 * Math.tanh(this._rat(x) / 0.95) : x;
     if (!(this.fx.lex || this.fx.dly)) { this.L = this.R = y; return; }
     let wl = 0, wr = 0;
-    if (this.fx.lex) { this.lex.run(y); wl += this.lex.wet * this.lex.L; wr += this.lex.wet * this.lex.R; }
+    if (this.fx.lex) { const r = this.rev; r.run(y); wl += r.wet * r.L; wr += r.wet * r.R; }
     if (this.fx.dly) { this.dly.run(y); wl += this.dly.l; wr += this.dly.r; }
     const g = this.cmp.run(y, wl, wr);
     this.L = 0.98 * Math.tanh((y + this.cmp.l * g) / 0.98);
     this.R = 0.98 * Math.tanh((y + this.cmp.r * g) / 0.98);
   }
-  flush() { fxFlushTiny(this, 0); fxFlushTiny(this.lex, 0); fxFlushTiny(this.dly, 0); fxFlushTiny(this.cmp, 0); }
+  flush() { fxFlushTiny(this, 0); fxFlushTiny(this.lex, 0); fxFlushTiny(this.plate, 0); fxFlushTiny(this.spring, 0); fxFlushTiny(this.conv, 0); fxFlushTiny(this.dly, 0); fxFlushTiny(this.cmp, 0); }
 }
-const FX_FLUSH_SKIP = new Set(['c', 'knobs', 'fx', 'lex', 'mem', 'buf', 'bufR', 'L', 'R', 'dly', 'cmp']);
+const FX_FLUSH_SKIP = new Set(['c', 'knobs', 'fx', 'lex', 'plate', 'spring', 'conv', 'mem', 'buf', 'bufR', 'L', 'R', 'dly', 'cmp']);
 function fxFlushTiny(o, depth) {
   if (Array.isArray(o) || ArrayBuffer.isView(o)) {
     if (o.length > 64) return;
@@ -1230,6 +1607,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'noteOff': this.keyOff(m.n); break;
       case 'seq': Object.assign(this.seq, m.seq); if (m.seq.bpm) this.fxc.setBpm(m.seq.bpm); break;
       case 'fx': this.fxc.setFx(m.name, m.on); break;
+      case 'ir': this.fxc.conv.setIR(m.id, m.L, m.R); break; // a recorded impulse response for Conv, decoded at this rate
       case 'fxknobs': for (const k in m.k) this.fxc.knobs[k] = m.k[k]; this.fxc.derive(); break;
       case 'mode': {
         const was = this.arp || this.seqMode === 2;
@@ -1718,8 +2096,18 @@ const BENDER = [
 
 // ---------- effects (the 303 app's RAT, delay, Lexicon 224 and Compactor) ----------
 const DLY_DIV_NAMES = ['1/32', '1/16T', '1/16', '1/8T', '1/16D', '1/8', '1/4T', '1/8D', '1/4', '1/4D', '1/2'];
-const LEX_PROGS = [['Small Hall B', 24, 152], ['Vocal Plate', 0, 107], ['Large Hall B', 24, 152], ['Chamber', 25, 255], ['Perc Plate', 0, 107],
-  ['Small Hall A', 24, 152], ['Room A', 24, 255], ['CD Plate', 5, 185], ['Chorus', 0, 253]];
+// the reverb slot's programs, mirrored from the engine's tables (LEX_PROGRAMS, PLATE_PROGRAMS, SPRING_PROGRAMS, CNV_PROGRAMS)
+const REV_TYPE_NAMES = ['224', 'Plate', 'Spring', 'Conv'], REV_IDS = ['lex', 'plate', 'spring', 'conv'];
+const LEX_PROGS = [['Small Hall B', 24, 152, 'Small Concert Hall B'], ['Vocal Plate', 0, 107, 'Vocal Plate'], ['Large Hall B', 24, 152, 'Large Concert Hall B'],
+  ['Chamber', 25, 255, 'Acoustic Chamber'], ['Perc Plate', 0, 107, 'Percussion Plate A'], ['Small Hall A', 24, 152, 'Small Concert Hall A'],
+  ['Room A', 24, 255, 'Room A'], ['CD Plate', 5, 185, 'Constant Density Plate A'], ['Chorus', 0, 253, 'Chorus A']];
+const PLATE_PROGS = [['Tiny', 'Tiny plate', 0.5], ['Small', 'Small plate', 0.72], ['Medium', 'Medium plate (Dattorro)', 1], ['Large', 'Large plate', 1.3], ['Huge', 'Huge plate', 1.65]];
+const SPRING_PROGS = [['1 spring', 'One spring', [36]], ['2 springs', 'Two springs', [31.5, 37.3]], ['3 springs', 'Three springs', [33.1, 37.7, 41.9]], ['Long tank', 'Long tank', [44.3, 51.1, 58.7]]];
+// [short, name, recorded IR id, gated, early reflections]
+const CNV_PROGS = [['Plate 140', 'EMT 140 plate', 'plate140'], ['Plate 140 Br', 'EMT 140 plate, bright', 'plate140b'], ['Drum room', 'Drum room', 'drumroom'],
+  ['Silo', 'Grain silo', 'silo'], ['Garage', 'Concrete garage', 'garage'], ['Musikverein', 'Musikverein, Vienna', 'musikverein'], ['On a Star', 'On a Star', 'star'],
+  ['Church', 'Church (generated)', null, false, true], ['Gated', 'Gated, 1980s (generated)', null, true, false]];
+const SPRING_STAGES_UI = 48;
 const exr = (lo, hi, p) => lo * Math.pow(hi / lo, p);
 const hz = f => f >= 1000 ? (f / 1000).toFixed(f < 10000 ? 2 : 1) + 'k' : f.toFixed(0) + 'Hz';
 const sec = t => t < 10 ? t.toFixed(1) + 's' : t.toFixed(0) + 's';
@@ -1730,14 +2118,40 @@ const FX = [
     { f: 'dlytime', label: 'Time', def: .7, fmt: v => DLY_DIV_NAMES[Math.round(v * 10)] }, { f: 'dlyfb', label: 'Fdbk', def: .35, fmt: v => Math.round(v * 95) + '%' },
     { f: 'dlylo', label: 'Lo cut', def: .3, fmt: v => hz(20 * Math.pow(50, v)) }, { f: 'dlyhi', label: 'Hi cut', def: .55, fmt: v => hz(1000 * Math.pow(20, v)) },
     { f: 'dlymix', label: 'Return', def: .35, fmt: pct }, { s: 'dlypp', label: 'Mode', opts: ['Mono', 'Ping-pong'], def: 1, val: i => i } ] },
-  { id: 'lex', name: 'Lexicon 224', sub: '20 kHz, 12-bit', items: [
-    { s: 'lexprog', label: 'Program', opts: LEX_PROGS.map((p, i) => 'P' + (i + 1) + ' ' + p[0]), def: 1, val: i => i / 8, progs: true },
-    { f: 'lexbass', label: 'Bass', def: .3, fmt: v => sec(exr(0.6, 70, v)) }, { f: 'lexmid', label: 'Mid', def: .27, fmt: v => sec(exr(0.6, 70, v)) },
-    { f: 'lexxover', label: 'X-over', def: .443, fmt: v => hz(exr(100, 10900, v)) }, { f: 'lextreble', label: 'Treble', def: .834, fmt: v => hz(exr(100, 10900, v)) },
-    { f: 'lexdepth', label: 'Depth', def: .5, fmt: v => Math.round(v * 71) }, { f: 'lexdiff', label: 'Diff', def: .55, fmt: v => Math.round(v * 63) },
-    { f: 'lexpre', label: 'Pre', def: .2, fmt: v => { const P = LEX_PROGS[state.params.lexprog | 0] || LEX_PROGS[1]; return Math.round(P[1] + (P[2] - P[1]) * v) + 'ms'; } },
-    { f: 'lexme', label: 'Mode enh', def: .5, fmt: v => v < .03 ? 'off' : 17 - Math.max(1, Math.min(16, Math.ceil(v * 16))) },
-    { f: 'lexpitch', label: 'Pitch', def: .2, fmt: v => 1 + Math.round(v * 15) }, { f: 'lexmix', label: 'Return', def: .5, fmt: pct } ] },
+  // the reverb slot (from the 303 app): one switch picks the unit, each unit has its program buttons and its own faders.
+  // rev: which unit an item belongs to; prog: the program buttons (stored as an index, sent as 0..1 like the 303's knobs).
+  { id: 'lex', name: 'Reverb', sub: 'four units, one slot', rv: true, items: [
+    { s: 'revtype', label: 'Reverb', opts: REV_TYPE_NAMES, def: 0, val: i => i / 3, rvType: true },
+    { s: 'lexprog', label: 'Program', rev: 'lex', prog: true, opts: LEX_PROGS.map(p => p[0]), def: 1, val: i => i / 8 },
+    { f: 'lexbass', rev: 'lex', label: 'Bass', def: .3, fmt: v => sec(exr(0.6, 70, v)) }, { f: 'lexmid', rev: 'lex', label: 'Mid', def: .27, fmt: v => sec(exr(0.6, 70, v)) },
+    { f: 'lexxover', rev: 'lex', label: 'X-over', def: .443, fmt: v => hz(exr(100, 10900, v)) }, { f: 'lextreble', rev: 'lex', label: 'Treble', def: .834, fmt: v => hz(exr(100, 10900, v)) },
+    { f: 'lexdepth', rev: 'lex', label: 'Depth', def: .5, fmt: v => Math.round(v * 71) }, { f: 'lexdiff', rev: 'lex', label: 'Diff', def: .55, fmt: v => Math.round(v * 63) },
+    { f: 'lexpre', rev: 'lex', label: 'Pre', def: .2, fmt: v => { const P = LEX_PROGS[state.params.lexprog | 0] || LEX_PROGS[1]; return Math.round(P[1] + (P[2] - P[1]) * v) + 'ms'; } },
+    { f: 'lexme', rev: 'lex', label: 'Mode enh', def: .5, fmt: v => v < .03 ? 'off' : 17 - Math.max(1, Math.min(16, Math.ceil(v * 16))) },
+    { f: 'lexpitch', rev: 'lex', label: 'Pitch', def: .2, fmt: v => 1 + Math.round(v * 15) }, { f: 'lexmix', rev: 'lex', label: 'Return', def: .5, fmt: pct },
+    { s: 'plateprog', label: 'Size', rev: 'plate', prog: true, opts: PLATE_PROGS.map(p => p[0]), def: 2, val: i => i / 4 },
+    { f: 'platepre', rev: 'plate', label: 'Pre', def: .2, fmt: v => Math.round(250 * v * v) + 'ms' },
+    { f: 'platedecay', rev: 'plate', label: 'Decay', def: .45, fmt: v => sec(exr(0.3, 20, v)) },
+    { f: 'platedamp', rev: 'plate', label: 'Damping', def: .6, fmt: v => hz(exr(1000, 20000, v)) },
+    { f: 'platebw', rev: 'plate', label: 'Bandw', def: .75, fmt: v => hz(exr(1000, 20000, v)) },
+    { f: 'platelo', rev: 'plate', label: 'Lo cut', def: .35, fmt: v => hz(exr(20, 1000, v)) },
+    { f: 'platediff', rev: 'plate', label: 'Diff', def: .88, fmt: pct },
+    { f: 'platemod', rev: 'plate', label: 'Mod', def: .5, fmt: v => Math.round(200 * v) + '%' },
+    { f: 'platemix', rev: 'plate', label: 'Return', def: .5, fmt: pct },
+    { s: 'sprprog', label: 'Tank', rev: 'spring', prog: true, opts: SPRING_PROGS.map(p => p[0]), def: 2, val: i => i / 3 },
+    { f: 'sprdwell', rev: 'spring', label: 'Dwell', def: .4, fmt: v => '×' + exr(0.5, 8, v).toFixed(1) },
+    { f: 'sprdecay', rev: 'spring', label: 'Decay', def: .5, fmt: v => sec(exr(0.4, 6, v)) },
+    { f: 'sprtension', rev: 'spring', label: 'Tension', def: .5, fmt: pct },
+    { f: 'sprtone', rev: 'spring', label: 'Tone', def: .5, fmt: v => hz(exr(1500, 6000, v)) },
+    { f: 'sprlo', rev: 'spring', label: 'Lo cut', def: .4, fmt: v => hz(exr(50, 1000, v)) },
+    { f: 'sprmix', rev: 'spring', label: 'Return', def: .5, fmt: pct },
+    { s: 'cnvprog', label: 'IR', rev: 'conv', prog: true, opts: CNV_PROGS.map(p => p[0]), def: 0, val: i => i / 8 },
+    { f: 'cnvpre', rev: 'conv', label: 'Pre', def: .2, fmt: v => Math.round(Math.max(250 * v * v, 512000 / (ctx ? ctx.sampleRate : 48000))) + 'ms' },
+    { f: 'cnvdecay', rev: 'conv', label: 'Decay', def: 1, fmt: v => { const P = CNV_PROGS[state.params.cnvprog | 0] || CNV_PROGS[0]; return P[2] ? (v >= .99 ? 'full' : sec(exr(0.2, 3, v))) : sec(P[3] ? exr(0.12, 1, v) : exr(0.2, 4, v)); } },
+    { f: 'cnvtone', rev: 'conv', label: 'Tone', def: .7, fmt: v => hz(exr(1000, 20000, v)) },
+    { f: 'cnvlo', rev: 'conv', label: 'Lo cut', def: .3, fmt: v => hz(exr(20, 1000, v)) },
+    { f: 'cnvwidth', rev: 'conv', label: 'Width', def: 2 / 3, fmt: v => Math.round(150 * v) + '%' },
+    { f: 'cnvmix', rev: 'conv', label: 'Return', def: .5, fmt: pct } ] },
   { id: 'cmp', name: 'Compactor', sub: 'ducks the returns', items: [
     { f: 'cmpthr', label: 'Thresh', def: .5, fmt: v => (-40 + 40 * v).toFixed(0) + 'dB' }, { f: 'cmprng', label: 'Range', def: .5, fmt: v => Math.round(200 * v) + '%' },
     { f: 'cmpatk', label: 'Attack', def: .3, fmt: v => (10 * v).toFixed(1) + 'ms' }, { f: 'cmphold', label: 'Hold', def: 0, fmt: v => Math.round(500 * v * v) + 'ms' },
@@ -1818,6 +2232,7 @@ async function boot() {
     node.connect(ctx.destination);
     node.port.onmessage = onEngineMsg;
     pushAll();
+    if ((state.params.revtype | 0) === 3) { irFailed = false; loadIRs(); } // a failed list gets one more try when audio starts
     if (ctx.state !== 'running') await ctx.resume();
   })();
   return booting;
@@ -1958,23 +2373,95 @@ const fxrow = document.getElementById('fxrow'), fxBox = {};
 for (const u of FX) {
   const el = document.createElement('section'); el.className = 'fxu'; el.setAttribute('aria-label', u.name);
   const sw = u.id === 'cmp' ? '' : `<button class="onoff" id="fx-${u.id}-on" aria-pressed="false">off</button>`;
-  el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><small>${u.sub}</small></div><div class="ctrls"></div>`;
-  const c = el.querySelector('.ctrls');
-  for (const it of u.items) {
-    if (it.f) fader(it, c);
-    else switcher({ ...it, onSet: it.progs ? () => ui.lexpre && ui.lexpre(state.params.lexpre) : null }, c);
+  if (u.rv) {
+    el.classList.add('rv');
+    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type" role="radiogroup" aria-label="Reverb type">` +
+      REV_TYPE_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n}</button>`).join('') +
+      `</span><span class="rv-lcd" id="rvLcd" aria-live="polite"></span><small>${u.sub}</small></div>` +
+      `<div class="rv-progs" id="rvProgs" role="radiogroup" aria-label="Program"></div><div class="ctrls"></div><p class="rv-note" id="rvNote"></p>`;
+    const c = el.querySelector('.ctrls');
+    for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.rev = it.rev; }
+  } else {
+    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><small>${u.sub}</small></div><div class="ctrls"></div>`;
+    const c = el.querySelector('.ctrls');
+    for (const it of u.items) it.f ? fader(it, c) : switcher(it, c);
   }
-  if (u.id === 'lex') c.querySelector('.sw').classList.add('progs');
   if (u.id === 'cmp') el.insertAdjacentHTML('beforeend', '<p class="fxnote">Keyed from the dry synth: it ducks the delay and reverb returns while you play, like the 303 app.</p>');
   fxrow.appendChild(el); fxBox[u.id] = el;
   const b = el.querySelector('.onoff');
   if (b) b.onclick = () => { boot(); state.fx[u.id] = !state.fx[u.id]; post({ type: 'fx', name: u.id, on: state.fx[u.id] }); renderFx(); save(); };
 }
+// ---------- the reverb slot: type switch, program buttons, the selected unit's faders, the note ----------
+const RV_PROG = {}; for (const it of FX.find(u => u.rv).items) if (it.prog) RV_PROG[it.rev] = it;
+const rvProgs = document.getElementById('rvProgs');
+let rvShown = '';
+function setRev(id, i) { // a type or program button: these switch at once (like the 303 app, no slewing)
+  const it = FX_SW[id]; state.params[id] = i; post({ type: 'param', id, v: it.val(i) }); save(); drawRev();
+}
+document.querySelector('.rv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { boot(); setRev('revtype', +b.dataset.t); } });
+rvProgs.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) { boot(); setRev(RV_PROG[REV_IDS[state.params.revtype | 0] || 'lex'].s, +b.dataset.i); } });
+const LEX_CHORUS_NAMES = { lexbass: 'Pair 1', lexmid: 'Pair 2', lexxover: 'Pair 3', lextreble: 'Pair 4', lexdepth: 'Wander' };
+const fdrLabel = id => document.querySelector(`label[for="f-${id}"]`);
+function revNote(T, i) {
+  if (T === 'lex') {
+    const P = LEX_PROGS[i];
+    return i === 8 ? 'Eight voices, four a side, each delay wandering at random. The first four faders are the voice-pair levels; Diffusion acts on pairs 3 and 4. 20 kHz, 12-bit gain-ranging converters, 16-bit words.'
+      : `Lexicon 224 (1978): 20 kHz, 12-bit gain-ranging converters, 16-bit words in a shared 32K-word memory. Predelay ${P[1]}–${P[2]} ms on this program. Names, ranges and specs follow Lexicon; the algorithms are estimates built on Dattorro's Griesinger-style plate.`;
+  }
+  if (T === 'plate') return `Jon Dattorro's published plate (JAES 1997): four input diffusers into a figure-eight tank with modulated allpasses. ${PLATE_PROGS[i][1]}: every delay scaled ×${PLATE_PROGS[i][2]}. Damping is the high cut inside the tank, Bandwidth the one before it.`;
+  if (T === 'spring') return `A dispersive spring model after Välimäki, Parker and Abel (JAES 2010): each spring is a delay loop through ${SPRING_STAGES_UI} stretched allpasses, so every echo smears into the falling drip. ${SPRING_PROGS[i][1]}, transit ${SPRING_PROGS[i][2].join(' / ')} ms. Dwell drives the tank, Tension lengthens the chirp.`;
+  const P = CNV_PROGS[i];
+  if (P[2]) {
+    const m = irMeta && irMeta.irs.find(x => x.id === P[2]);
+    return (m ? `${m.character} ${m.credit}, ${m.licence}. ` : irFailed ? 'The impulse responses could not be loaded. ' : 'Recorded impulse response; it loads when audio starts. ') +
+      'Length trims the response (full at the top). Partitioned FFT convolution, one 512-sample block late, which is the shortest predelay.';
+  }
+  return `Partitioned FFT convolution with a generated impulse response: seeded noise with the highs dying first${P[4] ? ', a build-up and early reflections' : ''}. ${P[3] ? 'Decay sets the gate length. ' : ''}The wet signal is one 512-sample block late, which is the shortest predelay.`;
+}
+function drawRev() {
+  const t = Math.max(0, Math.min(3, state.params.revtype | 0)), T = REV_IDS[t], pit = RV_PROG[T], n = pit.opts.length;
+  const sel = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0));
+  for (const b of document.querySelectorAll('.rv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
+  if (rvShown !== T) {
+    rvShown = T;
+    rvProgs.style.setProperty('--n', n);
+    const full = T === 'lex' ? LEX_PROGS.map(p => p[3]) : T === 'plate' ? PLATE_PROGS.map(p => p[1]) : T === 'spring' ? SPRING_PROGS.map(p => p[1]) : CNV_PROGS.map(p => p[1]);
+    rvProgs.innerHTML = pit.opts.map((o, i) => `<button data-i="${i}" role="radio" aria-checked="false" title="${full[i]}"><b>${i + 1}</b>${o}</button>`).join('');
+    for (const f of fxBox.lex.querySelectorAll('.fdr[data-rev]')) f.hidden = f.dataset.rev !== T;
+  }
+  for (const b of rvProgs.children) b.setAttribute('aria-checked', +b.dataset.i === sel);
+  const lcd = T === 'lex' ? `P${sel + 1} ${LEX_PROGS[sel][3]}` : `${sel + 1} ${(T === 'plate' ? PLATE_PROGS : T === 'spring' ? SPRING_PROGS : CNV_PROGS)[sel][1]}`;
+  document.getElementById('rvLcd').textContent = lcd.toUpperCase();
+  if (T === 'lex') for (const id in LEX_CHORUS_NAMES) fdrLabel(id).textContent = (sel === 8 ? LEX_CHORUS_NAMES[id] : FX.find(u => u.rv).items.find(x => x.f === id).label).toLowerCase();
+  if (T === 'conv') { fdrLabel('cnvdecay').textContent = CNV_PROGS[sel][3] ? 'gate' : CNV_PROGS[sel][2] ? 'length' : 'decay'; if (!irFailed) { loadIRMeta(); loadIRs(); } }
+  for (const it of FX.find(u => u.rv).items) if (it.f && it.rev === T) ui[it.f](state.params[it.f]); // readouts that depend on the program
+  document.getElementById('rvNote').textContent = revNote(T, sel);
+}
+// recorded impulse responses for Conv (irs/irs.json, from the 303 app): the list loads when Conv is shown, the samples once
+// audio is running, decoded at the audio rate here and handed to the engine
+let irMeta = null, irFailed = false, irMetaP = null, irSentTo = null;
+function loadIRMeta() {
+  irMetaP ||= fetch('irs/irs.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(m => { irMeta = m; drawRev(); return m; }).catch(() => { irFailed = true; irMetaP = null; drawRev(); return null; });
+  return irMetaP;
+}
+async function loadIRs() {
+  if (!ctx || !node || irSentTo === ctx) return; irSentTo = ctx;
+  const m = await loadIRMeta(); if (!m) { irSentTo = null; return; }
+  for (const ir of m.irs) {
+    try {
+      const buf = await ctx.decodeAudioData(await (await fetch('irs/' + ir.file)).arrayBuffer());
+      const L = buf.getChannelData(0).slice(), R = (buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0)).slice();
+      node.port.postMessage({ type: 'ir', id: ir.id, L, R }, [L.buffer, R.buffer]);
+    } catch (e) { console.warn('IR', ir.id, e && e.message); }
+  }
+}
+for (const id of ['revtype', 'lexprog', 'plateprog', 'sprprog', 'cnvprog']) ui[id] = () => drawRev(); // preset loads redraw the slot
 function renderFx() {
   for (const n of ['rat', 'dly', 'lex']) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'on' : 'off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
   fxBox.cmp.classList.toggle('on', !!(state.fx.dly || state.fx.lex));
 }
-renderFx();
+renderFx(); drawRev();
 
 // Randomise: depth sets how many bridges (1 at 0%, 8 at 100%) and how strong they can be (lower resistance)
 const brDepthEl = document.getElementById('brDepth'), brDepthOut = document.getElementById('o-brDepth');
