@@ -41,7 +41,7 @@
     --fs-xs: 11px; --fs-s: 13px; --fs: 15px; --fs-l: 16px; --fs-xl: 22px; --trk: 16px; --trk-min: 30px; }
 }
 
-/* ---------- glass themes: Colours… in the ≡ menu ----------
+/* ---------- glass themes: Options › Colours ----------
    Mono: one ink on one coloured glass (the swatch is the glass). Grey + colour (the default): black ink on grey glass,
    and the swatch is one deep spot colour, like a printed filter on a real LCD, on a few small things only:
    Run while running, the open tab, the pattern in use and the step playing, FX power when on, lit switch LEDs.
@@ -174,21 +174,54 @@ select.btn option { color: #000; }
 .transport { display: flex; align-items: center; gap: var(--gap-s) var(--gap); }
 .top .btn { height: var(--h-top); font-size: var(--fs-l); }
 .btn.play { min-width: 5.2em; justify-content: flex-start; }
-.appmenu { position: relative; }
-.appmenu .btn { width: var(--h-top); padding: 0; font-size: calc(var(--fs-l) + 2px); }
-.menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; min-width: 200px; display: flex; flex-direction: column; padding: 4px;
-  background: var(--glass); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.35); }
-.menu-pop[hidden] { display: none; }
-.menu-pop button { appearance: none; background: none; border: 0; text-align: left; padding: 4px 8px; font-size: var(--fs); color: var(--ink); cursor: pointer; text-transform: lowercase; border-radius: 2px; }
-.menu-pop button:hover, .menu-pop button:focus-visible { background: var(--ink); color: var(--glass); text-shadow: none; outline: 0; }
-.menu-ver { font-size: var(--fs-xs); color: var(--muted); padding: 4px 8px 2px; border-top: var(--rule); margin-top: 4px; }
+.btn.gear { width: var(--h-top); padding: 0; }
+.btn.gear svg { width: 62%; height: 62%; fill: currentColor; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
 
-/* Colours… panel: mode switch and six swatches, each drawn in its own Mono glass and ink */
-.lcd-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s) var(--gap-s) calc(var(--gap-s) + 2px);
-  background: var(--glass); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.35); text-shadow: none; }
-.lcd-pop[hidden] { display: none; }
-.lcd-pop h3 { margin: 0; padding: 0 var(--gap-s) 0 calc(var(--gap-s) + 2px); background: var(--ink); color: var(--glass); border-radius: var(--r);
-  font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; text-transform: lowercase; }
+/* ---------- Options sheet (the gear): a modal piece of the same glass, from the TB-303 app's dialog#options ---------- */
+html:has(dialog#options[open]) { overflow: hidden; }
+dialog#options { width: min(940px, calc(100vw - 32px)); height: min(600px, calc(100dvh - 32px)); max-width: none; max-height: none; margin: auto; padding: 0;
+  flex-direction: column; overflow: hidden; color: var(--ink); text-shadow: var(--shadow); border: 6px solid var(--bezel); border-radius: 12px;
+  background-color: var(--glass);
+  background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px),
+    radial-gradient(60% 30% at 10% 100%, rgb(var(--hl1-rgb) / .55), rgb(var(--hl1-rgb) / 0) 70%),
+    radial-gradient(50% 28% at 90% 102%, rgb(var(--hl2-rgb) / .4), rgb(var(--hl2-rgb) / 0) 70%),
+    linear-gradient(180deg, rgb(var(--dk2-rgb) / .2) 0%, rgb(var(--dk2-rgb) / 0) 22%),
+    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / .28) 100%);
+  box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset -4px 0 10px rgba(0,0,0,.15), 0 18px 40px rgba(0,0,0,.5); }
+dialog#options[open] { display: flex; }
+dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
+@media (orientation: landscape) and (max-height: 520px) {
+  dialog#options { width: calc(100vw - 32px); height: calc(100dvh - 32px); }
+}
+.opt-head { flex: none; display: flex; align-items: flex-end; gap: var(--gap) calc(var(--gap) + 12px); padding: calc(var(--pad) - 4px) var(--pad) 0; border-bottom: 2px solid var(--ink); }
+.opt-head h2 { margin: 0; padding-bottom: var(--gap-s); font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; text-transform: lowercase; }
+.otabs { flex: 1; min-width: 0; display: flex; gap: var(--gap-s); }
+.otabs button { appearance: none; background: none; color: var(--ink); border: 2px solid var(--ink); border-bottom: 0; border-radius: var(--r) var(--r) 0 0;
+  height: var(--h); padding: 0 calc(var(--gap-s) + 8px); font: inherit; font-size: var(--fs); line-height: 1; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.otabs button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+[data-lcdmode=colour] .otabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); }
+.otabs button:focus-visible { outline-offset: -5px; outline-color: currentColor; }
+.xbtn { align-self: center; flex: none; appearance: none; background: none; border: 0; color: var(--ink); width: var(--h); height: var(--h); padding: 3px; margin-bottom: var(--gap-s); cursor: pointer; }
+.xbtn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
+.opt-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: calc(var(--pad) + 4px) calc(var(--pad) + 4px) calc(var(--pad) + 8px);
+  font-size: var(--fs); scrollbar-width: thin; scrollbar-color: var(--ink) transparent; }
+.osec { display: grid; gap: calc(var(--gap) + 4px); align-content: start; min-width: 0; }
+.osec[hidden] { display: none; }
+/* MIDI: one status line, then the CC map flowing into columns */
+.opt-status { margin: 0; font-size: var(--fs-s); color: var(--muted); }
+.ccmap { margin: 0; padding: 0; list-style: none; columns: 4 170px; column-gap: calc(var(--gap) + 16px); }
+.ccmap li { display: grid; grid-template-columns: 3.4em 1fr; gap: var(--gap-s); padding: 2px 0; break-inside: avoid; }
+.ccmap b { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ccmap span { text-transform: lowercase; }
+/* About: Install and Check for update side by side, the version, then the notes */
+.opt-acts { display: flex; flex-wrap: wrap; gap: var(--gap-s) var(--gap); }
+.opt-ver { margin: calc(var(--gap) * -1 + 2px) 0 0; font-size: var(--fs-s); color: var(--muted); }
+.notes { columns: 2 300px; column-gap: calc(var(--gap) + 20px); }
+.notes p { margin: 0 0 calc(var(--gap-s) + 4px); break-inside: avoid; line-height: 1.15; }
+.notes strong { font-weight: 400; background: var(--ink); color: var(--glass); text-shadow: none; padding: 0 4px; border-radius: 2px; }
+
+/* Options › Colours: mode switch and six swatches, each drawn in its own Mono glass and ink */
 .lcd-mode { display: flex; align-items: center; gap: var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
 .lcd-mode .lab { color: var(--muted); }
 .lcd-seg { display: inline-flex; }

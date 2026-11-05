@@ -51,7 +51,6 @@
     const a = ACTS.find((a) => a.code === e.code && a.cmd === c && a.shift === e.shiftKey && a.alt === e.altKey);
     if (!a) return;
     e.preventDefault();
-    if (!menuPop.hidden) closeMenu();
     if (a.id !== 'rm-btn' && a.id !== 'tm-btn') closeAll();
     a.run();
   });

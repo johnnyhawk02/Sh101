@@ -57,7 +57,9 @@ site/js/app/*.js         the UI, as plain scripts sharing one scope, in this ord
   namer       preset namer
   sounds      what a preset holds, built-in sounds
   keyboard    engine feedback, computer keys, bender, Space
-  app         install, ≡ menu, Colours, auto-update
+  options     the Options sheet (gear): tabs, Colours
+  midi        MIDI CC to the front-panel controls, the MIDI tab's map and status
+  app         install, check for update, auto-update
 site/sw.js               offline cache: lists every file above (add new files there)
 ```
 
@@ -72,11 +74,19 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.5), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.6), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Options sheet and MIDI CC (v0.13.6)
+
+From the TB-303 app. The ≡ menu and the Colours pop-up are gone; a gear at the right of the top bar (`#open-options`) opens **Options**, a modal `<dialog>` of the same glass with three tabs, `midi`, `colours` and `about` (left and right arrows move between them, the last one is saved as `kestrel.optTab`). It closes with ×, Escape or a click on the backdrop. About 940 x 600 on a desktop; on a phone in landscape it fills the screen less a 16 px margin and its body scrolls.
+
+- **MIDI** (`js/app/midi.js`): every input, every channel, inputs plugged in later too. CC 1 onwards are the rack's continuous controls in panel order, then the bender's VCO, VCF and LFO mod (27 in all; CC 1 is LFO Rate, CC 10 Cutoff), built from `RACK` and `BENDER`. A CC moves the fader, its readout, the engine and the saved state as a drag does, batched to one update per frame. Switches and notes are not used. Access is asked for on the first touch. The tab's status line is the only status text in the app.
+- **Colours**: the old pop-up's mode switch and swatches, unchanged (`kestrel.lcdTheme`, `kestrel.lcdMode`, the head script).
+- **About**: Install app and Check for update (the old menu items), the version, and short notes on each modelled stage and effect, with the impulse-response credits.
 
 ### Preset menu: delete from the list, Factory folder, Export all and favourites (v0.13.5)
 
