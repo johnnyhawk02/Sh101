@@ -1,6 +1,8 @@
 // Shyoy: Faders, dials and switches, and the synth rack built from them.
 // ---------- UI: faders ----------
 const ui = {};
+// called with (id) whenever a fader or dial is moved by hand; the performance strip (strip.js) uses it to keep both copies in step
+const onMove = [];
 function fader(def, mount) {
   const id = def.f, store = def.bend ? state.bend : null;
   const get = () => (def.bend ? state.bend : state.params)[id];
@@ -12,7 +14,7 @@ function fader(def, mount) {
     cap.style.top = (9 + (1 - v) * (112 - 18)) + 'px'; tr.style.setProperty('--v', v);
     tr.setAttribute('aria-valuenow', Math.round(v * 100)); const t = def.fmt(v); out.textContent = t; tr.setAttribute('aria-valuetext', t);
     if (def.bend) out.classList.toggle('off', Math.abs(v - def.def) > 0.004);
-    if (send) { if (def.bend) post({ type: 'bend', b: bendPhysical(state.bend) }); else if (def.seq) post(seqMsg()); else post({ type: 'param', id, v }); save(); }
+    if (send) { if (def.bend) post({ type: 'bend', b: bendPhysical(state.bend) }); else if (def.seq) post(seqMsg()); else post({ type: 'param', id, v }); save(); if (!def.bend) for (const h of onMove) h(id); }
   };
   const fromY = (e) => { const r = tr.getBoundingClientRect(); return 1 - (e.clientY - r.top) / r.height; };
   let drag = null;
@@ -56,7 +58,7 @@ function dial(def, mount) {
     v = Math.max(0, Math.min(1, v)); state.params[id] = v;
     const n = Math.round(v * DIAL_SEGS); arc.setAttribute('d', n ? DIAL_LIT[n - 1] : '');
     kn.setAttribute('aria-valuenow', Math.round(v * 100)); const t = def.fmt(v); out.textContent = t; kn.setAttribute('aria-valuetext', t);
-    if (send) { post({ type: 'param', id, v }); save(); }
+    if (send) { post({ type: 'param', id, v }); save(); for (const h of onMove) h(id); }
   };
   let drag = null;
   const end = () => { drag = null; el.classList.remove('active'); };

@@ -289,6 +289,20 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .pm-opt { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); cursor: pointer; }
 .pm-opt input { accent-color: var(--ink); }
 
+/* ---------- performance strip (v0.18.0): eight assignable dials under the header, on every page (strip.js) ---------- */
+.mstrip { order: 0; flex: none; display: flex; justify-content: space-around; align-items: flex-start; padding: 14px var(--pad) 12px; border-bottom: var(--bw) solid var(--ink); }
+.mslot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 150px; }
+.mslot .dial { flex: none; gap: 6px; }
+.mslot .dial .knob { flex: none; width: 64px; height: 64px; min-height: 0; }
+.mpick > .rm-btn { font-size: var(--fs); padding: 0 10px; }
+/* the pick menu: two columns, module headings kept with their first control */
+.mpick .fn-menu { left: 50%; right: auto; transform: translateX(-50%); display: block; columns: 2; column-gap: 0; min-width: 380px; }
+.mpick .fn-menu[hidden] { display: none; }
+.mpick .fn-menu .mh { display: block; break-after: avoid; }
+.mpick .fn-menu button { break-inside: avoid; }
+.mslot:first-child .mpick .fn-menu { left: 0; transform: none; }
+.mslot:last-child .mpick .fn-menu { left: auto; right: 0; transform: none; }
+
 /* ---------- tabs: one segmented selector the full width of the glass ---------- */
 .tabs { order: 1; flex: none; display: flex; counter-reset: tab; border-bottom: var(--bw) solid var(--ink); }
 .tabs button { appearance: none; flex: 1 1 0; min-width: 0; background: none; border: 0; border-right: var(--rule); border-radius: 0; padding: calc(var(--gap-s) + 1px) 6px;

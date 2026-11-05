@@ -29,7 +29,7 @@ try {
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.17.3</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.18.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -51,6 +51,9 @@ try {
       <button type="button" class="btn gear" id="open-options" aria-haspopup="dialog" aria-label="Options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z M12 8.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2z" fill-rule="evenodd"/></svg></button>
     </div>
   </header>
+
+  <!-- the performance strip: eight assignable dials, on view on every page (strip.js) -->
+  <section class="mstrip" id="mstrip" aria-label="Performance dials"></section>
 
   <section class="rack" id="rack"></section>
 
@@ -179,7 +182,7 @@ try {
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.17.3</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.18.0</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
@@ -213,6 +216,7 @@ try {
 <script src="js/app/controls.js"></script>
 <script src="js/app/bend.js"></script>
 <script src="js/app/effects.js"></script>
+<script src="js/app/strip.js"></script>
 <script src="js/app/patterns.js"></script>
 <script src="js/app/generate.js"></script>
 <script src="js/app/sequencer.js"></script>
