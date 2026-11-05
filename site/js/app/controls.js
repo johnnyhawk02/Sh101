@@ -11,22 +11,48 @@ for (const el of document.querySelectorAll('.sld input[type=range]')) {
 const ui = {};
 // called with (id) whenever a fader or dial is moved by hand; the performance strip (strip.js) uses it to keep both copies in step
 const onMove = [];
+// ---------- per-control step sequencers (cseq.js) ----------
+// Every fader and dial registers under its key (its param id; 'b:' + id on the bend board), so the sequencer can show the
+// value heard on every copy of a control (the Synth page and the strip) without changing its setting. Holding a control
+// still for 500 ms (cancelled by a move of more than 6 px), or a right-click, opens its sequencer.
+const ctlRegs = {};   // key -> [{ el, paint, get, set }]
+let cseqHand = () => false, cseqOpen = () => {};
+function ctlReg(key, el, c) {
+  (ctlRegs[key] = (ctlRegs[key] || []).filter(r => r.el.isConnected)).push({ el, ...c });
+  el.classList.toggle('cseq', !!(state.cseq && state.cseq[key] && state.cseq[key].on));
+  const t = c.target; let hold = 0, x0 = 0, y0 = 0, v0 = 0;
+  // (capture: the setting is read before the press moves it)
+  t.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return; x0 = e.clientX; y0 = e.clientY; v0 = c.get(); clearTimeout(hold);
+    hold = setTimeout(() => { c.cancel(); if (c.get() !== v0) c.set(v0); cseqOpen(key); }, 500);
+  }, true);
+  t.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - x0, e.clientY - y0) > 6) clearTimeout(hold); });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) t.addEventListener(ev, () => clearTimeout(hold));
+  t.addEventListener('contextmenu', e => { e.preventDefault(); clearTimeout(hold); c.cancel(); cseqOpen(key); });
+}
 function fader(def, mount) {
   const id = def.f, store = def.bend ? state.bend : null;
   const get = () => (def.bend ? state.bend : state.params)[id];
   const el = document.createElement('div'); el.className = 'fdr' + (def.bend ? ' bend' : '');
   el.innerHTML = `<div class="track" role="slider" tabindex="0" id="f-${id}" aria-label="${def.label}" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="ticks"></div><div class="cap"></div></div><label for="f-${id}">${def.label}</label><output></output>`;
   const tr = el.querySelector('.track'), cap = el.querySelector('.cap'), out = el.querySelector('output');
-  const set = (v, send = true) => {
-    v = Math.max(0, Math.min(1, v)); (def.bend ? state.bend : state.params)[id] = v;
+  const key = def.bend ? 'b:' + id : id;
+  // paint: what the fader shows (its setting, or the value heard while its step sequencer runs)
+  const paint = (v) => {
     cap.style.top = (9 + (1 - v) * (112 - 18)) + 'px'; tr.style.setProperty('--v', v);
     tr.setAttribute('aria-valuenow', Math.round(v * 100)); const t = def.fmt(v); out.textContent = t; tr.setAttribute('aria-valuetext', t);
     if (def.bend) out.classList.toggle('off', Math.abs(v - def.def) > 0.004);
+  };
+  const set = (v, send = true) => {
+    v = Math.max(0, Math.min(1, v));
+    if (send && cseqHand(key, v)) return;   // its step sequencer is running: the move sets the base it plays around
+    (def.bend ? state.bend : state.params)[id] = v; paint(v);
     if (send) { if (def.bend) post({ type: 'bend', b: bendPhysical(state.bend) }); else if (def.seq) post(seqMsg()); else post({ type: 'param', id, v }); save(); if (!def.bend) for (const h of onMove) h(id); }
   };
   const fromY = (e) => { const r = tr.getBoundingClientRect(); return 1 - (e.clientY - r.top) / r.height; };
   let drag = null;
   tr.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;   // a right-click opens the step sequencer (ctlReg)
     tr.setPointerCapture(e.pointerId); boot();
     const cr = cap.getBoundingClientRect();
     if (e.clientY >= cr.top - 4 && e.clientY <= cr.bottom + 4) drag = { y: e.clientY, v: get() };
@@ -45,6 +71,7 @@ function fader(def, mount) {
   mount.appendChild(el);
   (def.bend ? bui : ui)[id] = v => set(v, false);
   set(get(), false);
+  ctlReg(key, el, { paint, target: tr, cancel: () => { drag = null; }, get, set });
 }
 // A dial (the 303 app's look): a ring of wedge segments lit up to the value, readout above, label below.
 // Vertical drag (Shift = fine), arrows / Page keys, Home/End, double-click resets.
@@ -62,10 +89,14 @@ function dial(def, mount) {
   el.innerHTML = `<output></output><div class="knob" role="slider" tabindex="0" id="f-${id}" aria-label="${def.label}" aria-valuemin="0" aria-valuemax="100">` +
     `<svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk" d="${DIAL_ALL.join('')}"/><path class="arc" d=""/></svg></div><label for="f-${id}">${def.label}</label>`;
   const kn = el.querySelector('.knob'), arc = el.querySelector('.arc'), out = el.querySelector('output');
-  const set = (v, send = true) => {
-    v = Math.max(0, Math.min(1, v)); state.params[id] = v;
+  const paint = (v) => {
     const n = Math.round(v * DIAL_SEGS); arc.setAttribute('d', n ? DIAL_LIT[n - 1] : '');
     kn.setAttribute('aria-valuenow', Math.round(v * 100)); const t = def.fmt(v); out.textContent = t; kn.setAttribute('aria-valuetext', t);
+  };
+  const set = (v, send = true) => {
+    v = Math.max(0, Math.min(1, v));
+    if (send && cseqHand(id, v)) return;
+    state.params[id] = v; paint(v);
     if (send) { post({ type: 'param', id, v }); save(); for (const h of onMove) h(id); }
   };
   let drag = null;
@@ -86,6 +117,7 @@ function dial(def, mount) {
   mount.appendChild(el);
   ui[id] = v => set(v, false);
   set(get(), false);
+  ctlReg(id, el, { paint, target: kn, cancel: end, get, set });
 }
 const bui = {};
 function switcher(def, mount) {

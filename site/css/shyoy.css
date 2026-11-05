@@ -529,6 +529,48 @@ html.fit .unit { position: absolute; left: 50%; top: 50%; width: 1400px; height:
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
 html.fit dialog#options { width: 1344px; height: 842px; inset: auto; left: 50%; top: 50%; margin: 0; max-width: none; max-height: none;
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
+/* ---------- per-control step sequencer pop-up (v0.21.0, js/app/cseq.js; from Elixir Mobile's fader sequencers): a small
+   card of the same glass over a dimmed screen. A control with one switched on gets a small square after its readout. ---------- */
+.fdr.cseq output::after, .dial.cseq output::after { content: ""; display: inline-block; width: .32em; height: .32em; margin-left: .22em; vertical-align: .12em; background: var(--ink); }
+html:has(dialog#cseq[open]) { overflow: hidden; }
+dialog#cseq { width: 620px; max-width: none; max-height: none; margin: auto; padding: 0; color: var(--ink); text-shadow: var(--shadow);
+  border: 6px solid var(--bezel); border-radius: 12px; background-color: var(--glass);
+  background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
+    repeating-linear-gradient(0deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px),
+    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / calc(.22 * var(--dirt))) 100%);
+  box-shadow: inset 0 6px 14px rgba(0,0,0,.3), 0 18px 40px rgba(0,0,0,.5); }
+dialog#cseq::backdrop { background: rgb(0 0 0 / .55); }
+html.fit dialog#cseq { inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%) scale(var(--k, 1)); }
+.cs-head { display: flex; align-items: center; gap: var(--gap); padding: calc(var(--pad) - 4px) var(--pad); border-bottom: 2px solid var(--ink); }
+.cs-head h2 { margin: 0 auto 0 0; font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; white-space: nowrap; }
+.cs-head output { font-size: var(--fs); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cs-head .btn { min-width: 3.4em; }
+.cs-body { display: grid; gap: var(--gap); padding: var(--pad); }
+.cs-pages { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap-s); }
+.cs-pages button { appearance: none; background: none; color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); height: var(--h);
+  font: inherit; font-size: var(--fs); line-height: 1; text-shadow: var(--shadow); cursor: pointer; position: relative; -webkit-tap-highlight-color: transparent; }
+.cs-pages button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+.cs-pages button.past { border-style: dashed; opacity: .45; }
+.cs-pages button.now::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 6px; height: 4px; margin-left: -3px; background: var(--ink); }
+.cs-pages button:focus-visible { outline-offset: 2px; }
+.cs-steps { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(2, 132px); gap: 8px; cursor: crosshair; touch-action: none; outline-offset: 4px; }
+.cs-steps i { position: relative; display: block; border: var(--bw) solid var(--line); border-radius: var(--r); background: var(--tint); overflow: hidden; }
+.cs-steps i::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line); }
+.cs-steps i b { position: absolute; left: 5px; right: 5px; --seg: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px);
+  top: calc(50% - var(--up, 0) * 50%); bottom: calc(50% - var(--dn, 0) * 50%); background: var(--seg); filter: drop-shadow(var(--shadow)); }
+.cs-steps i em { position: absolute; right: 3px; bottom: 2px; padding: 0 2px; background: var(--glass); border-radius: 2px; font-style: normal; font-size: var(--fs-xs); line-height: 1; color: var(--muted); text-shadow: none; }
+.cs-steps i.off { opacity: .28; }
+.cs-steps i.now { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+.cs-steps:focus-visible i.sel { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.cs-bars { display: grid; gap: 4px; }
+.cs-bar { display: grid; grid-template-columns: 4.2em 1fr 5em; align-items: center; gap: 0 10px; font-size: var(--fs-s); }
+.cs-bar output { text-align: right; font-size: var(--fs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cs-trk { height: var(--h); cursor: ew-resize; touch-action: none;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 5px, transparent 5px 7px) left center / calc(var(--v, 0) * 100%) 16px no-repeat,
+    repeating-linear-gradient(90deg, var(--ghost) 0 5px, transparent 5px 7px) left center / 100% 16px no-repeat; filter: drop-shadow(var(--shadow)); }
+.cs-trk:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.cs-acts { display: flex; gap: var(--gap-s); padding-top: 2px; }
+.cs-acts .cs-kind { min-width: 5.2em; margin-right: auto; }
 html.fit { touch-action: pan-x pan-y; overscroll-behavior: none; }
 /* v0.20.2: text isn't selectable (Johnny); typing boxes still are */
 body, body *:not(input):not(textarea) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

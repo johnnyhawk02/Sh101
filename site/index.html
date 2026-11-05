@@ -29,7 +29,7 @@ try {
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.20.3</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.21.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -170,7 +170,7 @@ try {
 <dialog id="options" aria-labelledby="opt-title">
   <div class="opt-head">
     <h2 id="opt-title">options</h2>
-    <div class="otabs" id="otabs" role="tablist" aria-label="Options sections"><button type="button" role="tab" data-sec="midi" aria-selected="true" aria-controls="osec-midi">midi</button><button type="button" role="tab" data-sec="colours" aria-selected="false" aria-controls="osec-colours">colours</button><button type="button" role="tab" data-sec="about" aria-selected="false" aria-controls="osec-about">about</button></div>
+    <div class="otabs" id="otabs" role="tablist" aria-label="Options sections"><button type="button" role="tab" data-sec="midi" aria-selected="true" aria-controls="osec-midi">midi</button><button type="button" role="tab" data-sec="colours" aria-selected="false" aria-controls="osec-colours">colours</button><button type="button" role="tab" data-sec="seq" aria-selected="false" aria-controls="osec-seq">sequencer</button><button type="button" role="tab" data-sec="about" aria-selected="false" aria-controls="osec-about">about</button></div>
     <button type="button" class="xbtn" id="close-options" aria-label="Close options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" fill="none"/></svg></button>
   </div>
   <div class="opt-body">
@@ -192,10 +192,13 @@ try {
         <button type="button" class="btn" id="lcd-look-reset">Reset</button>
       </div>
     </section>
+    <section class="osec" id="osec-seq" role="tabpanel" aria-label="Sequencer" hidden>
+      <label class="pm-opt"><input type="checkbox" id="cseq-swing" checked> Control step sequencers follow the swing</label>
+    </section>
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.20.3</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.21.0</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
@@ -221,6 +224,24 @@ try {
     </section>
   </div>
 </dialog>
+<dialog id="cseq" aria-labelledby="cs-title">
+  <div class="cs-head">
+    <h2 id="cs-title"><span id="cs-name"></span> seq</h2>
+    <output id="cs-val" aria-live="polite"></output>
+    <button type="button" class="btn" id="cs-on" aria-pressed="true">on</button>
+  </div>
+  <div class="cs-body">
+    <div class="cs-pages" id="cs-pages" role="tablist" aria-label="Step pages"></div>
+    <div class="cs-steps" id="cs-steps" role="slider" tabindex="0" aria-label="Steps: Left and Right pick a step, Up and Down move it"></div>
+    <div class="cs-bars">
+      <div class="cs-bar"><span>length</span><div class="cs-trk" id="cs-len" role="slider" tabindex="0" aria-label="Length" aria-valuemin="0" aria-valuemax="100"></div><output></output></div>
+      <div class="cs-bar"><span>slew</span><div class="cs-trk" id="cs-slew" role="slider" tabindex="0" aria-label="Slew" aria-valuemin="0" aria-valuemax="100"></div><output></output></div>
+      <div class="cs-bar"><span>speed</span><div class="cs-trk" id="cs-speed" role="slider" tabindex="0" aria-label="Speed" aria-valuemin="0" aria-valuemax="100"></div><output></output></div>
+      <div class="cs-bar"><span>depth</span><div class="cs-trk" id="cs-depth" role="slider" tabindex="0" aria-label="Depth" aria-valuemin="0" aria-valuemax="100"></div><output></output></div>
+    </div>
+    <div class="cs-acts"><button type="button" class="btn" id="cs-rand">randomise</button><button type="button" class="btn cs-kind" id="cs-kind" aria-label="Kind of randomise, click to change"></button><button type="button" class="btn" id="cs-done">done</button></div>
+  </div>
+</dialog>
 
 <script src="js/app/notips.js"></script>
 <script src="js/app/defs.js"></script>
@@ -243,6 +264,7 @@ try {
 <script src="js/app/keyboard.js"></script>
 <script src="js/app/options.js"></script>
 <script src="js/app/midi.js"></script>
+<script src="js/app/cseq.js"></script>
 <script src="js/app/app.js"></script>
 
 </body>

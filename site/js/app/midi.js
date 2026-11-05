@@ -10,7 +10,7 @@ const MIDI_MAP = (() => {
 })();
 document.getElementById('midi-map').innerHTML = MIDI_MAP.map((m, i) => `<li><b>CC ${i + 1}</b><span>${m.name}</span></li>`).join('');
 // a CC sets the control exactly as dragging it does: fader, readout, engine, saved state. One update per frame.
-const midiSet = (id, v) => { ui[id](v); post({ type: 'param', id, v: state.params[id] }); save(); };
+const midiSet = (id, v) => { if (cseqHand(id, v)) return; ui[id](v); post({ type: 'param', id, v: state.params[id] }); save(); };
 const midiPending = new Map(); let midiFrame = 0;
 function onMidi(e) {
   const [st, cc, val] = e.data; if ((st & 0xf0) !== 0xb0 || cc < 1 || cc > MIDI_MAP.length) return;

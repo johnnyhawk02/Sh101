@@ -110,7 +110,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.seq = { steps: [], length: 16, bpm: 120, swing: 0, gateLen: 0.5 };
     this.arp = 0; this.seqMode = 0; this.hold = false; this.arpNotes = []; this.arpIdx = -1; this.arpDir = 1; this.allUp = true;
     this.s101 = []; this.s101Idx = 0; this.s101Tr = 0;
-    this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.transpose = 0;
+    this.running = false; this.stepIdx = 0; this.n16 = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.transpose = 0;
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
@@ -151,7 +151,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       }
       case 'seq101': this.s101 = m.steps || []; if (this.s101Idx >= this.s101.length) this.s101Idx = 0; break;
       case 'run':
-        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; }
+        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.n16 = 0; this.nextStepAt = this.t; this.lastSlide = false; }
         else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.transpose = 0; }
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
@@ -285,7 +285,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
       this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen;
       this.lastSlide = !!st.s;
     }
-    this.port.postMessage({ type: 'step', i });
+    // n: sixteenths counted from the start (bar 1), for the per-control step sequencers; bpm for their slew
+    this.port.postMessage({ type: 'step', i, n: this.n16++, bpm: S.bpm });
     this.stepIdx = (i + 1) % len;
   }
 

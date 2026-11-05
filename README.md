@@ -81,6 +81,12 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Per-control step sequencers (v0.21.0)
+
+From Elixir Mobile's fader sequencers, as a pop-up. Hold any fader or dial for half a second (a move of more than 6 px cancels it), or right-click it, and its own step sequencer opens over a dimmed screen: page buttons (1-16 to 49-64), 16 steps in two rows of eight (drag to paint; the height is the step's offset from the control's setting, the middle is none; steps past the length are dimmed, the one playing outlined), then length (2-64), slew (off to a whole step), speed (a 16th up to 8 bars) and depth (±0-100% of the control's range), and Randomise with its kind (random, drunk, wobbly, ramp, s&h, sparse). Done, Esc or a click outside closes it. Keys: Left / Right pick a step, Up / Down nudge it, 1-4 pick the page, R randomises.
+
+While the pattern runs the control plays its setting plus the step's offset; moving it (or a MIDI CC) moves the setting the steps play around, and stopping or switching the sequencer off puts it back. Steps count the bar's 16ths from the start (the engine's step message now carries that count, `n`, and the tempo), so a short length runs against the bar. They land on the swung 16ths, or on the grid with Options › Sequencer › follow the swing off. A control with one switched on shows a small square after its readout. The sequencers belong to the sound: they save with every preset (`cseq` in the sound), and a preset without any clears them. Code: `js/app/cseq.js`; controls register in `ctlReg` (controls.js).
+
 ### Factory presets: Compactor 30% / 250 ms (v0.17.1)
 All the factory presets (Acid line, Sub bass, PWM arp, Starved & bent) now have the Compactor at Amount 30% and Release 250 ms. Nothing else in them changed, and your own saved presets are untouched.
 
