@@ -305,8 +305,8 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .mslot:first-child .mpick .fn-menu { left: 0; transform: none; }
 .mslot:last-child .mpick .fn-menu { left: auto; right: 0; transform: none; }
 
-/* ---------- tabs: one segmented selector the full width of the glass ---------- */
-.tabs { order: 1; flex: none; display: flex; counter-reset: tab; border-bottom: var(--bw) solid var(--ink); }
+/* ---------- tabs: one segmented selector the full width of the glass, along the bottom edge (v0.19.0) ---------- */
+.tabs { order: 3; flex: none; display: flex; counter-reset: tab; border-top: var(--bw) solid var(--ink); }
 .tabs button { appearance: none; flex: 1 1 0; min-width: 0; background: none; border: 0; border-right: var(--rule); border-radius: 0; padding: calc(var(--gap-s) + 1px) 6px;
   display: flex; align-items: baseline; justify-content: center; gap: 6px; color: var(--ink); font-size: var(--fs-l); line-height: 1; text-transform: lowercase;
   white-space: nowrap; cursor: pointer; text-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
@@ -317,7 +317,7 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .tabs button[aria-selected="true"]::before { color: var(--lit); }
 .tabs button:focus-visible { outline-offset: -4px; }
 
-/* ---------- views: exactly one fills the space under the tabs ---------- */
+/* ---------- views: exactly one fills the space between the strip and the tabs ---------- */
 .rack, .panel, .perf101 { order: 2; flex: 1 1 auto; min-height: 0; overflow: auto; }
 .panel { display: flex; flex-direction: column; gap: var(--gap); padding: var(--pad); }
 .panel[hidden] { display: none !important; }
