@@ -2,7 +2,7 @@
 // ---------- Kestrel glue: what a preset holds and how it loads ----------
 const clone = o => JSON.parse(JSON.stringify(o));
 const cleanSteps = a => clone(a).slice(0, 64).map(st => ({ n: Math.max(0, Math.min(11, st.n | 0)), o: Math.max(-2, Math.min(2, st.o | 0)), m: 'NTR'.includes(st.m) ? st.m : 'N', a: !!st.a, s: !!st.s }));
-function soundSnap() { return { params: clone(state.params), bend: clone(state.bend), br: clone(state.br), fx: clone(state.fx) }; }
+function soundSnap() { return { params: clone(state.params), bend: clone(state.bend), br: clone(state.br), fx: clone(state.fx), strip: clone(state.strip) }; }
 function patternSnap() { return { steps: clone(state.steps), s101: clone(state.s101 || []) }; }
 function projectSnap() { storeSlot(); return { sound: soundSnap(), pattern: patternSnap(), bpm: state.bpm, slots: clone(state.slots), slot: state.slot, chain: [...state.chain] }; }
 function applySound(x) {
@@ -12,6 +12,7 @@ function applySound(x) {
   for (const k in ui) ui[k](state.params[k]);
   for (const k in bui) bui[k](state.bend[k]);
   Object.values(cells).forEach(r => r()); renderFx();
+  stripLoad(x.strip);   // the performance strip's eight picks (strip.js)
 }
 function applyPattern(x) {
   if (!x || typeof x !== 'object' || !Array.isArray(x.steps) || !x.steps.length) return;
