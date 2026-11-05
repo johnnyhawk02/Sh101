@@ -51,8 +51,10 @@ lcdSws.addEventListener('keydown', (e) => {
 // and kestrel.lcdVars (the CSS variables they make, which the head script puts back before first paint). At the stock
 // values nothing is set. Brightness and Saturation move the glass in HSL, Dirt scales the shade at the top and in the
 // corners, Grain the pixel grid, Glow the ink's shadow. Stock Dirt is 100% here, so Shyoy looks as it did.
-const LOOK0 = { bright: 0, sat: 100, dirt: 100, grain: 100, glow: 100 };
+// v0.17.2: Glow is fixed at 0 (no ink shadow; it isn't really an LCD any more) and its slider is hidden, so a stored Glow is dropped.
+const LOOK0 = { bright: 0, sat: 100, dirt: 100, grain: 100, glow: 0 };
 const look = { ...LOOK0, ...(store.get('lcdLook', {}) || {}) };
+look.glow = 0;
 const LOOK_VARS = ['--glass-rgb', '--dirt', '--grain', '--glow'];
 function rgb2hsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;

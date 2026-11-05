@@ -13,7 +13,7 @@
   --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;            /* the backlight's pale haze */
   --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12;  /* shade at the top and in the corners */
   --acc: #5f7f00;            /* the spot colour this swatch brings to Grey + colour */
-  --dirt: 1; --grain: 1; --glow: 1;   /* Options › Colours look sliders (1 = stock); Brightness and Saturation reset --glass-rgb */
+  --dirt: 1; --grain: 1; --glow: 0;   /* Options › Colours look sliders (1 = stock); Glow is fixed at 0 (v0.17.2, slider hidden); Brightness and Saturation reset --glass-rgb */
   --glass: rgb(var(--glass-rgb));
   --ink: rgb(var(--ink-rgb));
   --muted: rgb(var(--ink-rgb) / .72);
@@ -150,6 +150,7 @@ select.btn option { color: #000; }
 
 /* horizontal sliders (sequencer, bridges depth): a segmented strip with an ink block */
 .sld { display: grid; grid-template-columns: auto 120px 2.6em; align-items: center; gap: 0 8px; font-size: var(--fs-s); text-transform: lowercase; }
+.sld[hidden] { display: none; }
 .sld output { text-align: right; font-size: var(--fs); font-variant-numeric: tabular-nums; }
 .sld input { -webkit-appearance: none; appearance: none; width: 100%; height: var(--h); margin: 0; background: none; cursor: pointer; touch-action: none; }
 .sld input::-webkit-slider-runnable-track { height: 12px; border: var(--bw) solid var(--ink); border-radius: 2px; background: repeating-linear-gradient(90deg, var(--ghost) 0 3px, transparent 3px 6px); }

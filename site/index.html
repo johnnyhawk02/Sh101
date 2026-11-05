@@ -12,7 +12,7 @@ try {
   const t = rd('lcdTheme'), m = rd('lcdMode'), el = document.documentElement;
   el.dataset.lcd = ['green', 'orange', 'amber', 'blue', 'red', 'grey'].includes(t) ? t : 'green';
   el.dataset.lcdmode = m === 'mono' ? 'mono' : 'colour';
-  const v = rd('lcdVars'); if (v && typeof v === 'object') for (const k in v) el.style.setProperty(k, v[k]);   // the look sliders
+  const v = rd('lcdVars'); if (v && typeof v === 'object') for (const k in v) if (k !== '--glow') el.style.setProperty(k, v[k]);   // the look sliders
 } catch (e) {}
 </script>
 <script src="js/app/fit.js"></script>
@@ -29,7 +29,7 @@ try {
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.17.1</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.17.2</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -172,14 +172,14 @@ try {
         <label class="sld"><span>Saturation</span><input type="range" data-look="sat" min="0" max="200" step="1" value="100" aria-label="Screen saturation"><output>100%</output></label>
         <label class="sld"><span>Dirt</span><input type="range" data-look="dirt" min="0" max="200" step="1" value="100" aria-label="Dirt on the glass"><output>100%</output></label>
         <label class="sld"><span>Grain</span><input type="range" data-look="grain" min="0" max="250" step="1" value="100" aria-label="Pixel grain"><output>100%</output></label>
-        <label class="sld"><span>Glow</span><input type="range" data-look="glow" min="0" max="200" step="1" value="100" aria-label="Glow round the ink"><output>100%</output></label>
+        <label class="sld" hidden><span>Glow</span><input type="range" data-look="glow" min="0" max="200" step="1" value="100" aria-label="Glow round the ink"><output>100%</output></label>
         <button type="button" class="btn" id="lcd-look-reset">Reset</button>
       </div>
     </section>
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.17.1</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.17.2</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
