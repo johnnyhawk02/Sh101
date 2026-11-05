@@ -1,0 +1,478 @@
+/* Shyoy: one pane of backlit yellow-green LCD glass in a black bezel (after Johnny's Elixir Mobile screen).
+   One ink for the segments, a faint ghost of the unlit ones, the offset shadow LCD type casts on its backplane,
+   a pixel font throughout. Every panel is headed by an inverted label strip, like silkscreen on the hardware;
+   buttons are outlined boxes that invert when on; faders are segmented bar graphs that grow to fill the view.
+   v0.9.8 design pass: one stylesheet, all sizes from the tokens below. Phones in landscape (sized on a Pixel 9a,
+   915 x 412 css px) only swap the tokens and hide the long help text, so every tab is one screen with no scrolling. */
+:root {
+  --case: #161815;
+  --bezel: #0b0c0a;
+  /* the glass: every colour on it comes from these triplets, so a theme only swaps them (see the themes below) */
+  --glass-rgb: 195 216 58;   /* yellow-green backlit LCD (Johnny, v0.9.1) */
+  --ink-rgb: 10 15 4;
+  --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;            /* the backlight's pale haze */
+  --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12;  /* shade at the top and in the corners */
+  --acc: #5f7f00;            /* the spot colour this swatch brings to Grey + colour */
+  --glass: rgb(var(--glass-rgb));
+  --ink: rgb(var(--ink-rgb));
+  --muted: rgb(var(--ink-rgb) / .72);
+  --ghost: rgb(var(--ink-rgb) / .13);
+  --tint: rgb(var(--ink-rgb) / .07);
+  --lit: rgb(var(--glass-rgb) / .72);   /* glass-coloured text on an ink strip, dimmed */
+  --line: rgb(var(--ink-rgb) / .42);
+  --rule: 1px solid var(--line);
+  --shadow: 2px 2px 0 rgb(var(--ink-rgb) / .17);
+  --f-lcd: "VT323", ui-monospace, "SF Mono", Menlo, monospace;
+  /* scale */
+  --bw: 2px;          /* outline weight */
+  --r: 3px;           /* corner radius */
+  --pad: 16px;        /* panel padding */
+  --gap: 12px;        /* gap between groups */
+  --gap-s: 6px;       /* gap inside a group */
+  --h: 28px; --menu-h: 22px;          /* control height */
+  --h-top: 34px;      /* header control height */
+  --fs-xs: 14px; --fs-s: 16px; --fs: 18px; --fs-l: 21px; --fs-xl: 40px;
+  --trk: 22px;        /* fader width */
+  --trk-min: 56px;    /* shortest a fader may get */
+  color-scheme: light;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --bw: 1.5px; --r: 2px; --pad: 6px; --gap: 6px; --gap-s: 3px; --h: 20px; --h-top: 22px; --menu-h: 18px;
+    --fs-xs: 11px; --fs-s: 13px; --fs: 15px; --fs-l: 16px; --fs-xl: 22px; --trk: 16px; --trk-min: 30px; }
+}
+
+/* ---------- glass themes: Colours… in the ≡ menu ----------
+   Mono: one ink on one coloured glass (the swatch is the glass). Grey + colour (the default): black ink on grey glass,
+   and the swatch is one deep spot colour, like a printed filter on a real LCD, on a few small things only:
+   Run while running, the open tab, the pattern in use and the step playing, FX power when on, lit switch LEDs.
+   Dials, faders and sliders always stay ink. The head script sets data-lcd and data-lcdmode before first paint. */
+:root[data-lcd=green] { --glass-rgb: 195 216 58; --ink-rgb: 10 15 4; --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;
+  --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12; --acc: #5f7f00; }
+:root[data-lcd=orange] { --glass-rgb: 250 161 66; --ink-rgb: 28 10 0; --hl1-rgb: 255 236 200; --hl2-rgb: 255 228 190;
+  --dk1-rgb: 64 32 10; --dk2-rgb: 48 24 6; --dk3-rgb: 32 14 2; --acc: #d0600a; }
+:root[data-lcd=amber] { --glass-rgb: 244 194 74; --ink-rgb: 30 21 0; --hl1-rgb: 255 246 200; --hl2-rgb: 255 240 190;
+  --dk1-rgb: 62 46 12; --dk2-rgb: 46 34 8; --dk3-rgb: 30 22 4; --acc: #b58300; }
+:root[data-lcd=blue] { --glass-rgb: 123 182 226; --ink-rgb: 3 17 42; --hl1-rgb: 225 242 255; --hl2-rgb: 215 236 255;
+  --dk1-rgb: 20 40 70; --dk2-rgb: 14 30 55; --dk3-rgb: 8 20 40; --acc: #2a63ae; }
+:root[data-lcd=red] { --glass-rgb: 242 107 82; --ink-rgb: 34 4 3; --hl1-rgb: 255 225 210; --hl2-rgb: 255 215 200;
+  --dk1-rgb: 70 20 14; --dk2-rgb: 52 14 10; --dk3-rgb: 36 8 6; --acc: #c2352a; }
+:root[data-lcd=grey] { --glass-rgb: 211 214 204; --ink-rgb: 18 20 16; --hl1-rgb: 255 255 248; --hl2-rgb: 250 252 244;
+  --dk1-rgb: 45 48 40; --dk2-rgb: 34 36 30; --dk3-rgb: 22 24 18; --acc: var(--ink); }
+:root[data-lcdmode=colour] { --glass-rgb: 211 214 204; --ink-rgb: 18 20 16; --hl1-rgb: 255 255 248; --hl2-rgb: 250 252 244;
+  --dk1-rgb: 45 48 40; --dk2-rgb: 34 36 30; --dk3-rgb: 22 24 18; --accent: var(--acc); }
+[data-lcdmode=colour] .btn.play.on, [data-lcdmode=colour] .slots button[aria-pressed=true],
+[data-lcdmode=colour] .fxu .onoff[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--glass); }
+[data-lcdmode=colour] .tabs button[aria-selected="true"], [data-lcdmode=colour] .roll .hd.cur { background: var(--accent); color: var(--glass); }
+[data-lcdmode=colour] .sw button[aria-pressed="true"] .led { background: var(--accent); }
+
+* { box-sizing: border-box; }
+html, body { background: var(--case); color: var(--glass); margin: 0; }
+body { background-image: radial-gradient(120% 60% at 50% 0%, #2a2d28, var(--case)); background-repeat: no-repeat;
+  font-family: var(--f-lcd); font-size: var(--fs); line-height: 1.15;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); }
+button, table, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+
+/* ---------- the glass ---------- */
+.unit { display: flex; flex-direction: column; height: calc(100dvh - 24px); min-height: 560px; max-width: 1480px; margin: 0 auto; overflow: hidden;
+  color: var(--ink); text-shadow: var(--shadow); border: 6px solid var(--bezel); border-radius: 12px;
+  background-color: var(--glass);
+  background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px),
+    radial-gradient(60% 30% at 10% 100%, rgb(var(--hl1-rgb) / .55), rgb(var(--hl1-rgb) / 0) 70%),
+    radial-gradient(50% 28% at 90% 102%, rgb(var(--hl2-rgb) / .4), rgb(var(--hl2-rgb) / 0) 70%),
+    radial-gradient(38% 20% at 70% 30%, rgb(var(--dk1-rgb) / .14), rgb(var(--dk1-rgb) / 0) 70%),
+    linear-gradient(180deg, rgb(var(--dk2-rgb) / .2) 0%, rgb(var(--dk2-rgb) / 0) 22%),
+    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / .28) 100%);
+  box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset -4px 0 10px rgba(0,0,0,.15), 0 18px 40px rgba(0,0,0,.5); }
+.lower { display: contents; }
+
+/* ---------- shared controls ---------- */
+.btn, .acts button, .slots button, .rm-btn, .chain-read button, .fxu .onoff,
+.pm button, .pm-foot button, .pm input[type=text], .pm-foot input[type=text] {
+  appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink);
+  height: var(--h); padding: 0 calc(var(--gap-s) + 4px); font-family: var(--f-lcd); font-size: var(--fs); line-height: 1;
+  cursor: pointer; text-transform: lowercase; text-shadow: var(--shadow); white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--gap-s); -webkit-tap-highlight-color: transparent; }
+.btn { box-shadow: var(--shadow); }
+.btn:active, .btn.held, .btn[aria-pressed="true"], .btn.on,
+.acts button:active, .rm-btn:active, .rm-btn[aria-expanded=true], .chain-read button:active,
+.slots button[aria-pressed=true], .slots button:active, .fxu .onoff[aria-pressed="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+button:disabled { opacity: .35; cursor: default; }
+@media (hover: hover) {
+  .btn:hover:not(:disabled):not(.on):not([aria-pressed="true"]), .acts button:hover:not(:disabled),
+  .slots button:hover:not([aria-pressed=true]), .rm-btn:hover:not([aria-expanded=true]), .tabs button:hover:not([aria-selected="true"]),
+  .sw button:hover:not([aria-pressed="true"]), .pm-foot button:hover { background: var(--tint); }
+}
+.led { display: inline-block; width: 9px; height: 9px; background: var(--ghost); flex: none; }
+.btn.on .led { background: var(--glass); }
+.led.on { background: var(--ink); }
+select.btn { padding-right: 6px; }
+select.btn option { color: #000; }
+
+/* number box, e.g. tempo */
+.num { display: flex; align-items: center; gap: var(--gap-s); font-size: var(--fs-s); color: var(--muted); text-transform: lowercase; }
+.num input { width: 3.2em; height: var(--h-top); font-size: var(--fs-l); background: none; color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r);
+  padding: 0 4px; text-align: center; text-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
+
+/* label strip: the one heading style for every module, group and effect */
+.mod h2, .bend-grp h3, .perf101 h3, .fxu .fxh {
+  margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: calc(var(--fs-l) + 4px);
+  padding: 0 var(--gap-s) 0 calc(var(--gap-s) + 2px); background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
+  font-size: var(--fs-l); font-weight: 400; line-height: 1.1; text-transform: lowercase; letter-spacing: .03em; white-space: nowrap; }
+.mod h2 small, .fxu .fxh small { color: var(--lit); font-size: var(--fs-xs); letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* faders: a column of LCD segments, lit up to the value; they stretch to the height of their row */
+.ctrls { display: flex; gap: var(--gap); align-items: stretch; flex: 1 1 auto; min-height: 0; }
+.fdr { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: calc(var(--trk) + 18px); }
+.fdr .track { position: relative; flex: 1 1 0; width: var(--trk); min-height: var(--trk-min); cursor: ns-resize; touch-action: none;
+  background: repeating-linear-gradient(0deg, var(--ghost) 0 5px, transparent 5px 7px); }
+.fdr .fill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--v, 0) * 100%);
+  background: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px); background-position: bottom; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
+.fdr .ticks, .fdr .cap { display: none; }
+.fdr label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
+.fdr output { font-size: var(--fs-xs); color: var(--muted); min-height: 1em; line-height: 1; white-space: nowrap; text-shadow: none; font-variant-numeric: tabular-nums; }
+.fdr.bend output.off { color: var(--ink); text-decoration: underline; }
+.dial { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1 1 0; min-width: 0; min-height: 0; }
+.dial .knob { flex: 1 1 0; min-height: var(--trk-min); width: 100%; max-width: 150px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }
+.dial .knob svg { height: 100%; max-width: 100%; aspect-ratio: 1; display: block; overflow: visible; }
+.dial .knob .trk { fill: var(--ghost); }
+.dial .knob .arc { fill: var(--ink); }
+.dial .knob:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.dial label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
+.dial output { font-size: var(--fs-s); color: var(--ink); min-height: 1em; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* switches: an LED list, the chosen one shown by its lit LED only */
+.sw { display: flex; flex-direction: column; gap: 2px; }
+.sw .lab { font-size: var(--fs-s); color: var(--muted); text-transform: lowercase; margin-bottom: 2px; }
+.sw button { appearance: none; border: 0; background: none; padding: 1px 6px 1px 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  font-size: var(--fs); line-height: 1.05; color: var(--ink); text-align: left; text-transform: lowercase; text-shadow: var(--shadow); border-radius: 2px; white-space: nowrap; }
+.sw button .led { width: 8px; height: 8px; }
+.sw button[aria-pressed="true"] .led { background: var(--ink); }
+.sw .btn { justify-content: flex-start; border: var(--bw) solid var(--ink); height: var(--h); padding: 0 10px; box-shadow: var(--shadow); margin-bottom: 4px; }
+
+/* horizontal sliders (sequencer, bridges depth): a segmented strip with an ink block */
+.sld { display: grid; grid-template-columns: auto 120px 2.6em; align-items: center; gap: 0 8px; font-size: var(--fs-s); text-transform: lowercase; }
+.sld output { text-align: right; font-size: var(--fs); font-variant-numeric: tabular-nums; }
+.sld input { -webkit-appearance: none; appearance: none; width: 100%; height: var(--h); margin: 0; background: none; cursor: pointer; touch-action: none; }
+.sld input::-webkit-slider-runnable-track { height: 12px; border: var(--bw) solid var(--ink); border-radius: 2px; background: repeating-linear-gradient(90deg, var(--ghost) 0 3px, transparent 3px 6px); }
+.sld input::-moz-range-track { height: 8px; border: var(--bw) solid var(--ink); border-radius: 2px; background: repeating-linear-gradient(90deg, var(--ghost) 0 3px, transparent 3px 6px); }
+.sld input::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 22px; margin-top: -7px; background: var(--ink); border: 0; border-radius: 2px; box-shadow: var(--shadow); }
+.sld input::-moz-range-thumb { width: 12px; height: 22px; background: var(--ink); border: 0; border-radius: 2px; }
+.sld input:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+
+/* ---------- header ---------- */
+.top { order: 0; flex: none; display: flex; align-items: center; gap: var(--gap) calc(var(--gap) + 8px); padding: calc(var(--pad) - 4px) var(--pad); border-bottom: var(--bw) solid var(--ink); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand b { display: inline-flex; align-items: flex-start; gap: 6px; padding: 2px 10px 0 12px; background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
+  font-size: var(--fs-xl); font-weight: 400; letter-spacing: .14em; line-height: 1; }
+.ver { font-style: normal; font-size: var(--fs-xs); letter-spacing: 0; color: var(--lit); margin-top: 3px; }
+.brand span { font-size: var(--fs-s); color: var(--muted); line-height: 1.05; max-width: 22ch; }
+.psu { display: inline-flex; align-items: center; gap: 8px; height: var(--h); padding: 0 10px; margin-right: auto; border: var(--bw) solid var(--ink); border-radius: var(--r);
+  font-size: var(--fs-s); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.psu::before { content: ""; width: 14px; height: 8px; border: var(--bw) solid var(--ink); border-radius: 1px; background: linear-gradient(90deg, var(--ink) 70%, transparent 70%); box-shadow: 2px 0 0 -0.5px var(--ink); }
+.transport { display: flex; align-items: center; gap: var(--gap-s) var(--gap); }
+.top .btn { height: var(--h-top); font-size: var(--fs-l); }
+.btn.play { min-width: 5.2em; justify-content: flex-start; }
+.appmenu { position: relative; }
+.appmenu .btn { width: var(--h-top); padding: 0; font-size: calc(var(--fs-l) + 2px); }
+.menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; min-width: 200px; display: flex; flex-direction: column; padding: 4px;
+  background: var(--glass); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.35); }
+.menu-pop[hidden] { display: none; }
+.menu-pop button { appearance: none; background: none; border: 0; text-align: left; padding: 4px 8px; font-size: var(--fs); color: var(--ink); cursor: pointer; text-transform: lowercase; border-radius: 2px; }
+.menu-pop button:hover, .menu-pop button:focus-visible { background: var(--ink); color: var(--glass); text-shadow: none; outline: 0; }
+.menu-ver { font-size: var(--fs-xs); color: var(--muted); padding: 4px 8px 2px; border-top: var(--rule); margin-top: 4px; }
+
+/* Colours… panel: mode switch and six swatches, each drawn in its own Mono glass and ink */
+.lcd-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s) var(--gap-s) calc(var(--gap-s) + 2px);
+  background: var(--glass); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.35); text-shadow: none; }
+.lcd-pop[hidden] { display: none; }
+.lcd-pop h3 { margin: 0; padding: 0 var(--gap-s) 0 calc(var(--gap-s) + 2px); background: var(--ink); color: var(--glass); border-radius: var(--r);
+  font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; text-transform: lowercase; }
+.lcd-mode { display: flex; align-items: center; gap: var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
+.lcd-mode .lab { color: var(--muted); }
+.lcd-seg { display: inline-flex; }
+.lcd-seg button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-right-width: 0; border-radius: 0; color: var(--ink); height: var(--h);
+  padding: 0 calc(var(--gap-s) + 6px); font: inherit; font-size: var(--fs); line-height: 1; text-transform: lowercase; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lcd-seg button:first-child { border-radius: var(--r) 0 0 var(--r); } .lcd-seg button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
+.lcd-seg button[aria-pressed="true"] { background: var(--ink); color: var(--glass); }
+.lcd-sws { display: flex; gap: var(--gap-s); }
+.lcd-sw { appearance: none; position: relative; display: flex; flex-direction: column; gap: 4px; width: calc(var(--fs) * 4.2); padding: 4px 5px 3px; cursor: pointer;
+  background: var(--sg); color: var(--si); border: var(--bw) solid rgb(var(--ink-rgb) / .2); border-radius: var(--r); font: inherit; font-size: var(--fs-s); line-height: 1;
+  text-transform: lowercase; text-align: left; -webkit-tap-highlight-color: transparent; }
+.lcd-sw[aria-checked="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.lcd-sw[aria-checked="true"]::after { content: "✓"; position: absolute; top: -7px; right: -6px; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; font-size: var(--fs-xs); line-height: 1; }
+.lcd-sw:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.lcd-sw .bars { display: flex; align-items: flex-end; gap: 3px; height: calc(var(--fs) * 1.4); }
+.lcd-sw .bars i { flex: 1; height: var(--b); background: repeating-linear-gradient(0deg, var(--si) 0 3px, transparent 3px 5px); background-position: bottom; }
+.lcd-sw[data-t=green] { --sg: #c3d83a; --si: #0a0f04; } .lcd-sw[data-t=orange] { --sg: #faa142; --si: #1c0a00; }
+.lcd-sw[data-t=amber] { --sg: #f4c24a; --si: #1e1500; } .lcd-sw[data-t=blue] { --sg: #7bb6e2; --si: #03112a; }
+.lcd-sw[data-t=red] { --sg: #f26b52; --si: #220403; } .lcd-sw[data-t=grey] { --sg: #d3d6cc; --si: #121410; }
+
+/* preset menu (from the 303 app), drawn as LCD */
+.presets { position: relative; display: flex; align-items: center; gap: var(--gap-s); }
+.pm { position: relative; display: flex; min-width: 0; }
+.pm button, .pm-foot button, .pm input[type=text], .pm-foot input[type=text] { text-shadow: none; }
+.pm input[type=text], .pm-foot input[type=text] { cursor: text; text-transform: none; justify-content: flex-start; }
+.top .pm .pm-btn, .top .pm .pm-step { height: var(--h-top); }
+.pm .pm-btn { min-width: 190px; max-width: 260px; justify-content: space-between; text-align: left; font-size: var(--fs); border-radius: var(--r) 0 0 var(--r); }
+.pm-btn .cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm .pm-btn::after { content: "▾"; margin-left: 8px; }
+.pm .pm-step { padding: 0 8px; font-size: var(--fs-xs); border-left-width: 0; border-radius: 0; }
+.pm .pm-step:last-of-type { border-radius: 0 var(--r) var(--r) 0; }
+.pm-pop { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; width: 340px; max-height: min(62vh, 460px); display: flex; flex-direction: column;
+  background: var(--glass); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.45); text-shadow: none; }
+.pm-pop[hidden] { display: none; }
+.pm .pm-qrow { display: flex; gap: 6px; margin: 6px; }
+.pm .pm-q { flex: 1; min-width: 0; }
+.pm .pm-favf { opacity: .5; } .pm .pm-favf[aria-pressed=true] { opacity: 1; background: var(--ink); color: var(--glass); }
+.pm-list { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 4px; scrollbar-width: thin; }
+.pm .pm-g { display: flex; justify-content: flex-start; width: 100%; height: auto; border: 0; border-top: var(--rule); border-radius: 0; padding: 3px 8px; padding-left: calc(8px + var(--d, 0) * 14px); font-size: var(--fs-s); }
+.pm .pm-g.sub { border-top-color: transparent; }
+.pm-g::before { content: "▸"; margin-right: 8px; } .pm-g[aria-expanded=true]::before { content: "▾"; }
+.pm-g .n { margin-left: auto; color: var(--muted); }
+.pm-row { display: flex; align-items: stretch; }
+.pm .pm-i { flex: 1; min-width: 0; height: auto; min-height: var(--h); border: 0; border-radius: 0; padding: 0 10px; padding-left: calc(10px + var(--d, 0) * 14px); justify-content: flex-start;
+  text-align: left; font-size: var(--fs); text-transform: none; overflow: hidden; text-overflow: ellipsis; gap: 8px; }
+.pm .pm-i[aria-selected=true] { background: var(--ink); color: var(--glass); }
+.pm-i.act, .pm-i:hover, .pm-g.act, .pm-g:hover { background: var(--ghost); }
+.pm-path { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); flex: none; }
+.pm .pm-star { flex: none; width: 30px; height: auto; padding: 0; border: 0; color: var(--muted); font-size: var(--fs-xs); }
+.pm .pm-star[aria-pressed=true] { color: var(--ink); }
+.pm-sum, .pm-none { padding: 4px 10px; font-size: var(--fs-xs); color: var(--muted); }
+.pm-foot { display: none; }
+.pm-pop .pm-foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border-top: var(--bw) solid var(--ink); }
+.pm-foot input[type=text] { flex: 1 1 140px; min-width: 0; }
+.pm-foot .hint:empty { display: none; }
+.pm-foot .hint { font-size: var(--fs-xs); color: var(--muted); flex-basis: 100%; }
+.pm-opt { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); cursor: pointer; }
+.pm-opt input { accent-color: var(--ink); }
+
+/* ---------- tabs: one segmented selector the full width of the glass ---------- */
+.tabs { order: 1; flex: none; display: flex; counter-reset: tab; border-bottom: var(--bw) solid var(--ink); }
+.tabs button { appearance: none; flex: 1 1 0; min-width: 0; background: none; border: 0; border-right: var(--rule); border-radius: 0; padding: calc(var(--gap-s) + 1px) 6px;
+  display: flex; align-items: baseline; justify-content: center; gap: 6px; color: var(--ink); font-size: var(--fs-l); line-height: 1; text-transform: lowercase;
+  white-space: nowrap; cursor: pointer; text-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
+.tabs button:last-of-type { border-right: 0; }
+.tabs button::before { counter-increment: tab; content: counter(tab, decimal-leading-zero); font-size: var(--fs-xs); color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+.tabs button[aria-selected="true"]::before { color: var(--lit); }
+.tabs button:focus-visible { outline-offset: -4px; }
+
+/* ---------- views: exactly one fills the space under the tabs ---------- */
+.rack, .panel, .perf101 { order: 2; flex: 1 1 auto; min-height: 0; overflow: auto; }
+.panel { display: flex; flex-direction: column; gap: var(--gap); padding: var(--pad); }
+.panel[hidden] { display: none !important; }
+.unit:not([data-view="tab-synth"]) .rack { display: none; }
+.unit:not([data-view="tab-perf"]) .perf101 { display: none; }
+.sec-h { flex: none; display: flex; flex-wrap: wrap; gap: var(--gap-s) var(--gap); align-items: center; }
+.sec-h p { margin: 0; font-size: var(--fs-s); color: var(--muted); max-width: 70ch; flex: 1 1 300px; }
+.sec-h .tools { margin-left: auto; display: flex; gap: var(--gap-s) var(--gap); flex-wrap: wrap; align-items: center; }
+
+/* synth: the rack of modules in signal-flow order, every row stretched to the bottom of the glass */
+.rack { display: flex; flex-wrap: wrap; align-content: stretch; }
+.mod { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); min-width: 0; padding: calc(var(--pad) - 6px) calc(var(--pad) - 4px) calc(var(--pad) - 6px);
+  border-right: var(--rule); border-bottom: var(--rule); }
+
+/* bend board */
+.bend-vals { flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--gap) 0; }
+.bend-grp { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: 0 calc(var(--gap) + 4px); border-right: var(--rule); }
+.bend-grp:first-child { padding-left: 0; } .bend-grp:last-child { border-right: 0; padding-right: 0; }
+.bend-grp .ctrls { gap: var(--gap); }
+
+/* bridges: a patch matrix the width of the glass */
+.br-depth { grid-template-columns: auto 140px 2.6em; }
+.scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: var(--fs-s); }
+.mx th { font-size: var(--fs-s); font-weight: 400; text-transform: lowercase; padding: 0 4px 2px; text-align: center; white-space: nowrap; }
+.mx th.src { text-align: left; width: 1%; padding-right: 14px; }
+.mx .jack { width: 9px; height: 9px; display: inline-block; border: var(--bw) solid var(--ink); margin-right: 6px; vertical-align: middle; }
+.cell { width: 64px; height: 28px; border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; cursor: ns-resize; touch-action: none; user-select: none;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--muted); }
+.mx .cell { width: 100%; min-width: 44px; height: clamp(20px, calc((100dvh - 330px) / 12), 40px); }
+.cell .fill { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(90deg, var(--ink) 0 4px, transparent 4px 6px); opacity: .9; }
+.cell span { position: relative; z-index: 1; }
+.cell.active { color: var(--ink); }
+.cell.active span { background: var(--glass); padding: 0 3px; }
+.mx .volt { font-size: var(--fs-s); color: var(--muted); display: inline-block; width: 4.2em; text-align: right; margin-left: 6px; font-variant-numeric: tabular-nums; }
+
+/* effects (from the 303 app): one box per unit, a power switch in its label strip */
+.fxrow { flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; align-content: stretch; gap: var(--gap); }
+.fxu { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s); border: var(--bw) solid var(--ink); border-radius: calc(var(--r) + 1px); opacity: .55; }
+.fxu.on { opacity: 1; }
+.fxu.rv { order: 4; flex-basis: 100%; }   /* the reverb slot gets its own row: folder, drive, delay and compactor share the first */
+.fxu .ctrls, .mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
+.fxu .fxh { justify-content: flex-start; padding-left: 3px; }
+.fxu .fxh b { font-weight: 400; }
+.fxu .fxh small { margin-left: auto; }
+.fxu .onoff { height: calc(var(--fs-l) - 2px); padding: 0 6px; font-size: var(--fs-xs); border-color: var(--glass); color: var(--glass); text-shadow: none; }
+.fxu .onoff[aria-pressed="true"] { background: var(--glass); color: var(--ink); }
+.fxu .lcd { font-size: var(--fs-s); border: var(--bw) solid var(--ink); padding: 0 6px; border-radius: var(--r); white-space: nowrap; }
+.fxu .fxnote { font-size: var(--fs-xs); color: var(--muted); max-width: 46ch; margin: 0; }
+/* the reverb slot (from the 303 app): type switch and program readout in the strip, a full-width row of program buttons,
+   the selected unit's faders, a two-line note */
+.rv .fxh { justify-content: flex-start; gap: calc(var(--gap) - 2px); }
+.rv-type { display: inline-flex; }
+.rv-type button { appearance: none; background: none; border: var(--bw) solid var(--glass); border-right-width: 0; border-radius: 0; color: var(--glass);
+  height: calc(var(--fs-l) - 2px); padding: 0 calc(var(--gap-s) + 2px); font: inherit; font-size: var(--fs-xs); line-height: 1; text-transform: lowercase; cursor: pointer; }
+.rv-type button:first-child { border-radius: var(--r) 0 0 var(--r); } .rv-type button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
+.rv-type button[aria-checked="true"] { background: var(--glass); color: var(--ink); }
+.rv-lcd { font-size: var(--fs-s); letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rv-progs { flex: none; display: grid; grid-template-columns: repeat(var(--n, 9), minmax(0, 1fr)); gap: var(--gap-s); }
+.rv-progs button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink); min-width: 0;
+  padding: 2px 4px 3px; font: inherit; font-size: var(--fs-s); line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+.rv-progs button b { display: block; font-weight: 400; font-size: var(--fs); }
+.rv-progs button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+@media (hover: hover) { .rv-progs button:hover:not([aria-checked="true"]), .rv-type button:hover:not([aria-checked="true"]) { background: var(--tint); } }
+.fdr[hidden] { display: none; }
+.rv-note { flex: none; margin: 0; padding: 0 3px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; max-width: 150ch; }
+
+/* ---------- sequencer: controls in one strip, the piano roll fills the rest ---------- */
+.seq { gap: var(--gap-s); }
+.sq-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
+.sq-side { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) calc(var(--gap) + 6px); }
+.acts { display: flex; gap: var(--gap-s); }
+.sq-msg { flex: 1 1 200px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; }
+.sq-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
+.sq-bank { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
+.bk-lab { color: var(--muted); }
+.slots { display: flex; gap: 4px; }
+.slots button, .rm-btn { min-width: calc(var(--h) + 4px); padding: 0 6px; font-size: var(--fs-s); position: relative; -webkit-touch-callout: none; user-select: none; }
+.slots button.used:not([aria-pressed=true]) { background: var(--ghost); }
+.slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 10px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
+.slots button.playing { outline: 2px dashed var(--ink); outline-offset: 2px; }
+/* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
+.rmenu { position: relative; }
+.sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu { margin-left: 0; }
+.rm-btn::after { content: " ▾"; }
+.fn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 70; min-width: 230px; display: flex; flex-direction: column; padding: 4px 0 6px;
+  background: var(--glass); color: var(--ink); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 0 10px 30px rgb(0 0 0 / .45); text-shadow: none; }
+.fn-menu[hidden] { display: none; }
+.fn-menu button { appearance: none; background: none; border: 0; border-radius: 0; box-shadow: none; margin: 0; width: 100%; height: var(--menu-h);
+  display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 0 12px 0 22px;
+  font-family: var(--f-lcd); font-size: var(--fs); line-height: 1; letter-spacing: 0; text-transform: none; text-align: left; color: var(--ink); text-shadow: none;
+  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fn-menu .mh { padding: 6px 12px 2px; font-size: var(--fs-s); line-height: 1; color: var(--muted); text-transform: lowercase; }
+.fn-menu kbd { font-family: var(--f-lcd); font-size: var(--fs-s); line-height: 1; color: var(--muted); text-transform: none; }
+.fn-menu button:not(:disabled):hover, .fn-menu button:focus-visible { background: var(--ink); color: var(--glass); outline: 0; }
+.fn-menu button:not(:disabled):hover kbd, .fn-menu button:focus-visible kbd { color: var(--glass); }
+.fn-menu button:disabled { opacity: .4; cursor: default; }
+.chain-read { display: flex; align-items: center; gap: 6px; } .chain-read[hidden] { display: none; }
+.chain-read .now { background: var(--ink); color: var(--glass); padding: 0 3px; } .chain-read .arr { opacity: .5; }
+.chain-read button { min-width: 0; height: calc(var(--h) - 4px); padding: 0 6px; }
+
+/* piano roll: key rows, octave lanes, tie/slide/accent rows; dim columns past the end extend the pattern */
+.rollwrap { flex: 1 1 auto; min-height: 0; overflow-x: auto; scrollbar-width: thin; }
+.roll { display: grid; grid-template-columns: calc(var(--fs) * 2.2) repeat(var(--steps, 32), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr);
+  width: 100%; height: 100%; min-width: 0; border: var(--bw) solid var(--ink); user-select: none; -webkit-user-select: none; text-shadow: none; }
+.roll > * { border: 0; border-right: 1px solid rgb(var(--ink-rgb) / .28); border-bottom: 1px solid rgb(var(--ink-rgb) / .28); padding: 0; background: transparent; color: var(--ink);
+  min-width: 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); line-height: 1; border-radius: 0; }
+.roll .rh { justify-content: flex-start; padding-left: 5px; border-right: var(--bw) solid var(--ink); text-transform: lowercase; white-space: nowrap; }
+.roll .blk { background: var(--tint); }
+.roll .rh.blk { background: rgb(var(--ink-rgb) / .17); }
+.roll .bar { border-right-color: rgb(var(--ink-rgb) / .6); }
+.roll .gap { border-bottom: var(--bw) solid rgb(var(--ink-rgb) / .65); }
+.roll button { cursor: pointer; }
+.roll button[data-t] { touch-action: none; }
+.roll button:focus-visible { outline: 2px dashed var(--ink); outline-offset: -3px; }
+.roll .hd { font-size: var(--fs-xs); justify-content: flex-start; padding-left: 4px; }
+.roll .hd.sel { outline: 2px dashed var(--ink); outline-offset: -3px; }
+.roll .hd.cur { background: var(--ink); color: var(--glass); }
+.roll .cell.cur:not(.on) { background: rgb(var(--ink-rgb) / .3); }
+.roll .cell.on { background: var(--ink); box-shadow: inset 0 0 0 1px var(--glass); }
+.roll .cell.on.cur { box-shadow: inset 0 0 0 2px var(--glass); }
+.roll .cell.tie { background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 5px); }
+.roll .cell.mem { box-shadow: inset 0 0 0 1px var(--muted); }
+.roll .ghost { opacity: .3; }
+.roll .cell.ghost:hover { opacity: .55; }
+.roll .end { border-right: 3px solid var(--ink); }
+
+/* ---------- perform: the bender and transpose (arpeggio and the 101 sequencer were taken off in v0.13.2) ---------- */
+.perf101 { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+.perf101 .grp { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 4px); padding: calc(var(--pad) - 6px) var(--pad) var(--pad); border-right: var(--rule); border-bottom: var(--rule); }
+.perf101 .grp:last-of-type { border-right: 0; }
+.perf101 .row { display: flex; gap: calc(var(--gap) + 6px); align-items: flex-start; flex-wrap: wrap; }
+#benderSlot { flex: 1 1 auto; min-height: 0; align-items: stretch; flex-wrap: nowrap; gap: var(--gap); }
+.perf101 .row:has(.lever) { align-items: center; }
+.lever { width: 180px; height: calc(var(--h) + 6px); border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; touch-action: none; cursor: ew-resize;
+  background: repeating-linear-gradient(90deg, var(--ghost) 0 4px, transparent 4px 7px); }
+.lever::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2px; background: var(--muted); }
+.lever i { position: absolute; top: 2px; bottom: 2px; width: 18px; background: var(--ink); left: calc(50% - 9px); box-shadow: var(--shadow); }
+.readout { align-self: flex-start; font-size: calc(var(--fs-l) + 6px); padding: 2px 14px; min-width: 7em; background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
+  font-variant-numeric: tabular-nums; }
+.hint { font-size: var(--fs-s); color: var(--muted); margin: 0; line-height: 1.3; }
+.hint kbd { font-family: var(--f-lcd); border: 1px solid var(--ink); padding: 0 4px; border-radius: 2px; color: var(--ink); }
+.perf101 .hint { grid-column: 1 / -1; padding: var(--gap) var(--pad); max-width: none; }
+body > .hint { display: none; }
+.status { font-size: var(--fs-s); color: var(--muted); }
+
+/* ---------- install pop-up: an LCD card along the bottom edge ---------- */
+.install { position: fixed; z-index: 60; left: 50%; bottom: max(12px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(560px, calc(100vw - 24px));
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--glass); color: var(--ink); border: 4px solid var(--bezel); border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.55); text-shadow: var(--shadow); }
+.install[hidden] { display: none; }
+.install .how { display: block; margin-top: 2px; }
+.install svg { width: 34px; height: 34px; flex: none; }
+.install div { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.1; }
+.install b { font-weight: 400; font-size: var(--fs-l); text-transform: lowercase; }
+.install span { font-size: var(--fs-s); color: var(--muted); }
+
+/* ---------- phones are played sideways: portrait shows a turn-your-phone card ---------- */
+.rotate { display: none; }
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 900px) {
+  .rotate { display: flex; position: fixed; inset: 0; z-index: 50; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: var(--glass); color: var(--ink); border: 6px solid var(--bezel); text-align: center; padding: 24px; font-size: 26px; text-shadow: var(--shadow); }
+  .rotate svg { width: 120px; height: 120px; animation: tilt 2.4s ease-in-out infinite; }
+  .rotate small { font-size: 19px; color: var(--muted); max-width: 26ch; }
+  .unit, .hint { display: none; }
+}
+@keyframes tilt { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* narrow desktop windows: the header wraps instead of squeezing */
+@media (max-width: 1280px) and (min-height: 521px) {
+  .top { flex-wrap: wrap; }
+  .brand span { display: none; }
+}
+
+/* ---------- landscape phone (Pixel 9a, 915 x 412): the tokens above shrink; this only drops the long text ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  html, body { height: 100%; overflow: hidden; }
+  body { padding: 2px max(4px, env(safe-area-inset-right, 0px)) 2px max(4px, env(safe-area-inset-left, 0px)); }
+  .unit { height: calc(100dvh - 4px); min-height: 0; border-width: 3px; border-radius: 8px; }
+  .top { flex-wrap: nowrap; padding: 3px var(--pad); gap: var(--gap) 10px; }
+  .brand b { padding: 1px 6px 0 8px; gap: 4px; letter-spacing: .1em; }
+  .ver { margin-top: 1px; }
+  .brand span, .presets > .num, .pm .pm-step, .mod h2 small, .fxu .fxh small, .fxu .fxnote, .sec-h p, .sq-msg, .bk-lab, .hint { display: none; }
+  .psu { padding: 0 6px; gap: 5px; }
+  .psu::before { width: 11px; height: 6px; }
+  .btn.play { min-width: 4.4em; }
+  .led { width: 7px; height: 7px; }
+  .pm .pm-btn { min-width: 120px; max-width: 160px; border-radius: var(--r); font-size: var(--fs); }
+  .pm-pop { position: fixed; top: 30px; right: 6px; width: 360px; max-height: calc(100dvh - 36px) !important; }
+  .tabs button { padding: 3px 4px; }
+  .mod { padding: 3px 5px 4px; gap: 3px; }
+  .mod h2, .bend-grp h3, .perf101 h3, .fxu .fxh { min-height: 0; padding-top: 1px; padding-bottom: 1px; }
+  .fdr { gap: 1px; min-width: 28px; }
+  .fdr label { margin-top: 1px; }
+  .ctrls { gap: 4px; }
+  .sw { gap: 0; } .sw .lab { margin-bottom: 0; } .sw button { padding: 0 3px 0 2px; gap: 4px; } .sw button .led { width: 6px; height: 6px; }
+  .bend-grp { padding: 0 8px; }
+  .sq-side { gap: 3px 10px; }
+  .sld { grid-template-columns: auto 70px 2.2em; gap: 0 4px; }
+  .br-depth { grid-template-columns: auto 90px 2.2em; }
+  .sld input::-webkit-slider-runnable-track { height: 9px; } .sld input::-webkit-slider-thumb { width: 9px; height: 16px; margin-top: -5px; }
+  .slots button::after { top: -6px; right: -4px; font-size: 9px; }
+  .roll { grid-template-columns: 30px repeat(var(--steps, 32), minmax(0, 1fr)); }
+  .roll .rh { padding-left: 3px; }
+  table.mx { border-spacing: 3px 2px; }
+  .mx th { padding: 0 2px 1px; line-height: 1; }
+  .mx .cell { min-width: 40px; height: clamp(15px, calc((100dvh - 158px) / 12), 26px); }
+  .mx .volt { width: 3.8em; margin-left: 3px; } .mx .jack { width: 7px; height: 7px; margin-right: 3px; }
+  .fxu { padding: 3px; gap: 3px; }
+  .fxu .onoff { height: 13px; padding: 0 3px; }
+  .perf101 .grp { padding: 4px 10px 8px; gap: 6px; } .perf101 .row { gap: 10px; }
+  .lever { width: 160px; }
+  .readout { font-size: calc(var(--fs-l) + 2px); }
+}

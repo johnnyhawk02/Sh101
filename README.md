@@ -2,11 +2,11 @@
 
 A circuit-modelled monosynth for the browser, with a 303-style step sequencer and a bend board for circuit-bending the model while it plays. Its architecture follows the classic single-VCO battery monosynth (VCO with sub-oscillator, 4-pole OTA filter, one envelope, LFO). It is an independent design: no Roland code, artwork or branding is used.
 
-Open `index.html` in a browser (Chrome, Edge, Firefox or Safari). Click **Run** or play keys A to K on your computer keyboard.
+The app is in `site/` and is live at https://shyoy.pages.dev. To run it locally, serve `site/` over http (for example `npx serve site`), since the page fetches its engine files. Click **Run** or play keys A to K on your computer keyboard.
 
 ## What is modelled
 
-Every stage in `src/dsp.js` runs in physical units (volts, amps, farads, ohms, kelvin) and is integrated over time. The audio path is 2x oversampled.
+Every stage in `site/js/dsp/engine.js` runs in physical units (volts, amps, farads, ohms, kelvin) and is integrated over time. The audio path is 2x oversampled.
 
 | Stage | Model |
 |---|---|
@@ -31,20 +31,55 @@ The component values are typical for these circuit topologies. They have not yet
 
 16 steps with note, octave, tie, rest, accent and slide, plus swing and gate length. Sequencing runs inside the audio thread, so it is sample-accurate. While it runs, keys transpose the pattern.
 
-## Develop
+## Code layout
+
+There is no build step: `site/` is what gets deployed.
 
 ```
-npm test        # runs the engine headless in Node: pitch tracking, self-oscillation, stability under heavy bending
-npm run build   # inlines src/dsp.js into src/ui.html -> index.html
+site/index.html          the page: markup only, loads the files below in order
+site/css/shyoy.css       all styles (glass colour tokens on :root)
+site/js/dsp/fx.js        AudioWorklet: effects (RAT, DS-1, TS808, Buchla 259, delay, the reverb slot, Compactor)
+site/js/dsp/engine.js    AudioWorklet: the circuit model (VCO, sub, VCF, VCA, env, LFO, PSU, bridges, both sequencers)
+site/js/app/*.js         the UI, as plain scripts sharing one scope, in this order:
+  defs        bend-board values, rack layout, effect units
+  state       patterns, saved state, slot data
+  audio       boots the worklet (fetches fx.js + engine.js, joins them) and sends it messages
+  controls    faders, dials, switches, the rack
+  bend        Bend board and Bridges
+  effects     FX page
+  sequencer   piano roll and its sliders
+  tabs        tabs, phone full screen / landscape
+  slots       pattern slots and chains
+  seqmenu     Randomise and Tools menus
+  transport   run/stop, tempo
+  presets     preset store, save bar, preset menu
+  namer       preset namer
+  sounds      what a preset holds, built-in sounds
+  keyboard    engine feedback, computer keys, bender, Space
+  app         install, ≡ menu, Colours, auto-update
+site/sw.js               offline cache: lists every file above (add new files there)
 ```
+
+The UI scripts are classic scripts, not modules, so a file may use anything declared in an earlier one, and anything in a later one only from inside an event handler or function called later.
+
+```
+npm test         # runs the engine headless in Node: pitch, stability under heavy bending, every effect on
+npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch main
+```
+
+`legacy/kestrel-v0.2/` keeps the first prototype (the old `src/`, `build.mjs` and its `index.html`).
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.2), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.3), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Code split into files (v0.13.3)
+
+No change to the sound, the look or what anything does. The one 264 KB `index.html` is now the page markup plus `css/shyoy.css`, the AudioWorklet in `js/dsp/` (effects and engine) and the UI in sixteen files in `js/app/` (see Code layout). Checked against v0.13.2: the engine renders bit-identical audio (stock patch, every effect, each reverb and pedal, a bent patch), the page sends the engine the same messages, and every tab and the menu screenshot pixel-identical at desktop size and at Pixel 9a landscape, apart from the version number. The offline cache now holds every file and fetches the app's code fresh when online, so an update never mixes old and new files. Dead code removed: two unused CSS rules (`.stp`, `.fxu .progs`), an unused engine table and an unused variable. The arpeggio and the 101 sequencer stay in the engine. The first prototype moved to `legacy/`.
 
 ### Perform page: bender only (v0.13.2)
 
