@@ -32,7 +32,7 @@
   --gap-s: 6px;       /* gap inside a group */
   --h: 28px; --menu-h: 22px;          /* control height */
   --h-top: 34px;      /* header control height */
-  --fs-xs: 14px; --fs-s: 16px; --fs: 18px; --fs-l: 21px; --fs-xl: 40px;
+  --fs-xs: 16px; --fs-s: 19px; --fs: 21px; --fs-l: 23px; --fs-xl: 40px;
   --trk: 22px;        /* fader width */
   --trk-min: 56px;    /* shortest a fader may get */
   color-scheme: light;
@@ -353,10 +353,10 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
 .route-dia .rsum { fill: none; stroke: var(--ink); stroke-width: 1.5; }
-.route-dia .rt { fill: var(--ink); font-size: 15px; }
-.route-dia .rs { fill: var(--muted); font-size: 13px; text-anchor: middle; }
+.route-dia .rt { fill: var(--ink); font-size: 17px; }
+.route-dia .rs { fill: var(--muted); font-size: 15px; text-anchor: middle; }
 .route-dia .rb rect { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 2; }
-.route-dia .rb text { fill: var(--muted); font-size: 15px; text-anchor: middle; }
+.route-dia .rb text { fill: var(--muted); font-size: 17px; text-anchor: middle; }
 .route-dia .rb.on rect { fill: var(--ink); stroke-dasharray: none; }
 .route-dia .rb.on text { fill: var(--glass); }
 [data-lcdmode=colour] .route-dia .rb.on rect { fill: var(--accent); stroke: var(--accent); }
@@ -383,7 +383,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .rv-lcd { font-size: var(--fs-s); letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rv-progs { flex: none; display: grid; grid-template-columns: repeat(var(--n, 9), minmax(0, 1fr)); gap: var(--gap-s); }
 .rv-progs button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink); min-width: 0;
-  padding: 2px 4px 3px; font: inherit; font-size: var(--fs-s); line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
+  padding: 2px 2px 3px; font: inherit; font-size: calc(var(--fs-s) - 2px); line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
 .rv-progs button b { display: block; font-weight: 400; font-size: var(--fs); }
 .rv-progs button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
@@ -401,7 +401,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .slots { display: flex; gap: 4px; }
 .slots button, .rm-btn { min-width: calc(var(--h) + 4px); padding: 0 6px; font-size: var(--fs-s); position: relative; -webkit-touch-callout: none; user-select: none; }
 .slots button.used:not([aria-pressed=true]) { background: var(--ghost); }
-.slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 10px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
+.slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 12px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
 .slots button.playing { outline: 2px dashed var(--ink); outline-offset: 2px; }
 /* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
 .rmenu { position: relative; }

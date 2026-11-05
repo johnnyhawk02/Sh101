@@ -75,11 +75,14 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.16.2), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.16.3), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Bigger small text (v0.16.3)
+The type scale in `site/css/shyoy.css` went up about 15%: `--fs-xs` 14 to 16px, `--fs-s` 16 to 19px, `--fs` 18 to 21px, `--fs-l` 21 to 23px (the big logo size stays 40px). The routing diagram's labels and the MIDI channel badge on the pattern slots went up to match. Reverb program names sit 2px under `--fs-s` with tighter padding so "small hall b" still fits its button. Every tab still fits with no scrolling at 1440 x 900 and 915 x 412.
 
 ### No install pop-up, no portrait cover (v0.16.2)
 
