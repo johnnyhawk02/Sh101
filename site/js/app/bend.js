@@ -33,7 +33,6 @@ function buildMatrix() {
       fill.style.left = '0'; fill.style.width = (v * 100) + '%';
       lab.textContent = v > 0 ? ohms(bridgeR(v)) : '∞';
       c.setAttribute('aria-valuenow', Math.round(v * 100)); c.setAttribute('aria-valuetext', v > 0 ? ohms(bridgeR(v)) + ' bridge' : 'open');
-      c.title = v > 0 ? ohms(bridgeR(v)) + ' resistor across these points' : 'Open. Drag up to bridge';
     };
     const set = v => { v = Math.round(Math.max(0, Math.min(1, v)) * 1000) / 1000; if (v < 0.004) v = 0; if (v) state.br[k] = v; else delete state.br[k]; render(); post({ type: 'bridges', br: state.br }); save(); };
     let drag = null;

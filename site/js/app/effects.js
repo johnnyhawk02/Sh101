@@ -23,7 +23,6 @@ for (const u of FX) {
     const c = el.querySelector('.ctrls');
     for (const it of u.items) it.dial ? dial(it, c) : it.f ? fader(it, c) : switcher(it, c);
   }
-  if (u.id === 'cmp') el.insertAdjacentHTML('beforeend', '<p class="fxnote">Keyed from the dry synth: it ducks the delay and reverb returns while you play, like the 303 app.</p>');
   fxrow.appendChild(el); fxBox[u.id] = el;
   const b = el.querySelector('.onoff');
   if (b) b.onclick = () => { boot(); state.fx[u.id] = !state.fx[u.id]; post({ type: 'fx', name: u.id, on: state.fx[u.id] }); renderFx(); save(); };
@@ -63,7 +62,7 @@ function drawRev() {
     rvShown = T;
     rvProgs.style.setProperty('--n', n);
     const full = T === 'lex' ? LEX_PROGS.map(p => p[3]) : T === 'plate' ? PLATE_PROGS.map(p => p[1]) : T === 'spring' ? SPRING_PROGS.map(p => p[1]) : CNV_PROGS.map(p => p[1]);
-    rvProgs.innerHTML = pit.opts.map((o, i) => `<button data-i="${i}" role="radio" aria-checked="false" title="${full[i]}"><b>${i + 1}</b>${o}</button>`).join('');
+    rvProgs.innerHTML = pit.opts.map((o, i) => `<button data-i="${i}" role="radio" aria-checked="false" aria-label="${i + 1} ${full[i]}"><b>${i + 1}</b>${o}</button>`).join('');
     for (const f of fxBox.lex.querySelectorAll('.fdr[data-rev]')) f.hidden = f.dataset.rev !== T;
   }
   for (const b of rvProgs.children) b.setAttribute('aria-checked', +b.dataset.i === sel);

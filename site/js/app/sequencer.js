@@ -3,13 +3,12 @@
 // A step is { n: key 0-11, o: octave -2..2, m: 'N' note | 'T' tie | 'R' rest, a: accent, s: slide }.
 // Rows: step numbers, octave lanes, keys B..C, then tie, slide and accent. At least 32 columns show;
 // columns past the pattern's end are dim, and pressing one grows the pattern to it (up to 64).
-const roll = document.getElementById('roll'), sqMsg = document.getElementById('sq-msg');
+const roll = document.getElementById('roll');
 const KEY_ROWS = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0], OCT_ROWS = [2, 1, -1, -2], BLACK = new Set([1, 3, 6, 8, 10]);
 const FLAG_ROWS = [['t', 'tie'], ['s', 'slide'], ['a', 'acc']];
 const SEQ_SHOW = 32, SEQ_MAX = 64;
 let selStep = -1, playStep = -1, seqCols = [], tail = [], undoBuf = null, playingSlot = -1, chainOffs = [];
 const restStep = (st) => ({ n: st ? st.n : 0, o: st ? st.o : 0, m: 'R', a: false, s: false });
-const say = t => { sqMsg.textContent = t; };
 function renderSeq() {
   const P = state.steps, n = P.length, cols = Math.max(SEQ_SHOW, n);
   const focusId = document.activeElement && document.activeElement.closest && document.activeElement.closest('#roll') ? document.activeElement.id : '';
@@ -104,7 +103,7 @@ const endPaint = e => { if (paint && e.pointerId === paint.id) paint = null; };
 addEventListener('pointerup', endPaint); addEventListener('pointercancel', endPaint);
 roll.addEventListener('click', e => {
   const h = e.target.closest('button[data-h]');
-  if (h) { const i = +h.dataset.h; selStep = selStep === i ? -1 : i; renderSeq(); if (selStep >= 0) say(`Writing from step ${i + 1}: play keys to fill steps in turn. Tap the number again to stop.`); return; }
+  if (h) { const i = +h.dataset.h; selStep = selStep === i ? -1 : i; renderSeq(); return; }
   if (paintedClick) { paintedClick = false; if (e.detail !== 0) return; }
   const b = e.target.closest('button[data-t]'); if (!b) return;
   applyCell(b); stepChanged();
@@ -160,15 +159,15 @@ document.querySelector('.sq-side').addEventListener('input', e => {
 });
 document.getElementById('p-dup').onclick = () => {
   const P = state.steps, n = P.length, to = [16, 32, 64].find(x => x > n);
-  if (!to) { say('Already at the 64-step maximum.'); return; }
+  if (!to) return;
   keepUndo(); state.steps = Array.from({ length: to }, (_, i) => ({ ...P[i % n] })); tail = [];
-  stepChanged(); say(`Repeated ${n} step${n === 1 ? '' : 's'} out to ${to}.`);
+  stepChanged();
 };
 document.getElementById('p-shuf').onclick = () => {
   const P = state.steps; if (P.length < 2) return; keepUndo();
   for (let i = P.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
   for (let i = 0; i < P.length; i++) if (P[i].m === 'T' && i === 0) P[i].m = 'N';
-  tail = []; stepChanged(); say('Shuffled. Tap again for another order.');
+  tail = []; stepChanged();
 };
 // Random: a minor-pentatonic line around the root, mostly notes, some rests and ties, accents on strong beats
 document.getElementById('p-rnd').onclick = () => {
@@ -182,7 +181,7 @@ document.getElementById('p-rnd').onclick = () => {
     if (m === 'T' && prev) { st.n = prev.n; st.o = prev.o; } else setPitch(st, v);
     P.push(st); if (m !== 'R') prev = st;
   }
-  state.steps = P; tail = []; stepChanged(); say(`New ${len}-step line. Undo brings the last one back.`);
+  state.steps = P; tail = []; stepChanged();
 };
 // Randomise one row (oct / slide / acc / tie): the notes stay, only that row is dealt again, as wild as Rnd depth.
 // Ties take the pitch of the note before them, so repeated tie presses start again from the pattern before the first press.
@@ -194,8 +193,8 @@ sqDepthEl.addEventListener('input', e => { e.stopPropagation(); showSqDepth(); t
 let tieBase = null, tieOut = null;
 function rndRow(kind) {
   const d = sqDepthEl.value / 100, P = state.steps, n = P.length, hit = (p) => Math.random() < p;
-  if (P.every(st => st.m === 'R')) { say('No notes to randomise yet.'); return; }
-  keepUndo(); let c = 0;
+  if (P.every(st => st.m === 'R')) return;
+  keepUndo();
   if (kind === 'o') {
     // octave jumps on played notes; ties follow the note they hold
     for (let i = 0; i < n; i++) {
@@ -203,18 +202,14 @@ function rndRow(kind) {
       if (st.m === 'T') { const pv = P[(i - 1 + n) % n]; st.o = pv.o; continue; }
       if (st.m === 'R') continue;
       st.o = !hit(d) ? 0 : hit(0.15 + 0.35 * d) ? (hit(0.5) ? 2 : -2) : (hit(0.6) ? 1 : -1);
-      if (st.o) c++;
     }
-    say(`${c} note${c === 1 ? '' : 's'} moved up or down an octave.`);
   } else if (kind === 's' || kind === 'a') {
     for (let i = 0; i < n; i++) {
       const st = P[i];
       // accents only sound on struck notes, and lean to the downbeats like the Random pattern
       const ok = kind === 'a' ? st.m === 'N' : st.m !== 'R';
       st[kind] = ok && hit(kind === 'a' ? Math.min(1, d * (i % 4 === 0 ? 1.6 : 0.8)) : d);
-      if (st[kind]) c++;
     }
-    say(`${c} ${kind === 'a' ? 'accent' : 'slide'}${c === 1 ? '' : 's'}.`);
   } else {
     const src = tieOut && tieBase && tieBase.length === n && JSON.stringify(P) === tieOut ? tieBase : clone(P);
     tieBase = src;
@@ -222,10 +217,9 @@ function rndRow(kind) {
     for (let i = 0; i < n; i++) {
       const st = Q[i]; if (st.m === 'R') continue;
       if (st.m === 'T') st.m = 'N';
-      if (i > 0 && Q[i - 1].m !== 'R' && hit(d)) { st.n = Q[i - 1].n; st.o = Q[i - 1].o; st.m = 'T'; c++; }
+      if (i > 0 && Q[i - 1].m !== 'R' && hit(d)) { st.n = Q[i - 1].n; st.o = Q[i - 1].o; st.m = 'T'; }
     }
     state.steps = Q; tieOut = JSON.stringify(Q);
-    say(`${c} tie${c === 1 ? '' : 's'}. Press again for another set; Undo brings back the last one.`);
   }
   tail = []; stepChanged(); if (kind === 't') tieOut = JSON.stringify(state.steps);
 }
@@ -235,7 +229,7 @@ function altRow(kind) {
   const d = sqDepthEl.value / 100, P = state.steps, n = P.length;
   const ok = i => kind === 'a' ? P[i].m === 'N' : kind === 't' ? i > 0 && P[i].m !== 'R' && P[i - 1].m !== 'R' : P[i].m !== 'R' && !(kind === 'o' && P[i].m === 'T');
   const idx = []; for (let i = 0; i < n; i++) if (ok(i)) idx.push(i);
-  if (!idx.length) { say('Nothing in that row to alter yet.'); return; }
+  if (!idx.length) return;
   keepUndo();
   for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
   const k = Math.max(1, Math.round(idx.length * d * 0.5)), pick = idx.slice(0, k);
@@ -247,13 +241,12 @@ function altRow(kind) {
   }
   // ties hold the note before them, so they follow its octave
   if (kind === 'o' || kind === 't') for (let i = 1; i < n; i++) if (P[i].m === 'T') { P[i].n = P[i - 1].n; P[i].o = P[i - 1].o; }
-  const name = { o: 'octave', s: 'slide', a: 'accent', t: 'tie' }[kind];
-  tail = []; stepChanged(); say(`Altered ${k} ${name}${k === 1 ? '' : 's'}. Tap again to keep nudging; Undo steps back.`);
+  tail = []; stepChanged();
 }
 [['a-oct', 'o'], ['a-slide', 's'], ['a-acc', 'a'], ['a-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => altRow(k); });
 [['r-oct', 'o'], ['r-slide', 's'], ['r-acc', 'a'], ['r-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => rndRow(k); });
-document.getElementById('p-clr').onclick = () => { keepUndo(); state.steps = state.steps.map(() => restStep()); tail = []; stepChanged(); say('Cleared. Undo brings it back.'); };
+document.getElementById('p-clr').onclick = () => { keepUndo(); state.steps = state.steps.map(() => restStep()); tail = []; stepChanged(); };
 document.getElementById('p-undo').onclick = () => {
-  if (!undoBuf) return; const u = JSON.parse(undoBuf); undoBuf = null; state.steps = u.steps; tail = u.tail; stepChanged(); say('Undone.');
+  if (!undoBuf) return; const u = JSON.parse(undoBuf); undoBuf = null; state.steps = u.steps; tail = u.tail; stepChanged();
 };
 renderSeq();

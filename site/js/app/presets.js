@@ -8,8 +8,8 @@ function loadStore(key) { const v = store.get(key, {}); return v && typeof v ===
   if (ch) store.set('projectPresets', u); }
 function presetBar(pre, storeKey, builtins, snap, apply, autoName) {
   const sel = document.getElementById(pre + '-preset'), nameEl = document.getElementById(pre + '-name');
-  const delBtn = document.getElementById(pre + '-del'), msg = document.getElementById(pre + '-msg');
-  const bar = { user: loadStore(storeKey), say: (t) => { msg.textContent = t; clearTimeout(bar.t); bar.t = setTimeout(() => { msg.textContent = ''; }, 4000); } };
+  const delBtn = document.getElementById(pre + '-del');
+  const bar = { user: loadStore(storeKey) };
   let armed = '';
   const esc = (n) => n.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   bar.render = (selected) => {
@@ -37,23 +37,20 @@ function presetBar(pre, storeKey, builtins, snap, apply, autoName) {
     const name = v.slice(2);
     apply(v[0] === 'b' ? builtins[name] : bar.user[name]);
     if (v[0] === 'u') nameEl.value = name;
-    bar.say(`Loaded ${name}.`);
   });
   document.getElementById(pre + '-save').onclick = () => {
     if (autoName && !nameEl.value.trim()) bar.suggest(true);
     const name = nameEl.value.trim();
-    if (!name) { nameEl.focus(); bar.say('Type a name first, then save.'); return; }
+    if (!name) { nameEl.focus(); return; }
     suggested = '';
-    const existed = name in bar.user;
     bar.user[name] = snap(); bar.save(); bar.render('u:' + name);
-    bar.say(existed ? `Updated ${name}.` : `Saved ${name}.`);
   };
   nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById(pre + '-save').click(); });
   delBtn.onclick = () => {
     const v = sel.value; if (!v.startsWith('u:')) return;
     const name = v.slice(2);
-    if (armed !== name) { armed = name; delBtn.textContent = 'Confirm delete'; bar.say(`Click Confirm delete to remove ${name}.`); return; }
-    delete bar.user[name]; bar.save(); bar.render(''); bar.say(`Deleted ${name}.`);
+    if (armed !== name) { armed = name; delBtn.textContent = 'Confirm delete'; return; }
+    delete bar.user[name]; bar.save(); bar.render('');
   };
   bar.render('');
   return bar;
@@ -64,8 +61,8 @@ function presetMenu(host) {
   const isPat = pre === 'pat';
   host.innerHTML = `<button type="button" class="pm-btn" aria-haspopup="listbox" aria-expanded="false"><span class="cur"></span></button>`
     + `<button type="button" class="pm-step" data-d="-1" aria-label="Previous preset">◀</button><button type="button" class="pm-step" data-d="1" aria-label="Next preset">▶</button>`
-    + `<div class="pm-pop" hidden><div class="pm-head"><div class="pm-qrow"><input type="text" class="pm-q" placeholder="Search" aria-label="Search presets"><button type="button" class="pm-favf" aria-pressed="false" title="Show favourites only">★</button></div>`
-    + (isPat ? `<div class="pm-chips" role="group" aria-label="Filter">${PM_TAGS.map(t => `<button type="button" class="pm-chip" data-t="${t.k}" aria-pressed="false" title="${t.tip}">${t.label}</button>`).join('')}</div>` : '')
+    + `<div class="pm-pop" hidden><div class="pm-head"><div class="pm-qrow"><input type="text" class="pm-q" placeholder="Search" aria-label="Search presets"><button type="button" class="pm-favf" aria-pressed="false" aria-label="Show favourites only">★</button></div>`
+    + (isPat ? `<div class="pm-chips" role="group" aria-label="Filter">${PM_TAGS.map(t => `<button type="button" class="pm-chip" data-t="${t.k}" aria-pressed="false" aria-label="${t.tip}">${t.label}</button>`).join('')}</div>` : '')
     + `</div><div class="pm-list" role="listbox" aria-label="${sel.getAttribute('aria-label')}"></div></div>`;
   host.querySelector('.pm-pop').appendChild(host.parentElement.querySelector('.pm-foot'));
   const btn = host.querySelector('.pm-btn'), pop = host.querySelector('.pm-pop'), q = host.querySelector('.pm-q'), list = host.querySelector('.pm-list');

@@ -31,8 +31,8 @@ try {
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.13.3</i></b><span>Circuit-modelled monosynth · bendable</span></div>
-    <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.13.4</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
       <label class="num">Tempo<input id="bpm" type="number" min="40" max="240" value="124"></label>
@@ -41,14 +41,13 @@ try {
         <select id="prj-preset" aria-label="Presets" hidden></select><div class="pm" data-for="prj-preset"></div>
         <div class="pm-foot">
           <input id="prj-name" type="text" placeholder="Save everything as…" maxlength="40" aria-label="Preset name">
-          <button id="prj-roll" title="Another name" aria-label="Suggest another name">🎲</button>
+          <button id="prj-roll" aria-label="Suggest another name">🎲</button>
           <button id="prj-save">Save</button>
           <button id="prj-del">Delete</button>
           <button id="prj-export">Export file</button>
           <button id="prj-import">Import file</button>
-          <label class="pm-opt" title="Loading a preset changes only the sound and effects, and keeps your pattern"><input type="checkbox" id="prj-sndonly"> Sound only</label>
+          <label class="pm-opt"><input type="checkbox" id="prj-sndonly"> Sound only</label>
           <input type="file" id="prj-file" accept=".json,application/json" hidden>
-          <span class="hint" id="prj-msg" role="status"></span>
         </div>
       </div>
       <div class="appmenu"><button class="btn" id="menuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Menu">≡</button>
@@ -56,7 +55,7 @@ try {
           <button role="menuitem" id="mColours">Colours…</button>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.13.3</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.13.4</span>
         </div>
         <div class="lcd-pop" id="lcdPop" role="dialog" aria-labelledby="lcdH" hidden>
           <h3 id="lcdH">colours</h3>
@@ -87,10 +86,9 @@ try {
           <label class="sld"><span>Length</span><input type="range" data-a="len" min="1" max="64" step="1" aria-label="Pattern length"><output id="o-len">16</output></label>
           <label class="sld"><span>Gate</span><input type="range" data-a="gate" min="10" max="95" step="1" aria-label="Gate time"><output id="o-gate">50%</output></label>
           <label class="sld"><span>Swing</span><input type="range" data-a="swing" min="0" max="75" step="1" aria-label="Swing"><output id="o-swing">0%</output></label>
-          <label class="sld spr" title="Drag to rotate the pattern; springs back to centre"><span>Shift</span><input type="range" data-a="shift" min="-16" max="16" step="1" value="0" aria-label="Shift pattern by steps"><output id="o-shift">0</output></label>
-          <label class="sld spr" title="Drag to transpose the pattern; springs back to centre"><span>Transpose</span><input type="range" data-a="tr" min="-12" max="12" step="1" value="0" aria-label="Transpose pattern by semitones"><output id="o-tr">0</output></label>
-          <label class="sld" title="How much Randomise and Alter change: Randomise re-deals that share of steps, Alter flips a few (about half as many)"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
-          <span class="sq-msg" id="sq-msg" role="status">Tap a note to set or rest a step. Drag to paint. Tap a step number, then play keys to write.</span>
+          <label class="sld spr"><span>Shift</span><input type="range" data-a="shift" min="-16" max="16" step="1" value="0" aria-label="Shift pattern by steps"><output id="o-shift">0</output></label>
+          <label class="sld spr"><span>Transpose</span><input type="range" data-a="tr" min="-12" max="12" step="1" value="0" aria-label="Transpose pattern by semitones"><output id="o-tr">0</output></label>
+          <label class="sld"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
         </div>
         <div class="sq-main">
           <div class="sq-bank">
@@ -128,7 +126,6 @@ try {
 
     <section class="panel" id="pan-bend" role="tabpanel" aria-labelledby="tab-bend" hidden>
       <div class="sec-h">
-        <p>Swap component values on the live circuit. Double-click any control to put it back to stock.</p>
         <div class="tools"><button class="btn light" id="bendStock">Stock values</button></div>
       </div>
       <div class="bend-vals" id="bendVals"></div>
@@ -140,8 +137,7 @@ try {
 
     <section class="panel" id="pan-br" role="tabpanel" aria-labelledby="tab-br" hidden>
       <div class="sec-h">
-        <p>Bridge any circuit node into another through a resistor; lower resistance is a stronger bridge. Rows are nodes you tap, columns are where the wire lands. Your finger carries mains hum.</p>
-        <div class="tools"><label class="sld br-depth" title="How wild Randomise is: more bridges, lower resistances"><span>Depth</span><input type="range" id="brDepth" min="0" max="100" step="1" value="35" aria-label="Randomise depth"><output id="o-brDepth">35%</output></label><button class="btn light" id="mxRand" title="Replace the bridges with a random set, as wild as Depth">Randomise</button><button class="btn light" id="mxClear">Remove bridges</button></div>
+        <div class="tools"><label class="sld br-depth"><span>Depth</span><input type="range" id="brDepth" min="0" max="100" step="1" value="35" aria-label="Randomise depth"><output id="o-brDepth">35%</output></label><button class="btn light" id="mxRand">Randomise</button><button class="btn light" id="mxClear">Remove bridges</button></div>
       </div>
       <div class="scroll"><table class="mx" id="mx"></table></div>
     </section>
@@ -160,8 +156,8 @@ try {
   <div><b id="installH">Install Shyoy</b><span id="installTxt">Add it to your home screen. It opens full screen in landscape and works offline.</span></div>
   <button class="btn" id="installGo">Install</button><button class="btn light" id="installNo">Not now</button>
 </div>
-<p class="hint">Play from your computer keyboard: <kbd>A</kbd>–<kbd>K</kbd> white keys, <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> black keys, <kbd>Z</kbd>/<kbd>X</kbd> transpose low/high, <kbd>Space</kbd> run/stop. While the sequencer runs, keys transpose it. Sound starts on your first click or key press. Your patch and pattern are kept in this browser.</p>
 
+<script src="js/app/notips.js"></script>
 <script src="js/app/defs.js"></script>
 <script src="js/app/state.js"></script>
 <script src="js/app/audio.js"></script>

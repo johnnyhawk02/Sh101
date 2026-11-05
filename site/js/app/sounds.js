@@ -51,7 +51,6 @@ const download = (name, obj) => {
 document.getElementById('prj-export').onclick = () => {
   const nm = (document.getElementById('prj-name').value.trim() || 'shyoy-preset').replace(/[^\w .-]+/g, '_');
   download(nm + '.json', { app: 'kestrel-ms1', kind: 'project', version: 1, project: projectSnap(), presets: prjBar.user });
-  prjBar.say(`Exported ${nm}.json with your ${Object.keys(prjBar.user).length} saved presets.`);
 };
 const prjFile = document.getElementById('prj-file');
 document.getElementById('prj-import').onclick = () => prjFile.click();
@@ -60,12 +59,11 @@ prjFile.addEventListener('change', async () => {
   try {
     const j = JSON.parse(await f.text());
     if (!j || j.app !== 'kestrel-ms1' || !j.project) throw 0;
-    let n = 0; if (j.presets && typeof j.presets === 'object') for (const [k, v] of Object.entries(j.presets)) { const nm = k.trim().slice(0, 40); if (nm && v && typeof v === 'object') { prjBar.user[nm] = v; n++; } }
+    if (j.presets && typeof j.presets === 'object') for (const [k, v] of Object.entries(j.presets)) { const nm = k.trim().slice(0, 40); if (nm && v && typeof v === 'object') prjBar.user[nm] = v; }
     applyPreset(j.project);
     const nm = f.name.replace(/\.json$/i, '').trim().slice(0, 40) || 'Imported';
     prjBar.user[nm] = projectSnap(); prjBar.save(); prjBar.render('u:' + nm);
-    prjBar.say(`Loaded ${nm}${n ? ` and added ${n} saved preset${n === 1 ? '' : 's'}` : ''}.`);
-  } catch (e) { prjBar.say('That file is not a Shyoy preset export.'); }
+  } catch (e) {}
 });
 if (PROJECT_BUILTIN[state.preset]) prjBar.render('b:' + state.preset);
 for (const el of document.querySelectorAll('.pm')) presetMenu(el);

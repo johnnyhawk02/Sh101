@@ -41,6 +41,7 @@ site/css/shyoy.css       all styles (glass colour tokens on :root)
 site/js/dsp/fx.js        AudioWorklet: effects (RAT, DS-1, TS808, Buchla 259, delay, the reverb slot, Compactor)
 site/js/dsp/engine.js    AudioWorklet: the circuit model (VCO, sub, VCF, VCA, env, LFO, PSU, bridges, both sequencers)
 site/js/app/*.js         the UI, as plain scripts sharing one scope, in this order:
+  notips      turns any title attribute into data-tip, so no tooltip ever shows
   defs        bend-board values, rack layout, effect units
   state       patterns, saved state, slot data
   audio       boots the worklet (fetches fx.js + engine.js, joins them) and sends it messages
@@ -71,11 +72,15 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.3), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.4), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### No messages, no tooltips (v0.13.4)
+
+As in the TB-303 app, nothing prints status text and nothing pops up on hover. The sequencer's message line (`#sq-msg`) and the preset bar's (`#prj-msg`) are gone with every call that wrote to them; the actions themselves are unchanged, and Delete still asks for a second click on the button itself (Confirm delete). Every `title` attribute is gone (where one was the only label it became an `aria-label`), and `js/app/notips.js`, from the 303 app's `statusline.js`, turns any `title` that turns up later into `data-tip` so the browser's tooltip box never appears. The help paragraphs are gone too: Bend board, Bridges, the Compactor note and the Perform page's computer-keyboard hint, with their CSS. Headings, module subtitles, readouts, the portrait notice, the install pop-up and the menu's version line stay.
 
 ### Code split into files (v0.13.3)
 

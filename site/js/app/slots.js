@@ -14,7 +14,7 @@ function loadSlotData() {
 function loadSlot(n) {
   if (n === state.slot) return;
   storeSlot(); state.slot = n; loadSlotData();
-  renderSeq(); post(seqMsg()); save(); renderBank(); say(`Pattern ${n + 1}.`);
+  renderSeq(); post(seqMsg()); save(); renderBank();
 }
 function renderBank() {
   for (const b of slotsEl.children) {
@@ -42,7 +42,6 @@ function toggleChain(k) {
   else { if (!state.chain.length && k !== state.slot) state.chain.push(state.slot); state.chain.push(k); }
   if (state.chain.length === 1) state.chain = [];
   storeSlot(); post(seqMsg()); save(); renderBank();
-  say(state.chain.length >= 2 ? `Chain ${state.chain.map(k => k + 1).join(' › ')}. Right-click or long-press a slot to add or remove it.` : 'Chain cleared.');
 }
 // tap a slot to load it; ctrl/cmd-click, right-click or long-press adds it to the chain (as in the 303 app)
 let lpT = null, lpFired = false;
@@ -57,10 +56,10 @@ slotsEl.addEventListener('click', e => {
   if (e.metaKey || e.ctrlKey) toggleChain(+b.dataset.n); else loadSlot(+b.dataset.n);
 });
 slotsEl.addEventListener('contextmenu', e => { const b = e.target.closest('button'); if (!b) return; e.preventDefault(); if (!lpFired) toggleChain(+b.dataset.n); });
-document.getElementById('chain-clear').onclick = () => { state.chain = []; playingSlot = -1; post(seqMsg()); save(); renderBank(); say('Chain cleared.'); };
-document.getElementById('p-copy').onclick = () => { clip = { steps: clone(state.steps), swing: state.params.swing, gateLen: state.params.gateLen }; try { localStorage.setItem('kestrel.clip', JSON.stringify(clip)); } catch (e) {} renderBank(); say(`Copied pattern ${state.slot + 1}. Pick a slot and Paste.`); };
+document.getElementById('chain-clear').onclick = () => { state.chain = []; playingSlot = -1; post(seqMsg()); save(); renderBank(); };
+document.getElementById('p-copy').onclick = () => { clip = { steps: clone(state.steps), swing: state.params.swing, gateLen: state.params.gateLen }; try { localStorage.setItem('kestrel.clip', JSON.stringify(clip)); } catch (e) {} renderBank(); };
 document.getElementById('p-paste').onclick = () => {
   if (!clip || !Array.isArray(clip.steps)) return; keepUndo();
   state.steps = cleanSteps(clip.steps); state.params.swing = clip.swing ?? state.params.swing; state.params.gateLen = clip.gateLen ?? state.params.gateLen;
-  tail = []; stepChanged(); say(`Pasted into pattern ${state.slot + 1}. Undo puts it back.`);
+  tail = []; stepChanged();
 };

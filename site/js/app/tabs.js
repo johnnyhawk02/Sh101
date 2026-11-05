@@ -13,8 +13,6 @@ TABS.forEach(([t], i) => {
 });
 let firstTab = 'tab-synth';
 try { const t = localStorage.getItem('kestrel-ms1-tab'); if (t && TABS.some(x => x[0] === t)) firstTab = t; } catch (e) {}
-// the computer-keyboard help lives in the Perform tab now that every screen is tabbed
-{ const h = document.querySelector('body > .hint'); const pf = document.getElementById('perf101'); if (h && pf) pf.appendChild(h); }
 showTab(firstTab);
 phoneMQ.addEventListener('change', () => showTab(unitEl.dataset.view || 'tab-seq'));
 

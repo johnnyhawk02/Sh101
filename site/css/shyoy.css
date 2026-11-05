@@ -243,8 +243,6 @@ select.btn option { color: #000; }
 .pm-foot { display: none; }
 .pm-pop .pm-foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border-top: var(--bw) solid var(--ink); }
 .pm-foot input[type=text] { flex: 1 1 140px; min-width: 0; }
-.pm-foot .hint:empty { display: none; }
-.pm-foot .hint { font-size: var(--fs-xs); color: var(--muted); flex-basis: 100%; }
 .pm-opt { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); cursor: pointer; }
 .pm-opt input { accent-color: var(--ink); }
 
@@ -266,7 +264,6 @@ select.btn option { color: #000; }
 .unit:not([data-view="tab-synth"]) .rack { display: none; }
 .unit:not([data-view="tab-perf"]) .perf101 { display: none; }
 .sec-h { flex: none; display: flex; flex-wrap: wrap; gap: var(--gap-s) var(--gap); align-items: center; }
-.sec-h p { margin: 0; font-size: var(--fs-s); color: var(--muted); max-width: 70ch; flex: 1 1 300px; }
 .sec-h .tools { margin-left: auto; display: flex; gap: var(--gap-s) var(--gap); flex-wrap: wrap; align-items: center; }
 
 /* synth: the rack of modules in signal-flow order, every row stretched to the bottom of the glass */
@@ -308,7 +305,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .fxu .onoff { height: calc(var(--fs-l) - 2px); padding: 0 6px; font-size: var(--fs-xs); border-color: var(--glass); color: var(--glass); text-shadow: none; }
 .fxu .onoff[aria-pressed="true"] { background: var(--glass); color: var(--ink); }
 .fxu .lcd { font-size: var(--fs-s); border: var(--bw) solid var(--ink); padding: 0 6px; border-radius: var(--r); white-space: nowrap; }
-.fxu .fxnote { font-size: var(--fs-xs); color: var(--muted); max-width: 46ch; margin: 0; }
 /* the reverb slot (from the 303 app): type switch and program readout in the strip, a full-width row of program buttons,
    the selected unit's faders, a two-line note */
 .rv .fxh { justify-content: flex-start; gap: calc(var(--gap) - 2px); }
@@ -333,7 +329,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .sq-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
 .sq-side { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) calc(var(--gap) + 6px); }
 .acts { display: flex; gap: var(--gap-s); }
-.sq-msg { flex: 1 1 200px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; }
 .sq-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
 .sq-bank { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
 .bk-lab { color: var(--muted); }
@@ -401,10 +396,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .lever i { position: absolute; top: 2px; bottom: 2px; width: 18px; background: var(--ink); left: calc(50% - 9px); box-shadow: var(--shadow); }
 .readout { align-self: flex-start; font-size: calc(var(--fs-l) + 6px); padding: 2px 14px; min-width: 7em; background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
   font-variant-numeric: tabular-nums; }
-.hint { font-size: var(--fs-s); color: var(--muted); margin: 0; line-height: 1.3; }
-.hint kbd { font-family: var(--f-lcd); border: 1px solid var(--ink); padding: 0 4px; border-radius: 2px; color: var(--ink); }
-.perf101 .hint { grid-column: 1 / -1; padding: var(--gap) var(--pad); max-width: none; }
-body > .hint { display: none; }
 .status { font-size: var(--fs-s); color: var(--muted); }
 
 /* ---------- install pop-up: an LCD card along the bottom edge ---------- */
@@ -425,7 +416,7 @@ body > .hint { display: none; }
     background: var(--glass); color: var(--ink); border: 6px solid var(--bezel); text-align: center; padding: 24px; font-size: 26px; text-shadow: var(--shadow); }
   .rotate svg { width: 120px; height: 120px; animation: tilt 2.4s ease-in-out infinite; }
   .rotate small { font-size: 19px; color: var(--muted); max-width: 26ch; }
-  .unit, .hint { display: none; }
+  .unit { display: none; }
 }
 @keyframes tilt { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -444,7 +435,7 @@ body > .hint { display: none; }
   .top { flex-wrap: nowrap; padding: 3px var(--pad); gap: var(--gap) 10px; }
   .brand b { padding: 1px 6px 0 8px; gap: 4px; letter-spacing: .1em; }
   .ver { margin-top: 1px; }
-  .brand span, .presets > .num, .pm .pm-step, .mod h2 small, .fxu .fxh small, .fxu .fxnote, .sec-h p, .sq-msg, .bk-lab, .hint { display: none; }
+  .brand span, .presets > .num, .pm .pm-step, .mod h2 small, .fxu .fxh small, .bk-lab { display: none; }
   .psu { padding: 0 6px; gap: 5px; }
   .psu::before { width: 11px; height: 6px; }
   .btn.play { min-width: 4.4em; }
