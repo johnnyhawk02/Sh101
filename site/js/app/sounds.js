@@ -8,7 +8,7 @@ function projectSnap() { storeSlot(); return { sound: soundSnap(), pattern: patt
 function applySound(x) {
   if (!x || typeof x !== 'object') return;
   state.params = { ...defaults, ...migrateCmp({ ...(x.params || {}) }) }; state.bend = { ...stockBend(), ...(x.bend || {}) };
-  state.br = { ...(x.br || {}) }; state.fx = { rat: false, dly: false, lex: false, fold: false, ...(x.fx || {}) };
+  state.br = { ...(x.br || {}) }; state.fx = { ...FX_OFF(), ...(x.fx || {}) };
   for (const k in ui) ui[k](state.params[k]);
   for (const k in bui) bui[k](state.bend[k]);
   Object.values(cells).forEach(r => r()); renderFx();

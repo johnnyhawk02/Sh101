@@ -72,4 +72,35 @@ for (const [drvtype, revtype] of [[0, 0], [1, 1 / 3], [2, 2 / 3], [0, 1]]) {
   const b = render(p, 2);
   assert.ok(finite(b), `effects ${drvtype}/${revtype} produced NaN`); assert.ok(peak(b) > 0.01 && peak(b) <= 1.5, `effects ${drvtype}/${revtype} peak ${peak(b)}`);
 }
+// routing: an impulse train through the FX chain alone (fxc.run), so each route can be compared exactly
+{
+  const chain = (k, fx) => {
+    const [p] = make(), c = p.fxc; Object.assign(c.knobs, k); c.derive(); for (const n in fx) c.setFx(n, fx[n]);
+    const L = new Float64Array(96000), R = new Float64Array(96000);
+    for (let i = 0; i < L.length; i++) { c.run(i < 48000 && i % 12000 < 40 ? 0.5 * Math.sin(i * 0.3) : 0); L[i] = c.L; R[i] = c.R; if ((i & 127) === 0) c.flush(); }
+    return [L, R];
+  };
+  const same = (a, b) => a[0].every((v, i) => v === b[0][i]) && a[1].every((v, i) => v === b[1][i]);
+  const both = { lex: true, dly: true }, big = { revtype: 1 / 3, platedecay: 0.9, platemix: 0.8, dlymix: 0.6, cmpamt: 0 };
+  const par = chain(big, both), d2r = chain({ ...big, fxret: 0.5 }, both), r2d = chain({ ...big, fxret: 1 }, both);
+  assert.ok(!same(par, d2r) && !same(par, r2d) && !same(d2r, r2d), 'the three return modes should differ');
+  for (const r of [par, d2r, r2d]) assert.ok(finite(r[0]) && finite(r[1]) && peak(r[0]) <= 1);
+  // with only one return on, the return mode does nothing
+  assert.ok(same(chain(big, { lex: true }), chain({ ...big, fxret: 1 }, { lex: true })));
+  assert.ok(same(chain(big, { dly: true }), chain({ ...big, fxret: 0.5 }, { dly: true })));
+  // the order of the folder and the drive matters only when both are on
+  const pre = { fold: true, rat: true };
+  assert.ok(!same(chain({}, pre), chain({ fxorder: 1 }, pre)), 'drive → fold should differ from fold → drive');
+  assert.ok(same(chain({}, { fold: true }), chain({ fxorder: 1 }, { fold: true })));
+  // the flanger: on changes the sound, chorus differs from flanger, both stay bounded
+  const fl = chain({}, { flg: true }), ch = chain({ flgmode: 1 }, { flg: true }), dry = chain({}, {});
+  assert.ok(!same(fl, dry) && !same(fl, ch) && finite(fl[0]) && finite(ch[0]) && peak(fl[0]) <= 1 && peak(ch[0]) <= 1);
+}
+// the flanger sweeps: the BBD delay follows the triangle LFO between its Manual and Depth limits
+{
+  const [p] = make(), f = p.fxc.flg; Object.assign(p.fxc.knobs, { flgman: 0.5, flgdep: 1, flgrate: 0.5 }); p.fxc.derive();
+  let lo = Infinity, hi = 0; const n = 48000 * 2;
+  for (let i = 0; i < n; i++) { f.run(0); const tri = f.ph < 0.5 ? 4 * f.ph - 1 : 3 - 4 * f.ph, v = Math.max(0, Math.min(1, f.man + 0.5 * f.dep * tri)); const ms = 1000 * 1024 / (2 * (500e3 - v * 460e3)); lo = Math.min(lo, ms); hi = Math.max(hi, ms); }
+  assert.ok(lo < 1.6 && hi > 4, `flanger sweep ${lo.toFixed(2)}-${hi.toFixed(2)} ms`);
+}
 console.log('engine tests passed');

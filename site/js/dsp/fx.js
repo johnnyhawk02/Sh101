@@ -941,8 +941,57 @@ class Buchla259 extends OsUnit {
   }
 }
 
-// The chain after the Kestrel's output stage: the Buchla 259 folder, then the drive slot (RAT, DS-1 or TS808) in series,
-// then the 224 and the delay as parallel returns, both ducked by the Compactor keyed from the dry synth, then a soft clip.
+// Flanger after the Boss BF-2: a 1024-stage bucket brigade (MN3207) clocked by a VCO (MN3102), so the delay is
+// 1024 / (2 f_clk). The clock runs from about 500 kHz down to 40 kHz, which is 1 to 12.8 ms; the clock is linear in the
+// control voltage, so the delay sweeps as 1/f and lingers at the long end. Manual sets the voltage, the triangle LFO
+// sweeps around it (Depth, Rate), Res feeds the BBD output back to its input through a soft clip. The BBD sits between
+// two fixed 8 kHz low-pass filters (anti-alias and reconstruction), and the output is the dry and delayed signals mixed
+// equally, which gives the comb. Chorus mode: no feedback, longer delays and a shallower sweep. Estimated from the
+// BF-2 service notes' block diagram; the BBD's sample-and-hold grit and noise are not modelled.
+const FLG_STAGES = 1024, FLG_FHI = 500e3, FLG_FLO = 40e3, FLG_LPF = 8000;
+const flgRate = (p) => 0.1 * Math.pow(100, p); // 0.1-10 Hz
+const flgMs = (v) => 1000 * FLG_STAGES / (2 * (FLG_FHI - v * (FLG_FHI - FLG_FLO)));
+class BF2Flanger {
+  constructor(fs) {
+    this.fs = fs; this.buf = new Float32Array(Math.ceil(fs * 0.016) + 4); this.w = 0; this.ph = 0; this.y = 0; this.g = 0.62;
+    const K = Math.tan(Math.PI * Math.min(FLG_LPF, 0.45 * fs) / fs), Q = Math.SQRT1_2, n = 1 / (1 + K / Q + K * K);
+    this.b0 = K * K * n; this.a1 = 2 * (K * K - 1) * n; this.a2 = (1 - K / Q + K * K) * n;
+    this.i1 = 0; this.i2 = 0; this.j1 = 0; this.j2 = 0; this.o1 = 0; this.o2 = 0; this.p1 = 0; this.p2 = 0;
+  }
+  derive(k) {
+    this.chorus = k.flgmode >= 0.5;
+    this.inc = flgRate(k.flgrate) / this.fs;
+    this.man = k.flgman; this.dep = k.flgdep;
+    this.fb = this.chorus ? 0 : 0.9 * k.flgres;
+    this.g = this.chorus ? 0.72 : 0.62; // the equal mix, raised so switching it on keeps roughly the dry loudness (the comb and the 8 kHz filter take about 3 dB)
+  }
+  run(x) {
+    this.ph += this.inc; if (this.ph >= 1) this.ph -= 1;
+    const tri = this.ph < 0.5 ? 4 * this.ph - 1 : 3 - 4 * this.ph;
+    let v = this.chorus ? 0.55 + 0.45 * this.man + 0.15 * this.dep * tri : this.man + 0.5 * this.dep * tri;
+    v = v < 0 ? 0 : v > 1 ? 1 : v;
+    const d = FLG_STAGES / (2 * (FLG_FHI - v * (FLG_FHI - FLG_FLO))) * this.fs;
+    // anti-alias filter into the BBD, with the feedback
+    const u = x + this.fb * Math.tanh(this.y);
+    const a = this.b0 * (u + 2 * this.i1 + this.i2) - this.a1 * this.j1 - this.a2 * this.j2;
+    this.i2 = this.i1; this.i1 = u; this.j2 = this.j1; this.j1 = a;
+    const b = this.buf, N = b.length;
+    b[this.w] = a;
+    let r = this.w - d; if (r < 0) r += N;
+    const i = Math.floor(r), f = r - i, j = i + 1 === N ? 0 : i + 1;
+    const z = b[i] + (b[j] - b[i]) * f;
+    this.w = this.w + 1 === N ? 0 : this.w + 1;
+    // reconstruction filter after it
+    const y = this.b0 * (z + 2 * this.o1 + this.o2) - this.a1 * this.p1 - this.a2 * this.p2;
+    this.o2 = this.o1; this.o1 = z; this.p2 = this.p1; this.p1 = y;
+    this.y = y;
+    return this.g * (x + y);
+  }
+}
+
+// The chain after the Kestrel's output stage: the Buchla 259 folder and the drive slot (RAT, DS-1 or TS808) in series
+// (fxorder swaps them), then the BF-2 flanger, then the reverb slot and the delay as returns, in parallel or one into the
+// other (fxret), both ducked by the Compactor keyed from the dry synth, then a soft clip.
 const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
   drvtype: 0, dsdist: 0.5, dstone: 0.5, dslevel: 0.5, tsdrive: 0.5, tstone: 0.5, tslevel: 0.5, fldtimbre: 0.5, fldsym: 0.5, fldlevel: 0.5,
   lexprog: 0.125, lexbass: 0.3, lexmid: 0.27, lexxover: 0.443, lextreble: 0.834, lexdepth: 0.5, lexdiff: 0.55, lexpre: 0.2, lexme: 0.5, lexpitch: 0.2, lexmix: 0.5,
@@ -950,13 +999,15 @@ const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
   sprprog: 2 / 3, sprdwell: 0.4, sprdecay: 0.5, sprtension: 0.5, sprtone: 0.5, sprlo: 0.4, sprmix: 0.5,
   cnvprog: 0, cnvpre: 0.2, cnvdecay: 1, cnvtone: 0.7, cnvlo: 0.3, cnvwidth: 2 / 3, cnvmix: 0.5,
   cmpamt: 0.4, cmprel: Math.sqrt(0.02), // 40%, 20 ms
-  dlypp: 1, dlytime: 0.7, dlyfb: 0.35, dlylo: 0.3, dlyhi: 0.55, dlymix: 0.35 };
+  dlypp: 1, dlytime: 0.7, dlyfb: 0.35, dlylo: 0.3, dlyhi: 0.55, dlymix: 0.35,
+  flgman: 0.5, flgdep: 0.5, flgrate: 0.3, flgres: 0.5, flgmode: 0,
+  fxorder: 0, fxret: 0 }; // routing: 0 = folder then drive / 1 = drive then folder; 0 = parallel returns, 0.5 = delay into reverb, 1 = reverb into delay
 class FxChain {
   constructor(fs) {
     this.fs = fs; this.c = { ...FX_PARTS }; this.knobs = { ...FX_KNOB_DEFS };
-    this.fx = { rat: false, lex: false, dly: false, fold: false }; this.bpm = 120;
+    this.fx = { rat: false, lex: false, dly: false, fold: false, flg: false }; this.bpm = 120;
     this.ds = new BossDS1(fs); this.ts = new TubeScreamer(fs); this.b259 = new Buchla259(fs); this.drvT = 0;
-    this.lex = new Lexicon224(fs); this.dly = new DigitalDelay(fs);
+    this.lex = new Lexicon224(fs); this.dly = new DigitalDelay(fs); this.flg = new BF2Flanger(fs);
     this.plate = new DattorroPlate(fs); this.spring = new SpringReverb(fs); this.conv = new ConvReverb(fs); this.revT = 0; this.cmp = new Compactor(fs);
     this.rt = { hin: 0, xin: 0, h1: 0, h2: 0, x1: 0, fb: 0, y: 0, hc: 0, xc: 0, v: 0, f: 0, xp: 0, dco: 0, dci: 0 };
     this.L = 0; this.R = 0;
@@ -967,7 +1018,9 @@ class FxChain {
   setBpm(b) { if (b !== this.bpm) { this.bpm = b; this.dly.derive(this.knobs, b); } }
   derive() {
     const c = this.c, k = this.knobs;
-    this.cmp.derive(k); this.dly.derive(k, this.bpm);
+    this.cmp.derive(k); this.dly.derive(k, this.bpm); this.flg.derive(k);
+    this.fxSwap = (k.fxorder || 0) >= 0.5;
+    this.retMode = Math.max(0, Math.min(2, Math.round((k.fxret || 0) * 2)));
     this.ds.derive(k); this.ts.derive(k); this.b259.derive(k);
     this.drvT = Math.max(0, Math.min(2, Math.round((k.drvtype || 0) * 2))); // drive slot: 0 = RAT, 1 = DS-1, 2 = TS808
     // RAT runs at RAT_OS x 2 the host rate here (the 303 voice is already 2x oversampled)
@@ -1044,21 +1097,39 @@ class FxChain {
     return s.f * this.ratLevel;
   }
   // one host-rate sample in; sets this.L / this.R
+  _drv(x) { const d = this.drvT === 1 ? this.ds.run(x) : this.drvT === 2 ? this.ts.run(x) : this._rat(x); return 0.95 * Math.tanh(d / 0.95); }
   run(x) {
-    if (this.fx.fold) x = this.b259.run(x);
     let y = x;
-    if (this.fx.rat) { const d = this.drvT === 1 ? this.ds.run(x) : this.drvT === 2 ? this.ts.run(x) : this._rat(x); y = 0.95 * Math.tanh(d / 0.95); }
+    if (this.fxSwap) { // routing: the drive slot first, then the folder
+      if (this.fx.rat) y = this._drv(y);
+      if (this.fx.fold) y = this.b259.run(y);
+    } else {
+      if (this.fx.fold) y = this.b259.run(y);
+      if (this.fx.rat) y = this._drv(y);
+    }
+    if (this.fx.flg) y = this.flg.run(y); // the flanger, ahead of the returns and the dry path
     if (!(this.fx.lex || this.fx.dly)) { this.L = this.R = y; return; }
+    // the returns, as the 303 app's _fxOut: in parallel (both fed y), or in series, the second fed y plus the first one's
+    // return in mono; both returns are heard
+    const rev = this.fx.lex ? this.rev : null, dly = this.fx.dly ? this.dly : null;
     let wl = 0, wr = 0;
-    if (this.fx.lex) { const r = this.rev; r.run(y); wl += r.wet * r.L; wr += r.wet * r.R; }
-    if (this.fx.dly) { this.dly.run(y); wl += this.dly.l; wr += this.dly.r; }
+    if (rev && dly && this.retMode === 1) { // delay into reverb
+      dly.run(y); wl += dly.l; wr += dly.r;
+      rev.run(y + 0.5 * (dly.l + dly.r)); wl += rev.wet * rev.L; wr += rev.wet * rev.R;
+    } else if (rev && dly && this.retMode === 2) { // reverb into delay
+      rev.run(y); const rl = rev.wet * rev.L, rr = rev.wet * rev.R; wl += rl; wr += rr;
+      dly.run(y + 0.5 * (rl + rr)); wl += dly.l; wr += dly.r;
+    } else {
+      if (rev) { rev.run(y); wl += rev.wet * rev.L; wr += rev.wet * rev.R; }
+      if (dly) { dly.run(y); wl += dly.l; wr += dly.r; }
+    }
     const g = this.cmp.run(y, wl, wr);
     this.L = 0.98 * Math.tanh((y + this.cmp.l * g) / 0.98);
     this.R = 0.98 * Math.tanh((y + this.cmp.r * g) / 0.98);
   }
-  flush() { fxFlushTiny(this, 0); fxFlushTiny(this.lex, 0); fxFlushTiny(this.plate, 0); fxFlushTiny(this.spring, 0); fxFlushTiny(this.conv, 0); fxFlushTiny(this.dly, 0); fxFlushTiny(this.cmp, 0); fxFlushTiny(this.ds.s, 0); fxFlushTiny(this.ts.s, 0); fxFlushTiny(this.b259.s, 0); }
+  flush() { fxFlushTiny(this, 0); fxFlushTiny(this.lex, 0); fxFlushTiny(this.plate, 0); fxFlushTiny(this.spring, 0); fxFlushTiny(this.conv, 0); fxFlushTiny(this.dly, 0); fxFlushTiny(this.flg, 0); fxFlushTiny(this.cmp, 0); fxFlushTiny(this.ds.s, 0); fxFlushTiny(this.ts.s, 0); fxFlushTiny(this.b259.s, 0); }
 }
-const FX_FLUSH_SKIP = new Set(['c', 'knobs', 'fx', 'lex', 'plate', 'spring', 'conv', 'mem', 'buf', 'bufR', 'L', 'R', 'dly', 'cmp', 'ds', 'ts', 'b259']);
+const FX_FLUSH_SKIP = new Set(['c', 'knobs', 'fx', 'lex', 'plate', 'spring', 'conv', 'mem', 'buf', 'bufR', 'L', 'R', 'dly', 'flg', 'cmp', 'ds', 'ts', 'b259']);
 function fxFlushTiny(o, depth) {
   if (Array.isArray(o) || ArrayBuffer.isView(o)) {
     if (o.length > 64) return;

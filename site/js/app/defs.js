@@ -104,6 +104,10 @@ const CNV_PROGS = [['Plate 140', 'EMT 140 plate', 'plate140'], ['Plate 140 Br', 
   ['Silo', 'Grain silo', 'silo'], ['Garage', 'Concrete garage', 'garage'], ['Musikverein', 'Musikverein, Vienna', 'musikverein'], ['On a Star', 'On a Star', 'star'],
   ['Church', 'Church (generated)', null, false, true], ['Gated', 'Gated, 1980s (generated)', null, true, false]];
 const SPRING_STAGES_UI = 48;
+// the BF-2's bucket brigade, mirrored from the engine (FLG_*): 1024 stages clocked 500 kHz down to 40 kHz
+const FLG_MODE_NAMES = ['Flanger', 'Chorus'];
+const flgRate = (p) => 0.1 * Math.pow(100, p); // 0.1-10 Hz
+const flgMs = (v) => 1000 * 1024 / (2 * (500e3 - v * (500e3 - 40e3)));
 const exr = (lo, hi, p) => lo * Math.pow(hi / lo, p);
 const hz = f => f >= 1000 ? (f / 1000).toFixed(f < 10000 ? 2 : 1) + 'k' : f.toFixed(0) + 'Hz';
 const sec = t => t < 10 ? t.toFixed(1) + 's' : t.toFixed(0) + 's';
@@ -168,11 +172,27 @@ const FX = [
     { f: 'cnvlo', rev: 'conv', label: 'Lo cut', def: .3, fmt: v => hz(exr(20, 1000, v)) },
     { f: 'cnvwidth', rev: 'conv', label: 'Width', def: 2 / 3, fmt: v => Math.round(150 * v) + '%' },
     { f: 'cnvmix', rev: 'conv', label: 'Return', def: .5, fmt: pct } ] },
+  // the BF-2 flanger (from the 303 app), after the folder and drive and ahead of the returns and the dry path.
+  // flgmode: flanger or chorus (the switch in its header; chorus has no feedback, so Res dims)
+  { id: 'flg', name: 'Flanger', sub: 'BF-2 · 1024-stage BBD', fg: true, items: [
+    { s: 'flgmode', label: 'Mode', opts: FLG_MODE_NAMES, def: 0, val: i => i },
+    { f: 'flgman', label: 'Manual', dial: true, def: .5, fmt: v => flgMs((state.params.flgmode | 0) ? 0.55 + 0.45 * v : v).toFixed(1) + ' ms' },
+    { f: 'flgdep', label: 'Depth', dial: true, def: .5, fmt: v => pct(v) + '%' },
+    { f: 'flgrate', label: 'Rate', dial: true, def: .3, fmt: v => { const f = flgRate(v); return (f < 1 ? f.toFixed(2) : f.toFixed(1)) + ' Hz'; } },
+    { f: 'flgres', label: 'Res', dial: true, def: .5, fmt: v => pct(v) + '%' } ] },
   // two dials, as in the 303 app: Amount (depth and sensitivity, 0 = off) and Release
   { id: 'cmp', name: 'Compactor', sub: 'ducks the returns', items: [
     { f: 'cmpamt', label: 'Amount', dial: true, def: CMP_AMT_DEF, fmt: v => v <= 0 ? 'off' : Math.round(100 * v) + '%' },
     { f: 'cmprel', label: 'Release', dial: true, def: CMP_REL_DEF, fmt: v => Math.round(1000 * v * v) + ' ms' } ] },
 ];
+// routing (the strip under the FX units): fxorder swaps the folder and the drive slot; fxret connects the delay and the
+// reverb in parallel, or one into the other. Stored as indices, sent as 0..1 like the 303 app's knobs; a sound saved
+// without them loads at 0 and 0, the routing every sound had before.
+const FX_ROUTE = [
+  { s: 'fxorder', label: 'Folder and drive order', opts: ['fold → drive', 'drive → fold'], def: 0, val: i => i },
+  { s: 'fxret', label: 'Delay and reverb routing', opts: ['parallel', 'dly → rev', 'rev → dly'], def: 0, val: i => i / 2 } ];
 const FX_SW = {}; for (const u of FX) for (const it of u.items) if (it.s) FX_SW[it.s] = it;
+for (const it of FX_ROUTE) FX_SW[it.s] = it;
 // the engine takes every effect control as a 0..1 knob; switches are stored as their index
-const fxKnobs = p => { const k = {}; for (const u of FX) for (const it of u.items) { const id = it.f || it.s; k[id] = it.s ? it.val(p[id] | 0) : p[id]; } return k; };
+const fxKnobs = p => { const k = {}; for (const it of [...FX.flatMap(u => u.items), ...FX_ROUTE]) { const id = it.f || it.s; k[id] = it.s ? it.val(p[id] | 0) : p[id]; } return k; };
+const FX_UNITS = ['fold', 'rat', 'flg', 'dly', 'lex'], FX_OFF = () => ({ rat: false, dly: false, lex: false, fold: false, flg: false });

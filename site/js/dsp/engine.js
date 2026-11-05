@@ -301,7 +301,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const eD = 1 - Math.exp(-dt / (P.dec / (4 * CE_NOM) * C.ce));
     const eR = 1 - Math.exp(-dt / (P.rel / (4 * CE_NOM) * C.ce));
 
-    const fxc = this.fxc, fxOn = fxc.fx.rat || fxc.fx.lex || fxc.fx.dly || fxc.fx.fold;
+    const fxc = this.fxc, fxOn = fxc.fx.rat || fxc.fx.lex || fxc.fx.dly || fxc.fx.fold || fxc.fx.flg;
     if (fxOn) fxc.flush();
     for (let j = 0; j < n; j++) {
       if (this.running) {

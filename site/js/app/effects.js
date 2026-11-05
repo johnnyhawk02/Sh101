@@ -1,6 +1,7 @@
 // Shyoy: FX page: units, the reverb slot, recorded impulse responses, the drive slot.
 // ---------- UI: effects ----------
 const fxrow = document.getElementById('fxrow'), fxBox = {};
+const fxRows = [0, 1].map(i => { const r = document.createElement('div'); r.className = 'fxr fxr' + i; fxrow.appendChild(r); return r; });
 for (const u of FX) {
   const el = document.createElement('section'); el.className = 'fxu'; el.setAttribute('aria-label', u.name);
   const sw = u.id === 'cmp' ? '' : `<button class="onoff" id="fx-${u.id}-on" aria-pressed="false">off</button>`;
@@ -18,12 +19,19 @@ for (const u of FX) {
     const c = el.querySelector('.ctrls');
     for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.drv = it.drv; }
     el.querySelector('.dv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); const i = +b.dataset.t; state.params.drvtype = i; post({ type: 'param', id: 'drvtype', v: FX_SW.drvtype.val(i) }); save(); drawDrv(); });
+  } else if (u.fg) { // the flanger: Flanger / Chorus in the header, four dials
+    el.classList.add('fg');
+    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type fg-mode" role="radiogroup" aria-label="Flanger mode">` +
+      FLG_MODE_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n.toLowerCase()}</button>`).join('') + `</span><small>${u.sub}</small></div><div class="ctrls"></div>`;
+    const c = el.querySelector('.ctrls');
+    for (const it of u.items) if (it.dial) dial(it, c);
+    el.querySelector('.fg-mode').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); const i = +b.dataset.t; state.params.flgmode = i; post({ type: 'param', id: 'flgmode', v: FX_SW.flgmode.val(i) }); save(); drawFlg(); });
   } else {
     el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><small>${u.sub}</small></div><div class="ctrls"></div>`;
     const c = el.querySelector('.ctrls');
     for (const it of u.items) it.dial ? dial(it, c) : it.f ? fader(it, c) : switcher(it, c);
   }
-  fxrow.appendChild(el); fxBox[u.id] = el;
+  fxRows[u.rv || u.fg ? 1 : 0].appendChild(el); fxBox[u.id] = el; // the reverb and the flanger share the second row
   const b = el.querySelector('.onoff');
   if (b) b.onclick = () => { boot(); state.fx[u.id] = !state.fx[u.id]; post({ type: 'fx', name: u.id, on: state.fx[u.id] }); renderFx(); save(); };
 }
@@ -72,6 +80,7 @@ function drawRev() {
   if (T === 'conv') { fdrLabel('cnvdecay').textContent = CNV_PROGS[sel][3] ? 'gate' : CNV_PROGS[sel][2] ? 'length' : 'decay'; if (!irFailed) { loadIRMeta(); loadIRs(); } }
   for (const it of FX.find(u => u.rv).items) if (it.f && it.rev === T) ui[it.f](state.params[it.f]); // readouts that depend on the program
   document.getElementById('rvNote').textContent = revNote(T, sel);
+  drawRoute();
 }
 // recorded impulse responses for Conv (irs/irs.json, from the 303 app): the list loads when Conv is shown, the samples once
 // audio is running, decoded at the audio rate here and handed to the engine
@@ -99,10 +108,74 @@ function drawDrv() {
   for (const b of fxBox.rat.querySelectorAll('.dv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
   for (const f of fxBox.rat.querySelectorAll('.fdr[data-drv]')) f.hidden = f.dataset.drv !== T;
   document.getElementById('dvSub').textContent = DRV_SUBS[t];
+  drawRoute();
 }
 ui.drvtype = () => drawDrv();
-function renderFx() {
-  for (const n of ['rat', 'dly', 'lex', 'fold']) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'on' : 'off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
-  fxBox.cmp.classList.toggle('on', !!(state.fx.dly || state.fx.lex));
+// the flanger's mode: Flanger or Chorus; chorus has no feedback, so Res dims, and Manual reads the chorus delay
+function drawFlg() {
+  const m = (state.params.flgmode | 0) ? 1 : 0;
+  for (const b of fxBox.flg.querySelectorAll('.fg-mode button')) b.setAttribute('aria-checked', +b.dataset.t === m);
+  document.getElementById('f-flgres').closest('.dial').classList.toggle('dim', m === 1);
+  ui.flgman(state.params.flgman);
+  drawRoute();
 }
-renderFx(); drawRev(); drawDrv();
+ui.flgmode = () => drawFlg();
+function renderFx() {
+  for (const n of FX_UNITS) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'on' : 'off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
+  fxBox.cmp.classList.toggle('on', !!(state.fx.dly || state.fx.lex));
+  drawRoute();
+}
+// ---------- routing: a block diagram of the signal path, and the two switches that change it (the 303 app's strip) ----------
+// Click a block (or Enter / Space on it) to switch that unit on or off: it clicks the unit's own on/off button.
+const routeEl = document.createElement('section'); routeEl.className = 'fx-route'; routeEl.setAttribute('aria-label', 'FX routing');
+routeEl.innerHTML = `<svg class="route-dia" id="routeDia" viewBox="0 0 586 64" role="group" aria-label="Signal path through the effects"></svg><div class="route-ctl"></div>`;
+document.getElementById('pan-fx').appendChild(routeEl);
+const routeDia = routeEl.querySelector('.route-dia'), routeSegs = {};
+for (const it of FX_ROUTE) {
+  const g = document.createElement('div'); g.className = 'lcd-seg'; g.setAttribute('role', 'group'); g.setAttribute('aria-label', it.label);
+  g.innerHTML = it.opts.map((o, i) => `<button type="button" data-i="${i}" aria-pressed="false">${o}</button>`).join('');
+  g.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (!b) return; boot(); const i = +b.dataset.i; state.params[it.s] = i; post({ type: 'param', id: it.s, v: it.val(i) }); save(); drawRoute(); });
+  routeEl.querySelector('.route-ctl').appendChild(g); routeSegs[it.s] = g;
+  ui[it.s] = () => drawRoute(); // preset loads
+}
+function drawRoute() {
+  const p = state.params, fx = state.fx, swap = (p.fxorder | 0) === 1, ret = Math.max(0, Math.min(2, p.fxret | 0));
+  for (const it of FX_ROUTE) for (const b of routeSegs[it.s].children) b.setAttribute('aria-pressed', +b.dataset.i === (it.s === 'fxorder' ? (swap ? 1 : 0) : ret));
+  const drv = DRV_NAMES[Math.max(0, Math.min(2, p.drvtype | 0))].toLowerCase(), rev = REV_TYPE_NAMES[Math.max(0, Math.min(3, p.revtype | 0))].toLowerCase();
+  const W = 62, H = 18, Y = 24, X0 = 26; // block size, main row centre, shift for the 'shyoy' label
+  const blk = (unit, label, x, y, on, name) => `<g class="rb${on ? ' on' : ''}"${unit ? ` data-u="${unit}" role="button" tabindex="0" aria-pressed="${!!on}" aria-label="${name}"` : ''}>` +
+    `<rect x="${x}" y="${y - H / 2}" width="${W}" height="${H}" rx="2"/><text x="${x + W / 2}" y="${y + 4.5}">${label}</text></g>`;
+  const ln = (pts) => `<polyline class="rw" points="${pts.map(q => q.join(',')).join(' ')}"/>`;
+  const arr = (x, y) => `<path class="ra" d="M${x - 5} ${y - 3.5} L${x} ${y} L${x - 5} ${y + 3.5}Z"/>`;
+  const pre = swap ? [['rat', drv, fx.rat, 'Drive'], ['fold', 'folder', fx.fold, 'Folder']] : [['fold', 'folder', fx.fold, 'Folder'], ['rat', drv, fx.rat, 'Drive']];
+  pre.push(['flg', (p.flgmode | 0) ? 'chorus' : 'flanger', fx.flg, 'Flanger']);
+  let h = `<text class="rt" x="0" y="${Y + 4.5}">shyoy</text>`;
+  pre.forEach(([u, label, on, name], i) => { const x = X0 + 36 + i * 74; h += ln([[x - 10, Y], [x, Y]]) + arr(x, Y) + blk(u, label, x, Y, on, name); });
+  const sx = X0 + 270, cx = X0 + 428, ox = X0 + 506; // split, Compactor, sum
+  h += ln([[X0 + 246, Y], [sx, Y]]) + `<circle class="rn" cx="${sx}" cy="${Y}" r="2.5"/>`;
+  const dlyB = (x, y) => blk('dly', 'delay', x, y, fx.dly, 'Delay'), revB = (x, y) => blk('lex', rev, x, y, fx.lex, 'Reverb');
+  if (ret === 0) { // side by side
+    const yt = 12, yb = 46, x = sx + 34, mx = sx + 120;
+    h += ln([[sx, Y], [sx + 14, Y], [sx + 14, yt], [x, yt]]) + arr(x, yt) + ln([[sx + 14, Y], [sx + 14, yb], [x, yb]]) + arr(x, yb);
+    h += dlyB(x, yt) + revB(x, yb);
+    h += ln([[x + W, yt], [mx, yt], [mx, Y], [cx, Y]]) + ln([[x + W, yb], [mx, yb], [mx, Y]]) + arr(cx, Y);
+  } else { // one into the other
+    const [a, b] = ret === 1 ? [dlyB, revB] : [revB, dlyB], x1 = sx + 10, x2 = sx + 82;
+    h += ln([[sx, Y], [x1, Y]]) + arr(x1, Y) + a(x1, Y) + ln([[x1 + W, Y], [x2, Y]]) + arr(x2, Y) + b(x2, Y) + ln([[x2 + W, Y], [cx, Y]]) + arr(cx, Y);
+  }
+  h += blk('', 'cmp', cx, Y, fx.lex || fx.dly, 'Compactor');
+  h += ln([[cx + W, Y], [ox - 7, Y]]) + arr(ox - 7, Y);
+  // the dry signal, under the returns, into the sum
+  const dy = ret === 0 ? 60 : 50;
+  h += ln([[sx, Y], [sx, dy], [ox, dy], [ox, Y + 7]]) + `<path class="ra" d="M${ox - 3.5} ${Y + 12} L${ox} ${Y + 7} L${ox + 3.5} ${Y + 12}Z"/>`;
+  h += `<text class="rt rs" x="${ox - 30}" y="${dy - 3}">dry</text>`;
+  h += `<circle class="rsum" cx="${ox}" cy="${Y}" r="7"/><path class="rw" d="M${ox - 4} ${Y} H${ox + 4} M${ox} ${Y - 4} V${Y + 4}"/>`;
+  h += ln([[ox + 7, Y], [ox + 20, Y]]) + arr(ox + 20, Y) + `<text class="rt" x="${ox + 24}" y="${Y + 4.5}">out</text>`;
+  routeDia.innerHTML = h;
+}
+{
+  const hit = (e) => { const g = e.target.closest('[data-u]'); if (g) { document.getElementById('fx-' + g.dataset.u + '-on').click(); const n = routeDia.querySelector(`[data-u="${g.dataset.u}"]`); if (n && e.type === 'keydown') n.focus(); } };
+  routeDia.addEventListener('click', hit);
+  routeDia.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hit(e); } });
+}
+renderFx(); drawRev(); drawDrv(); drawFlg();

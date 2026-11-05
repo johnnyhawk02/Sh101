@@ -74,11 +74,17 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.14.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.15.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### FX routing strip and the BF-2 flanger, from the TB-303 app (v0.15.0)
+
+- **Routing** (`FxChain` in `js/dsp/fx.js`): `fxorder` (0 = folder then drive, 1 = drive then folder) and `fxret` (0 = delay and reverb in parallel, 0.5 = delay into reverb, 1 = reverb into delay), instant like `drvtype`. In series the second unit is fed the dry signal plus 0.5 × the first one's return (L + R), both returns are heard, the Compactor ducks their sum: the 303 app's `_fxOut`. Stored in the sound as indices (`FX_ROUTE` in `defs.js`); a sound saved without them loads at 0 and 0, and with the defaults the chain's output is bit-identical to v0.14.
+- **Flanger**: `BF2Flanger` copied unchanged from `tb303-model.js`, after the folder and drive and ahead of the split, so the returns and the dry path both get it. `flgman`, `flgdep`, `flgrate`, `flgres`, `flgmode` (0 flanger, 1 chorus) with the 303 app's defaults; `fx.flg` switches it, off in anything saved before. It shares the second row of the FX page with the reverb; in chorus mode Res dims.
+- **Diagram** (`drawRoute()` in `js/app/effects.js`): an inline SVG strip under the units, redrawn on every on/off, pedal, reverb type, flanger mode and routing change and on preset loads. A block is a button: clicking it (or Enter / Space) clicks that unit's own on/off. On the phone the reverb's note is hidden to make room.
 
 ### Sequencer extras from the TB-303 app: Generate, Refill slots, move notes, D-pad, Join chain (v0.14.0)
 

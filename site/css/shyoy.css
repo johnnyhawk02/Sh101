@@ -338,10 +338,36 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .mx .volt { font-size: var(--fs-s); color: var(--muted); display: inline-block; width: 4.2em; text-align: right; margin-left: 6px; font-variant-numeric: tabular-nums; }
 
 /* effects (from the 303 app): one box per unit, a power switch in its label strip */
-.fxrow { flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; align-content: stretch; gap: var(--gap); }
+.fxrow { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--gap); }
+.fxr { flex: 1 1 0; min-height: 0; display: flex; gap: var(--gap); }
+.fxr1 { flex-grow: 1.35; }
 .fxu { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s); border: var(--bw) solid var(--ink); border-radius: calc(var(--r) + 1px); opacity: .55; }
 .fxu.on { opacity: 1; }
-.fxu.rv { order: 4; flex-basis: 100%; }   /* the reverb slot gets its own row: folder, drive, delay and compactor share the first */
+.fxu.rv { flex: 1 1 0; min-width: 0; }   /* the reverb slot and the flanger share the second row: folder, drive, delay and compactor the first */
+.fxu.fg { flex: none; }
+.fg .fxh { justify-content: flex-start; gap: calc(var(--gap) - 2px); }
+.fg .ctrls { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-s) var(--gap); }
+@media (orientation: landscape) and (max-height: 520px) { .fg .ctrls { grid-template-columns: repeat(4, 44px); gap: 4px; } }
+.fg .dial .knob { min-height: 0; }
+.dial.dim { opacity: .4; }
+/* routing (the 303 app's strip): the block diagram on the left, the two switches stacked on the right */
+.fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: var(--gap-s); border-top: 1px solid var(--line); }
+.route-dia { width: 586px; height: 64px; flex: 0 1 auto; min-width: 0; overflow: visible; font-family: var(--f-lcd); }
+.route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
+.route-dia .rsum { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.route-dia .rt { fill: var(--ink); font-size: 15px; }
+.route-dia .rs { fill: var(--muted); font-size: 13px; text-anchor: middle; }
+.route-dia .rb rect { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.route-dia .rb text { fill: var(--muted); font-size: 15px; text-anchor: middle; }
+.route-dia .rb.on rect { fill: var(--ink); stroke-dasharray: none; }
+.route-dia .rb.on text { fill: var(--glass); }
+[data-lcdmode=colour] .route-dia .rb.on rect { fill: var(--accent); stroke: var(--accent); }
+.route-dia [data-u] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.route-dia [data-u]:hover rect, .route-dia [data-u]:focus-visible rect { stroke-width: 2.5; }
+.route-dia [data-u]:focus-visible { outline: none; }
+.route-ctl { display: grid; gap: var(--gap-s); justify-items: stretch; margin-left: auto; flex: none; }
+.route-ctl .lcd-seg { display: flex; } .route-ctl .lcd-seg button { flex: 1; }
 .fxu .ctrls, .mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
 .fxu .fxh { justify-content: flex-start; padding-left: 3px; }
 .fxu .fxh b { font-weight: 400; }
@@ -513,6 +539,9 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
   .mx .volt { width: 3.8em; margin-left: 3px; } .mx .jack { width: 7px; height: 7px; margin-right: 3px; }
   .fxu { padding: 3px; gap: 3px; }
   .fxu .onoff { height: 13px; padding: 0 3px; }
+  .rv-note { display: none; }   /* long help text, as elsewhere on the phone: makes room for the routing strip */
+  .route-dia { width: 510px; height: 56px; }
+  .fx-route { padding-top: 3px; }
   .perf101 .grp { padding: 4px 10px 8px; gap: 6px; } .perf101 .row { gap: 10px; }
   .lever { width: 160px; }
   .readout { font-size: calc(var(--fs-l) + 2px); }
