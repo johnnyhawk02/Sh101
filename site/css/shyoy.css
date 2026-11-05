@@ -239,6 +239,17 @@ select.btn option { color: #000; }
 .pm-path { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); flex: none; }
 .pm .pm-star { flex: none; width: 30px; height: auto; padding: 0; border: 0; color: var(--muted); font-size: var(--fs-xs); }
 .pm .pm-star[aria-pressed=true] { color: var(--ink); }
+/* unticked stars are an outline ☆, faint until hovered; each row ends with its own × (from the TB-303 app) */
+.pm .pm-star[aria-pressed=false] { color: var(--ink); opacity: .28; }
+.pm .pm-row:hover .pm-star[aria-pressed=false] { opacity: .55; }
+.pm .pm-star[aria-pressed=false]:hover { opacity: 1; }
+.pm .pm-del { flex: none; min-width: 26px; height: auto; min-height: var(--menu-h); padding: 0 6px; border: 0; border-radius: 0; background: transparent; color: var(--ink); opacity: .45; font-size: var(--fs); text-shadow: none; }
+.pm .pm-row:hover .pm-del { opacity: .75; }
+.pm .pm-del:hover { opacity: 1; }
+.pm .pm-del[aria-pressed=true] { opacity: 1; background: var(--ink); color: var(--glass); font-size: var(--fs-xs); text-transform: lowercase; }
+.pm .pm-restore { display: flex; justify-content: flex-start; width: 100%; height: auto; min-height: var(--h); border: 0; border-radius: 0; background: transparent; padding: 0 10px; padding-left: calc(10px + var(--d, 0) * 14px);
+  font-size: var(--fs-s); color: var(--muted); text-transform: lowercase; text-shadow: none; }
+.pm .pm-restore:hover { color: var(--ink); background: var(--tint); }
 .pm-sum, .pm-none { padding: 4px 10px; font-size: var(--fs-xs); color: var(--muted); }
 .pm-foot { display: none; }
 .pm-pop .pm-foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border-top: var(--bw) solid var(--ink); }

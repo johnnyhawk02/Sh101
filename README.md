@@ -72,11 +72,19 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.4), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.5), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Preset menu: delete from the list, Factory folder, Export all and favourites (v0.13.5)
+
+From the TB-303 app's picker. Every row ends with a ×: the first click arms it (`delete?`), a second click on the same row deletes. Any other click in the list, or closing the menu, disarms it. Your own presets are removed for good; factory ones are hidden (`kestrel.hidden.prj`) and a `restore N deleted` row at the end of the Factory folder (or the flat list) brings them all back. Deleting the loaded preset sets the menu back to Choose… and leaves the sound alone, and a deleted preset leaves favourites and recents. Unticked stars are an outline ☆. The foot's Delete button is gone.
+
+`FACTORY_PRESETS` in `js/app/sounds.js` is in the shape of an Export all file's `projectPresets`; paste one in and its presets join the Factory folder after the four factory patches (it starts with those four, identical to what `PRESETS` builds). They load through `applyPreset`, so missing newer controls get their defaults.
+
+The foot reads: name, 🎲, Save, **Export all** (`shyoy-presets.json`, every preset of your own; with none, the current sound as one project file), **Export favourites** (`shyoy-favourites.json`, every starred preset, factory and own), **Import file** (a presets file adds them all without touching the sound; a project file loads and saves under its file name; the older project-plus-presets export still works), Sound only.
 
 ### No messages, no tooltips (v0.13.4)
 
