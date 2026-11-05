@@ -1,0 +1,55 @@
+/* Shyoy planning mockup: the rack as an always-on strip under the header (see top-synth.js). Built on shyoy.css; only re-lays things. */
+
+/* order: header, synth strip, tabs, the open page */
+.unit .rack { display: flex !important; order: 1; flex: none; flex-wrap: nowrap; align-content: stretch; overflow: hidden;
+  border-bottom: var(--bw) solid var(--ink); }
+.tabs { order: 2; }
+.panel, .perf101 { order: 3; }
+
+/* modules: the label strip slimmed, no bottom rule */
+.rack .mod { flex: 1 0 auto; border-bottom: 0; gap: 6px; padding: 8px 8px 6px; }
+.rack .mod:last-child { border-right: 0; }
+.rack .mod h2 { min-height: 24px; font-size: var(--fs); }
+.rack .mod .ctrls { gap: 2px; justify-content: space-evenly; align-items: flex-start; }
+
+/* dials: a fixed knob size and cell width (--knob, --kn-w per variant) */
+.rack .dial { flex: none; width: var(--kn-w); min-width: 0; gap: 2px; }
+.rack .dial .knob { flex: none; width: var(--knob); height: var(--knob); min-height: 0; }
+.rack { --out-fs: var(--fs-xs); }
+.rack .dial output { font-size: var(--out-fs); line-height: 1; min-height: 0; height: var(--out-fs); color: var(--muted); text-shadow: none; }
+
+/* the stepping switch: label over one box with the current choice */
+.stp { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; padding-top: calc(var(--out-fs) + 2px); }
+.stp .lab { font-size: var(--fs-s); text-transform: lowercase; line-height: 1; order: 2; margin-top: 2px; }
+.stp .btn { order: 1; height: calc(var(--knob) - 8px); margin: 4px 0; min-width: var(--st-w); padding: 0 6px; font-size: var(--fs); text-transform: none; }
+
+/* --- A: everything in one row --- */
+[data-mock=a] .rack { height: 146px; --knob: 38px; --kn-w: 39px; --st-w: 44px; }
+[data-mock=a] .rack .mod h2 small { display: none; }
+[data-mock=a] .rack .mod { padding: 8px 4px 6px; }
+[data-mock=a] .rack .dial label, [data-mock=a] .stp .lab { font-size: 17px; }
+[data-mock=a] .rack { --out-fs: 16px; }
+[data-mock=a] .rack .mod .ctrls { gap: 1px; }
+[data-mock=a] .stp .btn { font-size: var(--fs-s); padding: 0 4px; }
+
+/* --- B: one row, Perform module on the Perform tab --- */
+[data-mock=b] .rack { height: 156px; --knob: 44px; --kn-w: 45px; --st-w: 46px; }
+[data-mock=b] .rack .dial label, [data-mock=b] .stp .lab { font-size: var(--fs-xs); }
+[data-mock=b] .rack .mod { padding: 8px 4px 6px; }
+[data-mock=b] .stp .btn { font-size: var(--fs-xs); padding: 0 4px; }
+[data-mock=b] .rack .mod h2 small { display: none; }
+[data-mock=b] .perf101 { grid-template-rows: auto minmax(0, 1fr); }
+.mk-perf { border-bottom: var(--rule); --knob: 60px; --kn-w: 82px; }
+.mk-perf h3 small { color: var(--lit); font-size: var(--fs-xs); }
+.mk-perf .ctrls { justify-content: center; gap: calc(var(--gap) * 3); align-items: flex-start; flex: none; }
+.mk-perf .dial { flex: none; width: var(--kn-w); }
+.mk-perf .dial .knob { flex: none; width: var(--knob); height: var(--knob); min-height: 0; }
+
+/* --- C: two rows, switches as lists --- */
+[data-mock=c] .rack { height: 300px; flex-wrap: wrap; --knob: 50px; --kn-w: 60px; }
+[data-mock=c] .rack .mod { height: 150px; flex: 1 1 auto; border-bottom: var(--rule); }
+[data-mock=c] .rack .m-vcf { border-right: 0; }
+[data-mock=c] .rack .m-vcf ~ .mod { border-bottom: 0; }
+[data-mock=c] .rack .sw { gap: 0; }
+[data-mock=c] .rack .sw .lab { font-size: var(--fs-xs); margin-bottom: 0; }
+[data-mock=c] .rack .sw button { font-size: var(--fs-s); padding: 0 4px; line-height: 1.05; }

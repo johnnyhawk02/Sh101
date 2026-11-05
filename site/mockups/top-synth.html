@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- PLANNING MOCKUP (not part of the app): a copy of index.html v0.17.3 with the Synth page as an always-on strip at the top and the other pages as tabs under it.
+     <base> points every path at site/, so the real scripts and CSS load; mockups/top-synth.css and .js only re-lay the rack. ?v=a | b | c picks the variant. -->
+<base href="../">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#161815">
+<script>
+// glass colours before first paint (Options › Colours): the swatch, and Mono or Grey + colour (on unless saved "mono"), and the look sliders' variables
+try {
+  const rd = (k) => { const v = localStorage.getItem('kestrel.' + k); try { return JSON.parse(v); } catch (e) { return v; } };
+  const t = rd('lcdTheme'), m = rd('lcdMode'), el = document.documentElement;
+  el.dataset.lcd = ['green', 'orange', 'amber', 'blue', 'red', 'grey'].includes(t) ? t : 'green';
+  el.dataset.lcdmode = m === 'mono' ? 'mono' : 'colour';
+  const v = rd('lcdVars'); if (v && typeof v === 'object') for (const k in v) if (k !== '--glow') el.style.setProperty(k, v[k]);   // the look sliders
+} catch (e) {}
+</script>
+<script src="js/app/fit.js"></script>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+<title>Shyoy mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<link rel="stylesheet" href="css/shyoy.css">
+<link rel="stylesheet" href="mockups/top-synth.css">
+
+<div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
+<div class="unit" id="unit">
+  <header class="top">
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.17.3</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
+    <div class="transport">
+      <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
+      <label class="num">Tempo<input id="bpm" type="number" min="40" max="240" value="124"></label>
+      <div class="presets" id="prj-bar">
+        <span class="num">Preset</span>
+        <select id="prj-preset" aria-label="Presets" hidden></select><div class="pm" data-for="prj-preset"></div>
+        <div class="pm-foot">
+          <input id="prj-name" type="text" placeholder="Save everything as…" maxlength="40" aria-label="Preset name">
+          <button id="prj-roll" aria-label="Suggest another name">🎲</button>
+          <button id="prj-save">Save</button>
+          <button id="prj-export">Export all</button>
+          <button id="prj-exfav">Export favourites</button>
+          <button id="prj-import">Import file</button>
+          <label class="pm-opt"><input type="checkbox" id="prj-sndonly"> Sound only</label>
+          <input type="file" id="prj-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <button type="button" class="btn gear" id="open-options" aria-haspopup="dialog" aria-label="Options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z M12 8.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2z" fill-rule="evenodd"/></svg></button>
+    </div>
+  </header>
+
+  <section class="rack" id="rack"></section>
+
+  <div class="lower">
+    <nav class="tabs" role="tablist" aria-label="Panels">
+      <button role="tab" id="tab-synth" aria-controls="rack" aria-selected="false">Synth</button>
+      <button role="tab" id="tab-seq" aria-controls="pan-seq" aria-selected="true">Sequencer</button>
+      <button role="tab" id="tab-bend" aria-controls="pan-bend" aria-selected="false">Bend board</button>
+      <button role="tab" id="tab-br" aria-controls="pan-br" aria-selected="false" hidden>Bridges</button>
+      <button role="tab" id="tab-fx" aria-controls="pan-fx" aria-selected="false">FX</button>
+      <button role="tab" id="tab-perf" aria-controls="perf101" aria-selected="false">Perform</button>
+    </nav>
+
+    <section class="panel seq" id="pan-seq" role="tabpanel" aria-labelledby="tab-seq">
+      <div class="sq-body">
+        <div class="sq-side">
+          <label class="sld"><span>Length</span><input type="range" data-a="len" min="1" max="64" step="1" aria-label="Pattern length"><output id="o-len">16</output></label>
+          <label class="sld"><span>Gate</span><input type="range" data-a="gate" min="10" max="95" step="1" aria-label="Gate time"><output id="o-gate">50%</output></label>
+          <label class="sld"><span>Swing</span><input type="range" data-a="swing" min="0" max="75" step="1" aria-label="Swing"><output id="o-swing">0%</output></label>
+          <label class="sld"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
+        </div>
+        <div class="sq-main">
+          <div class="sq-bank">
+            <span class="bk-lab">pattern</span>
+            <div class="slots" id="slots" role="group" aria-label="Pattern slots"><button type="button" data-n="0" aria-pressed="false">1</button><button type="button" data-n="1" aria-pressed="false">2</button><button type="button" data-n="2" aria-pressed="false">3</button><button type="button" data-n="3" aria-pressed="false">4</button><button type="button" data-n="4" aria-pressed="false">5</button><button type="button" data-n="5" aria-pressed="false">6</button><button type="button" data-n="6" aria-pressed="false">7</button><button type="button" data-n="7" aria-pressed="false">8</button></div>
+            <div class="chain-read" id="chain-read" hidden><span class="ch-list"></span><button type="button" id="chain-clear" aria-label="Clear chain">×</button></div>
+            <div class="rmenu"><button type="button" class="rm-btn" id="rm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="rm-menu">Randomise</button><div class="fn-menu" id="rm-menu" role="menu" aria-label="Randomise" hidden>
+              <span class="mh" role="presentation">randomise</span>
+              <button type="button" role="menuitem" id="r-acc">Accents</button>
+              <button type="button" role="menuitem" id="r-slide">Slides</button>
+              <button type="button" role="menuitem" id="r-oct">Octaves</button>
+              <button type="button" role="menuitem" id="r-tie">Ties</button>
+              <span class="mh" role="presentation">alter</span>
+              <button type="button" role="menuitem" id="a-acc">Accents</button>
+              <button type="button" role="menuitem" id="a-slide">Slides</button>
+              <button type="button" role="menuitem" id="a-oct">Octaves</button>
+              <button type="button" role="menuitem" id="a-tie">Ties</button>
+              <span class="mh" role="presentation">pattern</span>
+              <button type="button" role="menuitem" id="p-shuf">Shuffle steps</button>
+              <button type="button" role="menuitem" id="p-rnd">Generate</button>
+              <button type="button" role="menuitem" id="p-refill">Refill slots</button>
+            </div></div>
+            <div class="rmenu"><button type="button" class="rm-btn" id="tm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="tm-menu">Tools</button><div class="fn-menu" id="tm-menu" role="menu" aria-label="Tools" hidden>
+              <span class="mh" role="presentation">pattern</span>
+              <button type="button" role="menuitem" id="p-copy">Copy</button>
+              <button type="button" role="menuitem" id="p-paste" disabled>Paste</button>
+              <button type="button" role="menuitem" id="p-dup">Double</button>
+              <button type="button" role="menuitem" id="p-clr">Clear</button>
+              <button type="button" role="menuitem" id="p-undo" disabled>Undo</button>
+              <span class="mh" role="presentation">move notes</span>
+              <button type="button" role="menuitem" id="nu-up">Up a semitone</button>
+              <button type="button" role="menuitem" id="nu-dn">Down a semitone</button>
+              <button type="button" role="menuitem" id="nu-oup">Up an octave</button>
+              <button type="button" role="menuitem" id="nu-odn">Down an octave</button>
+              <button type="button" role="menuitem" id="rot-l">Shift a step left</button>
+              <button type="button" role="menuitem" id="rot-r">Shift a step right</button>
+              <span class="mh" role="presentation">chain</span>
+              <button type="button" role="menuitem" id="p-join">Join chain and copy</button>
+            </div></div>
+          </div>
+          <div class="rollwrap"><div class="roll" id="roll" role="grid" aria-label="Pattern"></div></div>
+          <!-- the cross under the roll (from the TB-303 app): up and down move every note a semitone (Shift-click for an octave), left and right shift the pattern a step -->
+          <div class="sq-foot"><div class="dpad" role="group" aria-label="Move the notes">
+            <button type="button" class="dp-up" data-nudge="1" aria-label="Notes up">▲</button>
+            <button type="button" class="dp-lt" data-rot="-1" aria-label="Shift the pattern left">◀</button>
+            <button type="button" class="dp-rt" data-rot="1" aria-label="Shift the pattern right">▶</button>
+            <button type="button" class="dp-dn" data-nudge="-1" aria-label="Notes down">▼</button>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="pan-bend" role="tabpanel" aria-labelledby="tab-bend" hidden>
+      <div class="sec-h">
+        <div class="tools"><button class="btn light" id="bendStock">Stock values</button></div>
+      </div>
+      <div class="bend-vals" id="bendVals"></div>
+    </section>
+
+    <section class="panel" id="pan-fx" role="tabpanel" aria-labelledby="tab-fx" hidden>
+      <div class="fxrow" id="fxrow"></div>
+    </section>
+
+    <section class="panel" id="pan-br" role="tabpanel" aria-labelledby="tab-br" hidden>
+      <div class="sec-h">
+        <div class="tools"><label class="sld br-depth"><span>Depth</span><input type="range" id="brDepth" min="0" max="100" step="1" value="35" aria-label="Randomise depth"><output id="o-brDepth">35%</output></label><button class="btn light" id="mxRand">Randomise</button><button class="btn light" id="mxClear">Remove bridges</button></div>
+      </div>
+      <div class="scroll"><table class="mx" id="mx"></table></div>
+    </section>
+
+    <section class="perf101" id="perf101" aria-label="Performance controls">
+      <div class="grp"><h3>Bender</h3>
+        <div class="row" id="benderSlot"></div>
+        <div class="row"><div class="lever" id="lever" role="slider" tabindex="0" aria-label="Bend lever" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+          <button class="btn light" id="modPush">Mod push</button><div id="trSw"></div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<dialog id="options" aria-labelledby="opt-title">
+  <div class="opt-head">
+    <h2 id="opt-title">options</h2>
+    <div class="otabs" id="otabs" role="tablist" aria-label="Options sections"><button type="button" role="tab" data-sec="midi" aria-selected="true" aria-controls="osec-midi">midi</button><button type="button" role="tab" data-sec="colours" aria-selected="false" aria-controls="osec-colours">colours</button><button type="button" role="tab" data-sec="about" aria-selected="false" aria-controls="osec-about">about</button></div>
+    <button type="button" class="xbtn" id="close-options" aria-label="Close options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" fill="none"/></svg></button>
+  </div>
+  <div class="opt-body">
+    <section class="osec" id="osec-midi" role="tabpanel" aria-label="MIDI">
+      <p class="opt-status" id="midi-status"></p>
+      <ol class="ccmap" id="midi-map"></ol>
+    </section>
+    <section class="osec" id="osec-colours" role="tabpanel" aria-label="Colours" hidden>
+      <div class="lcd-mode"><span class="lab">mode</span>
+        <div class="lcd-seg" role="group" aria-label="Mode"><button type="button" data-m="mono" aria-pressed="false">Mono</button><button type="button" data-m="colour" aria-pressed="true">Grey + colour</button></div>
+      </div>
+      <div class="lcd-sws" id="lcdSws" role="radiogroup" aria-label="Colour"></div>
+      <div class="lcd-look" id="lcd-look">
+        <label class="sld"><span>Brightness</span><input type="range" data-look="bright" min="-50" max="50" step="1" value="0" aria-label="Screen brightness"><output>0</output></label>
+        <label class="sld"><span>Saturation</span><input type="range" data-look="sat" min="0" max="200" step="1" value="100" aria-label="Screen saturation"><output>100%</output></label>
+        <label class="sld"><span>Dirt</span><input type="range" data-look="dirt" min="0" max="200" step="1" value="100" aria-label="Dirt on the glass"><output>100%</output></label>
+        <label class="sld"><span>Grain</span><input type="range" data-look="grain" min="0" max="250" step="1" value="100" aria-label="Pixel grain"><output>100%</output></label>
+        <label class="sld" hidden><span>Glow</span><input type="range" data-look="glow" min="0" max="200" step="1" value="100" aria-label="Glow round the ink"><output>100%</output></label>
+        <button type="button" class="btn" id="lcd-look-reset">Reset</button>
+      </div>
+    </section>
+    <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
+      <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
+      <p class="opt-ver" id="mInstallHow" hidden></p>
+      <p class="opt-ver" id="mVer">Shyoy v0.17.3</p>
+      <div class="notes">
+        <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
+        <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
+        <p><strong>Mixer.</strong> An inverting op-amp summer that soft-clips at the supply rails, then a coupling cap.</p>
+        <p><strong>VCF.</strong> Four OTA-C integrator stages, each I = Iabc·tanh(ΔV/2Vt) into its own 240 pF cap, with resonance feedback from stage 4 through a diode clamp. Solved per sample as a zero-delay (TPT) network, re-linearised around each OTA's operating point.</p>
+        <p><strong>VCA.</strong> An OTA with a tanh input, its Iabc set by the envelope or the gate.</p>
+        <p><strong>Envelope.</strong> A 10 µF timing cap charged toward the rail through the attack resistor. A comparator at about 4.3 V hands over to decay, which discharges toward the sustain voltage.</p>
+        <p><strong>LFO.</strong> An op-amp integrator and Schmitt trigger relaxation oscillator on a 0.1 µF cap. Random samples noise on each square edge.</p>
+        <p><strong>Power and battery sag.</strong> A 9 V battery with internal resistance feeds the supply. Its voltage sags under load, and the rails start to fall once less than about 6 V reaches the converter. The header shows the battery voltage and the rail.</p>
+        <p><strong>Accent.</strong> A 303-style sweep capacitor: consecutive accents build up the filter sweep. Acc adds accent to the cutoff (0 is the real 101).</p>
+        <p><strong>Bend board.</strong> The VCO timing cap, reset pulse width and discharge resistance, each VCF stage cap, OTA offset, resonance polarity, envelope cap and attack threshold, LFO cap and hysteresis, temperature, battery voltage and internal resistance.</p>
+        <p hidden><strong>Bridges.</strong> Any tap node (saw cap, pulse comparator, sub flip-flop, noise, LFO, envelope cap, VCF stage 2, VCF out, VCA out, or a finger with mains hum) to any injection point, through 10 MΩ down to 1 kΩ, applied as current into a cap or summing node.</p>
+        <p><strong>RAT.</strong> An LM308 stage with gain-bandwidth and slew limits from its 30 pF cap, 1N914 diodes to ground, then the 3.3 nF filter. Run at 4× the host rate.</p>
+        <p><strong>DS-1 and TS808.</strong> The Boss DS-1 (transistor booster, op-amp into 1N4148 diodes to ground, tone filter) and the Ibanez TS808 (JRC4558 with diodes in the feedback, tone stage), from ElectroSmash's part values, at 4×.</p>
+        <p><strong>Folder.</strong> The Buchla 259 timbre wavefolder after Esqueda, Pöntynen, Välimäki and Parker (DAFx-17): five folding cells on 6 V rails, level-matched by a peak follower.</p>
+        <p><strong>Flanger.</strong> After the Boss BF-2: a 1024-stage bucket brigade clocked from 500 kHz down to 40 kHz (1 to 12.8 ms, swept as 1/f by a triangle LFO), Res feedback through a soft clip, 8 kHz filters either side, the dry and delayed signals mixed equally. Chorus mode has no feedback.</p>
+        <p><strong>Routing.</strong> The strip under the units: the folder before or after the drive, and the delay and reverb side by side or one into the other (the second fed the dry signal plus the first one's return). Click a block to switch its unit.</p>
+        <p><strong>Delay.</strong> A clean digital delay synced to the tempo, ping-pong or mono, with a low cut and a high cut inside the feedback loop so each repeat gets thinner and darker.</p>
+        <p><strong>Reverb slot.</strong> Four units: a Lexicon 224 (20 kHz, 12-bit gain-ranging converters, 16-bit words, 32K-word memory, on Dattorro's Griesinger-style plate; the variants are estimates), Dattorro's plate (JAES 1997), a spring tank after Välimäki, Parker and Abel (JAES 2010), and partitioned FFT convolution.</p>
+        <p><strong>Convolution IRs.</strong> EMT 140 plate impulse responses by Greg Hopkins (Hopkins Media Services), Creative Commons Attribution, via oramics/sampled. Drum room, silo, garage, Musikverein and On a Star impulse responses from Voxengo, free for any use. See irs/CREDITS.md.</p>
+        <p><strong>Compactor.</strong> A sidechain on the delay and reverb returns, keyed by the dry synth, after the Kilohearts Compactor: Amount sets depth and sensitivity, Release 0 to 1 s, with 3 ms lookahead.</p>
+      </div>
+    </section>
+  </div>
+</dialog>
+
+<script src="js/app/notips.js"></script>
+<script src="js/app/defs.js"></script>
+<script src="js/app/state.js"></script>
+<script src="js/app/audio.js"></script>
+<script src="js/app/controls.js"></script>
+<script src="js/app/bend.js"></script>
+<script src="js/app/effects.js"></script>
+<script src="js/app/patterns.js"></script>
+<script src="js/app/generate.js"></script>
+<script src="js/app/sequencer.js"></script>
+<script src="js/app/tabs.js"></script>
+<script src="js/app/slots.js"></script>
+<script src="js/app/seqmenu.js"></script>
+<script src="js/app/transport.js"></script>
+<script src="js/app/presets.js"></script>
+<script src="js/app/namer.js"></script>
+<script src="js/app/sounds.js"></script>
+<script src="js/app/keyboard.js"></script>
+<script src="js/app/options.js"></script>
+<script src="js/app/midi.js"></script>
+<script src="js/app/app.js"></script>
+<script src="mockups/top-synth.js"></script>
+
+</body>
+</html>
