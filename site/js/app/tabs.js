@@ -1,6 +1,7 @@
 // Shyoy: Tabs, and full screen + landscape lock on phones.
 // ---------- tabs ----------
-const TABS = [['tab-synth', null], ['tab-seq', 'pan-seq'], ['tab-bend', 'pan-bend'], ['tab-br', 'pan-br'], ['tab-fx', 'pan-fx'], ['tab-perf', null]];
+// Bridges was taken off the page in v0.16.5: its tab and panel stay in the HTML, hidden, and bend.js still builds the matrix.
+const TABS = [['tab-synth', null], ['tab-seq', 'pan-seq'], ['tab-bend', 'pan-bend'], ['tab-fx', 'pan-fx'], ['tab-perf', null]];
 const unitEl = document.getElementById('unit');
 function showTab(id) {
   unitEl.dataset.view = id;

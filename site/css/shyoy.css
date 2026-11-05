@@ -294,6 +294,7 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
   display: flex; align-items: baseline; justify-content: center; gap: 6px; color: var(--ink); font-size: var(--fs-l); line-height: 1; text-transform: lowercase;
   white-space: nowrap; cursor: pointer; text-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
 .tabs button:last-of-type { border-right: 0; }
+.tabs button[hidden] { display: none; }
 .tabs button::before { counter-increment: tab; content: counter(tab, decimal-leading-zero); font-size: var(--fs-xs); color: var(--muted); }
 .tabs button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
 .tabs button[aria-selected="true"]::before { color: var(--lit); }
