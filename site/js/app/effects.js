@@ -10,7 +10,7 @@ for (const u of FX) {
     el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type" role="radiogroup" aria-label="Reverb type">` +
       REV_TYPE_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n}</button>`).join('') +
       `</span><span class="rv-lcd" id="rvLcd" aria-live="polite"></span><small>${u.sub}</small></div>` +
-      `<div class="rv-progs" id="rvProgs" role="radiogroup" aria-label="Program"></div><div class="ctrls"></div><p class="rv-note" id="rvNote"></p>`;
+      `<div class="rv-progs" id="rvProgs" role="radiogroup" aria-label="Program"></div><div class="ctrls"></div>`;
     const c = el.querySelector('.ctrls');
     for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.rev = it.rev; }
   } else if (u.dv) {
@@ -46,22 +46,6 @@ fxBox.lex.querySelector('.rv-type').addEventListener('click', e => { const b = e
 rvProgs.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) { boot(); setRev(RV_PROG[REV_IDS[state.params.revtype | 0] || 'lex'].s, +b.dataset.i); } });
 const LEX_CHORUS_NAMES = { lexbass: 'Pair 1', lexmid: 'Pair 2', lexxover: 'Pair 3', lextreble: 'Pair 4', lexdepth: 'Wander' };
 const fdrLabel = id => document.querySelector(`label[for="f-${id}"]`);
-function revNote(T, i) {
-  if (T === 'lex') {
-    const P = LEX_PROGS[i];
-    return i === 8 ? 'Eight voices, four a side, each delay wandering at random. The first four faders are the voice-pair levels; Diffusion acts on pairs 3 and 4. 20 kHz, 12-bit gain-ranging converters, 16-bit words.'
-      : `Lexicon 224 (1978): 20 kHz, 12-bit gain-ranging converters, 16-bit words in a shared 32K-word memory. Predelay ${P[1]}–${P[2]} ms on this program. Names, ranges and specs follow Lexicon; the algorithms are estimates built on Dattorro's Griesinger-style plate.`;
-  }
-  if (T === 'plate') return `Jon Dattorro's published plate (JAES 1997): four input diffusers into a figure-eight tank with modulated allpasses. ${PLATE_PROGS[i][1]}: every delay scaled ×${PLATE_PROGS[i][2]}. Damping is the high cut inside the tank, Bandwidth the one before it.`;
-  if (T === 'spring') return `A dispersive spring model after Välimäki, Parker and Abel (JAES 2010): each spring is a delay loop through ${SPRING_STAGES_UI} stretched allpasses, so every echo smears into the falling drip. ${SPRING_PROGS[i][1]}, transit ${SPRING_PROGS[i][2].join(' / ')} ms. Dwell drives the tank, Tension lengthens the chirp.`;
-  const P = CNV_PROGS[i];
-  if (P[2]) {
-    const m = irMeta && irMeta.irs.find(x => x.id === P[2]);
-    return (m ? `${m.character} ${m.credit}, ${m.licence}. ` : irFailed ? 'The impulse responses could not be loaded. ' : 'Recorded impulse response; it loads when audio starts. ') +
-      'Length trims the response (full at the top). Partitioned FFT convolution, one 512-sample block late, which is the shortest predelay.';
-  }
-  return `Partitioned FFT convolution with a generated impulse response: seeded noise with the highs dying first${P[4] ? ', a build-up and early reflections' : ''}. ${P[3] ? 'Decay sets the gate length. ' : ''}The wet signal is one 512-sample block late, which is the shortest predelay.`;
-}
 function drawRev() {
   const t = Math.max(0, Math.min(3, state.params.revtype | 0)), T = REV_IDS[t], pit = RV_PROG[T], n = pit.opts.length;
   const sel = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0));
@@ -79,7 +63,6 @@ function drawRev() {
   if (T === 'lex') for (const id in LEX_CHORUS_NAMES) fdrLabel(id).textContent = (sel === 8 ? LEX_CHORUS_NAMES[id] : FX.find(u => u.rv).items.find(x => x.f === id).label).toLowerCase();
   if (T === 'conv') { fdrLabel('cnvdecay').textContent = CNV_PROGS[sel][3] ? 'gate' : CNV_PROGS[sel][2] ? 'length' : 'decay'; if (!irFailed) { loadIRMeta(); loadIRs(); } }
   for (const it of FX.find(u => u.rv).items) if (it.f && it.rev === T) ui[it.f](state.params[it.f]); // readouts that depend on the program
-  document.getElementById('rvNote').textContent = revNote(T, sel);
   drawRoute();
 }
 // recorded impulse responses for Conv (irs/irs.json, from the 303 app): the list loads when Conv is shown, the samples once

@@ -13,6 +13,7 @@
   --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;            /* the backlight's pale haze */
   --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12;  /* shade at the top and in the corners */
   --acc: #5f7f00;            /* the spot colour this swatch brings to Grey + colour */
+  --dirt: 1; --grain: 1; --glow: 1;   /* Options › Colours look sliders (1 = stock); Brightness and Saturation reset --glass-rgb */
   --glass: rgb(var(--glass-rgb));
   --ink: rgb(var(--ink-rgb));
   --muted: rgb(var(--ink-rgb) / .72);
@@ -21,7 +22,7 @@
   --lit: rgb(var(--glass-rgb) / .72);   /* glass-coloured text on an ink strip, dimmed */
   --line: rgb(var(--ink-rgb) / .42);
   --rule: 1px solid var(--line);
-  --shadow: 2px 2px 0 rgb(var(--ink-rgb) / .17);
+  --shadow: 2px 2px 0 rgb(var(--ink-rgb) / calc(.17 * var(--glow)));
   --f-lcd: "VT323", ui-monospace, "SF Mono", Menlo, monospace;
   /* scale */
   --bw: 2px;          /* outline weight */
@@ -74,12 +75,12 @@ button, table, input, select { font: inherit; color: inherit; }
   color: var(--ink); text-shadow: var(--shadow); border: 6px solid var(--bezel); border-radius: 12px;
   background-color: var(--glass);
   background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
-    repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px),
     radial-gradient(60% 30% at 10% 100%, rgb(var(--hl1-rgb) / .55), rgb(var(--hl1-rgb) / 0) 70%),
     radial-gradient(50% 28% at 90% 102%, rgb(var(--hl2-rgb) / .4), rgb(var(--hl2-rgb) / 0) 70%),
-    radial-gradient(38% 20% at 70% 30%, rgb(var(--dk1-rgb) / .14), rgb(var(--dk1-rgb) / 0) 70%),
-    linear-gradient(180deg, rgb(var(--dk2-rgb) / .2) 0%, rgb(var(--dk2-rgb) / 0) 22%),
-    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / .28) 100%);
+    radial-gradient(38% 20% at 70% 30%, rgb(var(--dk1-rgb) / calc(.14 * var(--dirt))), rgb(var(--dk1-rgb) / 0) 70%),
+    linear-gradient(180deg, rgb(var(--dk2-rgb) / calc(.2 * var(--dirt))) 0%, rgb(var(--dk2-rgb) / 0) 22%),
+    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / calc(.28 * var(--dirt))) 100%);
   box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset -4px 0 10px rgba(0,0,0,.15), 0 18px 40px rgba(0,0,0,.5); }
 .lower { display: contents; }
 
@@ -124,7 +125,7 @@ select.btn option { color: #000; }
 .fdr .track { position: relative; flex: 1 1 0; width: var(--trk); min-height: var(--trk-min); cursor: ns-resize; touch-action: none;
   background: repeating-linear-gradient(0deg, var(--ghost) 0 5px, transparent 5px 7px); }
 .fdr .fill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--v, 0) * 100%);
-  background: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px); background-position: bottom; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
+  background: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px); background-position: bottom; filter: drop-shadow(var(--shadow)); }
 .fdr .ticks, .fdr .cap { display: none; }
 .fdr label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
 .fdr output { font-size: var(--fs-xs); color: var(--muted); min-height: 1em; line-height: 1; white-space: nowrap; text-shadow: none; font-variant-numeric: tabular-nums; }
@@ -171,7 +172,7 @@ select.btn option { color: #000; }
 .top .btn { height: var(--h-top); font-size: var(--fs-l); }
 .btn.play { min-width: 5.2em; justify-content: flex-start; }
 .btn.gear { width: var(--h-top); padding: 0; }
-.btn.gear svg { width: 62%; height: 62%; fill: currentColor; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
+.btn.gear svg { width: 62%; height: 62%; fill: currentColor; filter: drop-shadow(var(--shadow)); }
 
 /* ---------- Options sheet (the gear): a modal piece of the same glass, from the TB-303 app's dialog#options ---------- */
 html:has(dialog#options[open]) { overflow: hidden; }
@@ -179,11 +180,11 @@ dialog#options { width: min(940px, calc(100vw - 32px)); height: min(600px, calc(
   flex-direction: column; overflow: hidden; color: var(--ink); text-shadow: var(--shadow); border: 6px solid var(--bezel); border-radius: 12px;
   background-color: var(--glass);
   background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
-    repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px),
     radial-gradient(60% 30% at 10% 100%, rgb(var(--hl1-rgb) / .55), rgb(var(--hl1-rgb) / 0) 70%),
     radial-gradient(50% 28% at 90% 102%, rgb(var(--hl2-rgb) / .4), rgb(var(--hl2-rgb) / 0) 70%),
-    linear-gradient(180deg, rgb(var(--dk2-rgb) / .2) 0%, rgb(var(--dk2-rgb) / 0) 22%),
-    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / .28) 100%);
+    linear-gradient(180deg, rgb(var(--dk2-rgb) / calc(.2 * var(--dirt))) 0%, rgb(var(--dk2-rgb) / 0) 22%),
+    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / calc(.28 * var(--dirt))) 100%);
   box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset -4px 0 10px rgba(0,0,0,.15), 0 18px 40px rgba(0,0,0,.5); }
 dialog#options[open] { display: flex; }
 dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
@@ -196,7 +197,7 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 [data-lcdmode=colour] .otabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); }
 .otabs button:focus-visible { outline-offset: -5px; outline-color: currentColor; }
 .xbtn { align-self: center; flex: none; appearance: none; background: none; border: 0; color: var(--ink); width: var(--h); height: var(--h); padding: 3px; margin-bottom: var(--gap-s); cursor: pointer; }
-.xbtn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
+.xbtn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(var(--shadow)); }
 .opt-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: calc(var(--pad) + 4px) calc(var(--pad) + 4px) calc(var(--pad) + 8px);
   font-size: var(--fs); scrollbar-width: thin; scrollbar-color: var(--ink) transparent; }
 .osec { display: grid; gap: calc(var(--gap) + 4px); align-content: start; min-width: 0; }
@@ -234,6 +235,10 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .lcd-sw[data-t=green] { --sg: #c3d83a; --si: #0a0f04; } .lcd-sw[data-t=orange] { --sg: #faa142; --si: #1c0a00; }
 .lcd-sw[data-t=amber] { --sg: #f4c24a; --si: #1e1500; } .lcd-sw[data-t=blue] { --sg: #7bb6e2; --si: #03112a; }
 .lcd-sw[data-t=red] { --sg: #f26b52; --si: #220403; } .lcd-sw[data-t=grey] { --sg: #d3d6cc; --si: #121410; }
+/* look sliders (from the TB-303 app): brightness, saturation, dirt, grain, glow, then Reset */
+.lcd-look { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--fs) * 17), 1fr)); gap: var(--gap-s) calc(var(--gap) * 2); align-items: center; max-width: 900px; }
+.lcd-look .sld { grid-template-columns: calc(var(--fs) * 5) 1fr 3em; }
+.lcd-look #lcd-look-reset { justify-self: start; }
 
 /* preset menu (from the 303 app), drawn as LCD */
 .presets { position: relative; display: flex; align-items: center; gap: var(--gap-s); }
@@ -384,7 +389,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .rv-progs button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
 @media (hover: hover) { .rv-progs button:hover:not([aria-checked="true"]), .rv-type button:hover:not([aria-checked="true"]) { background: var(--tint); } }
 .fdr[hidden] { display: none; }
-.rv-note { flex: none; margin: 0; padding: 0 3px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; max-width: 150ch; }
 
 /* ---------- sequencer: controls in one strip, the piano roll fills the rest ---------- */
 .seq { gap: var(--gap-s); }
@@ -402,6 +406,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 /* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
 .rmenu { position: relative; }
 .sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu { margin-left: 0; }
+.rm-btn { text-transform: none; }   /* Johnny: the menu buttons read "Randomise ▾" and "Tools ▾" */
 .rm-btn::after { content: " ▾"; }
 .fn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 70; min-width: 230px; display: flex; flex-direction: column; padding: 4px 0 6px;
   background: var(--glass); color: var(--ink); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 0 10px 30px rgb(0 0 0 / .45); text-shadow: none; }

@@ -37,7 +37,7 @@ function showLcd() {
   lcdSeg.forEach(b => b.setAttribute('aria-pressed', b.dataset.m === lcdMode));
   lcdBtns.forEach(b => { const on = b.dataset.t === lcdTheme; b.setAttribute('aria-checked', on); b.tabIndex = on ? 0 : -1; });
 }
-function setLcd(t, m) { lcdTheme = t; lcdMode = m; store.set('lcdTheme', t); store.set('lcdMode', m); showLcd(); }
+function setLcd(t, m) { lcdTheme = t; lcdMode = m; store.set('lcdTheme', t); store.set('lcdMode', m); showLcd(); applyLook(); }
 showLcd();
 lcdSeg.forEach(b => b.onclick = () => setLcd(lcdTheme, b.dataset.m));
 lcdBtns.forEach(b => b.onclick = () => setLcd(b.dataset.t, lcdMode));
@@ -46,3 +46,40 @@ lcdSws.addEventListener('keydown', (e) => {
   e.preventDefault(); e.stopPropagation();
   const i = (LCD_T.indexOf(lcdTheme) + d + LCD_T.length) % LCD_T.length; setLcd(LCD_T[i], lcdMode); lcdBtns[i].focus();
 });
+
+// Brightness, Saturation, Dirt, Grain, Glow (from the TB-303 app's options.js): saved as kestrel.lcdLook (the slider values)
+// and kestrel.lcdVars (the CSS variables they make, which the head script puts back before first paint). At the stock
+// values nothing is set. Brightness and Saturation move the glass in HSL, Dirt scales the shade at the top and in the
+// corners, Grain the pixel grid, Glow the ink's shadow. Stock Dirt is 100% here, so Shyoy looks as it did.
+const LOOK0 = { bright: 0, sat: 100, dirt: 100, grain: 100, glow: 100 };
+const look = { ...LOOK0, ...(store.get('lcdLook', {}) || {}) };
+const LOOK_VARS = ['--glass-rgb', '--dirt', '--grain', '--glow'];
+function rgb2hsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1)), h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+function hsl2rgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [r, g, b].map(v => Math.round((v + m) * 255));
+}
+function applyLook() {
+  for (const v of LOOK_VARS) rootEl.style.removeProperty(v);
+  const vars = {};
+  if (look.bright !== 0 || look.sat !== 100) {
+    const [h, s0, l0] = rgb2hsl(...getComputedStyle(rootEl).getPropertyValue('--glass-rgb').trim().split(/\s+/).map(Number));
+    const b = look.bright / 100, s = Math.min(1, s0 * look.sat / 100), l = b > 0 ? l0 + (1 - l0) * b * .8 : l0 * (1 + b * .8);
+    vars['--glass-rgb'] = hsl2rgb(h, s, l).join(' ');
+  }
+  for (const k of ['dirt', 'grain', 'glow']) if (look[k] !== LOOK0[k]) vars['--' + k] = String(look[k] / 100);
+  for (const k in vars) rootEl.style.setProperty(k, vars[k]);
+  store.set('lcdLook', look); store.set('lcdVars', vars);
+}
+const lookBox = document.getElementById('lcd-look');
+const showLook = () => { for (const i of lookBox.querySelectorAll('input')) { const k = i.dataset.look; i.value = look[k]; i.nextElementSibling.textContent = k === 'bright' ? (look[k] > 0 ? '+' : '') + look[k] : look[k] + '%'; } };
+lookBox.addEventListener('input', (e) => { const i = e.target; if (!i.dataset?.look) return; look[i.dataset.look] = +i.value; applyLook(); showLook(); });
+document.getElementById('lcd-look-reset').onclick = () => { Object.assign(look, LOOK0); applyLook(); showLook(); };
+showLook(); applyLook();

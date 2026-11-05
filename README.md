@@ -75,11 +75,17 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.16.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.16.1), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### LCD look sliders, and two audit fixes (v0.16.1)
+
+- **Options › Colours** gains the TB-303 app's look sliders: Brightness (-50..+50) and Saturation (0..200%) move the glass colour in HSL; Dirt (the shade at the top and in the corners), Grain (the pixel grid) and Glow (the ink's shadow) scale `--dirt`, `--grain` and `--glow`. Reset puts them back. Saved as `kestrel.lcdLook` (slider values) and `kestrel.lcdVars` (the variables), which the head script applies before first paint. At stock (Dirt 100%, unlike the 303 app's 0) Shyoy looks exactly as before.
+- The sequencer menu buttons read `Randomise ▾` and `Tools ▾` (not lowercased), as specified.
+- The reverb's long description under its programs is gone (no help text on the pages); the IR credits are in Options › About.
 
 ### One fixed-size screen, scaled to fit any window (v0.16.0)
 
