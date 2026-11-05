@@ -1,7 +1,7 @@
 // Shyoy: Tabs, and full screen + landscape lock on phones.
 // ---------- tabs ----------
 const TABS = [['tab-synth', null], ['tab-seq', 'pan-seq'], ['tab-bend', 'pan-bend'], ['tab-br', 'pan-br'], ['tab-fx', 'pan-fx'], ['tab-perf', null]];
-const phoneMQ = matchMedia('(orientation: landscape) and (max-height: 520px)'), unitEl = document.getElementById('unit');
+const unitEl = document.getElementById('unit');
 function showTab(id) {
   unitEl.dataset.view = id;
   for (const [t, p] of TABS) { const on = t === id; document.getElementById(t).setAttribute('aria-selected', on); if (p) document.getElementById(p).hidden = !on; }
@@ -14,7 +14,6 @@ TABS.forEach(([t], i) => {
 let firstTab = 'tab-synth';
 try { const t = localStorage.getItem('kestrel-ms1-tab'); if (t && TABS.some(x => x[0] === t)) firstTab = t; } catch (e) {}
 showTab(firstTab);
-phoneMQ.addEventListener('change', () => showTab(unitEl.dataset.view || 'tab-seq'));
 
 // ---------- phones: go full screen and hold landscape on the first touch ----------
 const coarse = matchMedia('(pointer: coarse)').matches;

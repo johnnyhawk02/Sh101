@@ -41,6 +41,7 @@ site/css/shyoy.css       all styles (glass colour tokens on :root)
 site/js/dsp/fx.js        AudioWorklet: effects (RAT, DS-1, TS808, Buchla 259, delay, the reverb slot, Compactor)
 site/js/dsp/engine.js    AudioWorklet: the circuit model (VCO, sub, VCF, VCA, env, LFO, PSU, bridges, both sequencers)
 site/js/app/*.js         the UI, as plain scripts sharing one scope, in this order:
+  fit         (loaded in <head>) scales the fixed 1400 x 906 screen to the window, sets --k, fitK()
   notips      turns any title attribute into data-tip, so no tooltip ever shows
   defs        bend-board values, rack layout, effect units
   state       patterns, saved state, slot data
@@ -49,7 +50,7 @@ site/js/app/*.js         the UI, as plain scripts sharing one scope, in this ord
   bend        Bend board and Bridges
   effects     FX page
   sequencer   piano roll and its sliders
-  tabs        tabs, phone full screen / landscape
+  tabs        tabs, full screen / landscape lock on phones
   slots       pattern slots and chains
   seqmenu     Randomise and Tools menus
   transport   run/stop, tempo
@@ -74,17 +75,25 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.15.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.16.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### One fixed-size screen, scaled to fit any window (v0.16.0)
+
+After the TB-303 app's `fit.js` and its `html.fit` rules. The glass (`.unit`) is always **1400 x 906** CSS px, the 1.545:1 shape of Johnny's MacBook Pro display and big enough that the desktop layout fits unsqueezed. `js/app/fit.js` (loaded in `<head>`, before first paint) puts `fit` on `<html>` and sets `--k = min((vw - pad) / 1400, (vh - pad) / 906, 2.2)` (pad 16 px, 4 px when the window's short side is under 600 px); the `html.fit` rules at the end of `shyoy.css` centre the glass and scale it by `--k`, with the dark case round it. Every device gets this one layout: the landscape-phone and narrow-desktop media queries and the phone tokens are gone, and a phone or iPad shows the same screen smaller. The portrait "Turn your phone sideways" card stays. The viewport meta has `maximum-scale=1, user-scalable=no`.
+
+- All six pages (Synth, Sequencer, Bend board, Bridges, FX, Perform) lay out at that size with nothing scrolling. Bridge cells are a fixed 52 px tall (they were sized from the window height).
+- The Options sheet lives in the top layer, outside the glass, so it has its own fixed 1344 x 842 (96% x 93% of the screen) and the same `scale(var(--k))`. The preset menu and the sequencer menus are absolutely positioned inside the glass and scale with it; the preset menu's max height is worked out in design pixels.
+- Drags: faders, the bend lever and range sliders measure their element, so they follow the pointer at any scale. The dials and the bridge cells counted screen pixels of travel; they now divide by `fitK()`, so a dial still turns the same amount for the same distance on the glass.
+
 ### FX routing strip and the BF-2 flanger, from the TB-303 app (v0.15.0)
 
 - **Routing** (`FxChain` in `js/dsp/fx.js`): `fxorder` (0 = folder then drive, 1 = drive then folder) and `fxret` (0 = delay and reverb in parallel, 0.5 = delay into reverb, 1 = reverb into delay), instant like `drvtype`. In series the second unit is fed the dry signal plus 0.5 × the first one's return (L + R), both returns are heard, the Compactor ducks their sum: the 303 app's `_fxOut`. Stored in the sound as indices (`FX_ROUTE` in `defs.js`); a sound saved without them loads at 0 and 0, and with the defaults the chain's output is bit-identical to v0.14.
 - **Flanger**: `BF2Flanger` copied unchanged from `tb303-model.js`, after the folder and drive and ahead of the split, so the returns and the dry path both get it. `flgman`, `flgdep`, `flgrate`, `flgres`, `flgmode` (0 flanger, 1 chorus) with the 303 app's defaults; `fx.flg` switches it, off in anything saved before. It shares the second row of the FX page with the reverb; in chorus mode Res dims.
-- **Diagram** (`drawRoute()` in `js/app/effects.js`): an inline SVG strip under the units, redrawn on every on/off, pedal, reverb type, flanger mode and routing change and on preset loads. A block is a button: clicking it (or Enter / Space) clicks that unit's own on/off. On the phone the reverb's note is hidden to make room.
+- **Diagram** (`drawRoute()` in `js/app/effects.js`): an inline SVG strip under the units, redrawn on every on/off, pedal, reverb type, flanger mode and routing change and on preset loads. A block is a button: clicking it (or Enter / Space) clicks that unit's own on/off.
 
 ### Sequencer extras from the TB-303 app: Generate, Refill slots, move notes, D-pad, Join chain (v0.14.0)
 
@@ -96,7 +105,7 @@ npx wrangler pages deploy site --project-name shyoy --branch main
 
 ### Options sheet and MIDI CC (v0.13.6)
 
-From the TB-303 app. The ≡ menu and the Colours pop-up are gone; a gear at the right of the top bar (`#open-options`) opens **Options**, a modal `<dialog>` of the same glass with three tabs, `midi`, `colours` and `about` (left and right arrows move between them, the last one is saved as `kestrel.optTab`). It closes with ×, Escape or a click on the backdrop. About 940 x 600 on a desktop; on a phone in landscape it fills the screen less a 16 px margin and its body scrolls.
+From the TB-303 app. The ≡ menu and the Colours pop-up are gone; a gear at the right of the top bar (`#open-options`) opens **Options**, a modal `<dialog>` of the same glass with three tabs, `midi`, `colours` and `about` (left and right arrows move between them, the last one is saved as `kestrel.optTab`). It closes with ×, Escape or a click on the backdrop. A fixed 1344 x 842, scaled with the screen (v0.16.0).
 
 - **MIDI** (`js/app/midi.js`): every input, every channel, inputs plugged in later too. CC 1 onwards are the rack's continuous controls in panel order, then the bender's VCO, VCF and LFO mod (27 in all; CC 1 is LFO Rate, CC 10 Cutoff), built from `RACK` and `BENDER`. A CC moves the fader, its readout, the engine and the saved state as a drag does, batched to one update per frame. Switches and notes are not used. Access is asked for on the first touch. The tab's status line is the only status text in the app.
 - **Colours**: the old pop-up's mode switch and swatches, unchanged (`kestrel.lcdTheme`, `kestrel.lcdMode`, the head script).

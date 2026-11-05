@@ -37,7 +37,7 @@ function buildMatrix() {
     const set = v => { v = Math.round(Math.max(0, Math.min(1, v)) * 1000) / 1000; if (v < 0.004) v = 0; if (v) state.br[k] = v; else delete state.br[k]; render(); post({ type: 'bridges', br: state.br }); save(); };
     let drag = null;
     c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); boot(); drag = { y: e.clientY, v: state.br[k] || 0 }; });
-    c.addEventListener('pointermove', e => { if (drag) set(drag.v - (e.clientY - drag.y) * (e.shiftKey ? .001 : .005)); });
+    c.addEventListener('pointermove', e => { if (drag) set(drag.v - (e.clientY - drag.y) / fitK() * (e.shiftKey ? .001 : .005)); });
     c.addEventListener('pointerup', () => drag = null); c.addEventListener('pointercancel', () => drag = null);
     c.addEventListener('dblclick', () => set(0));
     c.addEventListener('wheel', e => { e.preventDefault(); set((state.br[k] || 0) - Math.sign(e.deltaY) * (e.shiftKey ? .005 : .02)); }, { passive: false });

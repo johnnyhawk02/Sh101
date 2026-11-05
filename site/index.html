@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#161815">
 <script>
@@ -14,6 +14,7 @@ try {
   el.dataset.lcdmode = m === 'mono' ? 'mono' : 'colour';
 } catch (e) {}
 </script>
+<script src="js/app/fit.js"></script>
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 </head>
@@ -31,7 +32,7 @@ try {
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.15.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.16.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -58,12 +59,12 @@ try {
 
   <div class="lower">
     <nav class="tabs" role="tablist" aria-label="Panels">
-      <button role="tab" id="tab-synth" class="ph-only" aria-controls="rack" aria-selected="false">Synth</button>
+      <button role="tab" id="tab-synth" aria-controls="rack" aria-selected="false">Synth</button>
       <button role="tab" id="tab-seq" aria-controls="pan-seq" aria-selected="true">Sequencer</button>
       <button role="tab" id="tab-bend" aria-controls="pan-bend" aria-selected="false">Bend board</button>
       <button role="tab" id="tab-br" aria-controls="pan-br" aria-selected="false">Bridges</button>
       <button role="tab" id="tab-fx" aria-controls="pan-fx" aria-selected="false">FX</button>
-      <button role="tab" id="tab-perf" class="ph-only" aria-controls="perf101" aria-selected="false">Perform</button>
+      <button role="tab" id="tab-perf" aria-controls="perf101" aria-selected="false">Perform</button>
     </nav>
 
     <section class="panel seq" id="pan-seq" role="tabpanel" aria-labelledby="tab-seq">
@@ -177,7 +178,7 @@ try {
     </section>
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
-      <p class="opt-ver" id="mVer">Shyoy v0.15.0</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.16.0</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>

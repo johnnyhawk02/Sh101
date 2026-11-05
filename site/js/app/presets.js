@@ -164,7 +164,7 @@ function presetMenu(host) {
     build();
     const it = byV.get(sel.value);
     if (it) { let k = ''; for (const p of it.path) { k = k ? k + '/' + p : p; open.add(k); } const i = it.name.indexOf(' - '); if (i > 0) open.add(it.path.join('/') + '/' + it.name.slice(0, i)); }
-    q.value = ''; draw(); pop.hidden = false; pop.style.maxHeight = Math.max(240, Math.min(520, innerHeight - btn.getBoundingClientRect().bottom - 16)) + 'px'; btn.setAttribute('aria-expanded', 'true');
+    q.value = ''; draw(); pop.hidden = false; pop.style.maxHeight = Math.max(240, Math.min(520, (unitEl.getBoundingClientRect().bottom - btn.getBoundingClientRect().bottom) / fitK() - 16)) + 'px'; btn.setAttribute('aria-expanded', 'true');
     if (matchMedia('(pointer: fine)').matches) q.focus();
     list.querySelector('.pm-g ~ .pm-row [aria-selected=true], .pm-row [aria-selected=true]')?.scrollIntoView({ block: 'center' });
   }

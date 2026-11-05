@@ -64,7 +64,7 @@ function dial(def, mount) {
   kn.addEventListener('pointermove', e => {
     if (!drag || e.pointerId !== drag.id) return;
     if (e.pointerType === 'mouse' && !(e.buttons & 1)) { end(); return; }
-    set(drag.v + (drag.y - e.clientY) / (e.shiftKey ? 600 : 160));
+    set(drag.v + (drag.y - e.clientY) / fitK() / (e.shiftKey ? 600 : 160));
   });
   kn.addEventListener('pointerup', end); kn.addEventListener('pointercancel', end); kn.addEventListener('lostpointercapture', end);
   kn.addEventListener('dblclick', () => set(def.def));
