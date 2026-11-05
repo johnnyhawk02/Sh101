@@ -1,22 +1,22 @@
 /* Shyoy planning mockup: the rack as an always-on strip under the header (see top-synth.js). Built on shyoy.css; only re-lays things. */
 
 /* order: header, synth strip, tabs, the open page */
-.unit .rack { display: flex !important; order: 1; flex: none; flex-wrap: nowrap; align-content: stretch; overflow: hidden;
+html:not([data-mock=d]) .unit .rack { display: flex !important; order: 1; flex: none; flex-wrap: nowrap; align-content: stretch; overflow: hidden;
   border-bottom: var(--bw) solid var(--ink); }
-.tabs { order: 2; }
-.panel, .perf101 { order: 3; }
+html:not([data-mock=d]) .tabs { order: 2; }
+html:not([data-mock=d]) .panel, html:not([data-mock=d]) .perf101 { order: 3; }
 
 /* modules: the label strip slimmed, no bottom rule */
-.rack .mod { flex: 1 0 auto; border-bottom: 0; gap: 6px; padding: 8px 8px 6px; }
-.rack .mod:last-child { border-right: 0; }
-.rack .mod h2 { min-height: 24px; font-size: var(--fs); }
-.rack .mod .ctrls { gap: 2px; justify-content: space-evenly; align-items: flex-start; }
+html:not([data-mock=d]) .rack .mod { flex: 1 0 auto; border-bottom: 0; gap: 6px; padding: 8px 8px 6px; }
+html:not([data-mock=d]) .rack .mod:last-child { border-right: 0; }
+html:not([data-mock=d]) .rack .mod h2 { min-height: 24px; font-size: var(--fs); }
+html:not([data-mock=d]) .rack .mod .ctrls { gap: 2px; justify-content: space-evenly; align-items: flex-start; }
 
 /* dials: a fixed knob size and cell width (--knob, --kn-w per variant) */
-.rack .dial { flex: none; width: var(--kn-w); min-width: 0; gap: 2px; }
-.rack .dial .knob { flex: none; width: var(--knob); height: var(--knob); min-height: 0; }
-.rack { --out-fs: var(--fs-xs); }
-.rack .dial output { font-size: var(--out-fs); line-height: 1; min-height: 0; height: var(--out-fs); color: var(--muted); text-shadow: none; }
+html:not([data-mock=d]) .rack .dial { flex: none; width: var(--kn-w); min-width: 0; gap: 2px; }
+html:not([data-mock=d]) .rack .dial .knob { flex: none; width: var(--knob); height: var(--knob); min-height: 0; }
+html:not([data-mock=d]) .rack { --out-fs: var(--fs-xs); }
+html:not([data-mock=d]) .rack .dial output { font-size: var(--out-fs); line-height: 1; min-height: 0; height: var(--out-fs); color: var(--muted); text-shadow: none; }
 
 /* the stepping switch: label over one box with the current choice */
 .stp { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; padding-top: calc(var(--out-fs) + 2px); }
@@ -53,3 +53,17 @@
 [data-mock=c] .rack .sw { gap: 0; }
 [data-mock=c] .rack .sw .lab { font-size: var(--fs-xs); margin-bottom: 0; }
 [data-mock=c] .rack .sw button { font-size: var(--fs-s); padding: 0 4px; line-height: 1.05; }
+
+/* --- D: 8 assignable performance dials under the header; the rack stays the Synth tab --- */
+.mstrip { order: 0; flex: none; display: flex; justify-content: space-around; align-items: flex-start; padding: 14px var(--pad) 12px; border-bottom: var(--bw) solid var(--ink); }
+.mslot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 150px; }
+.mslot .dial { flex: none; gap: 6px; }
+.mslot .dial .knob { flex: none; width: 64px; height: 64px; min-height: 0; }
+.mslot .dial output { font-size: var(--fs-s); }
+.mpick > .rm-btn { font-size: var(--fs); padding: 0 10px; height: var(--h); }
+.mpick .fn-menu { left: 50%; right: auto; transform: translateX(-50%); display: block; columns: 2; column-gap: 0; min-width: 380px; padding: 4px 0 6px; }
+.mpick .fn-menu[hidden] { display: none; }
+.mpick .fn-menu .mh { display: block; break-after: avoid; }
+.mpick .fn-menu button { break-inside: avoid; }
+.mslot:first-child .mpick .fn-menu { left: 0; transform: none; }
+.mslot:last-child .mpick .fn-menu { left: auto; right: 0; transform: none; }
