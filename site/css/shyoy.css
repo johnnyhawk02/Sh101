@@ -309,13 +309,14 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
    with no line under it and a coloured top edge; the others sit lower, shaded and recessed ---------- */
 .tabs { order: 1; flex: none; display: flex; align-items: flex-end; gap: 6px; padding: 8px var(--pad) 0; counter-reset: tab;
   background: linear-gradient(var(--ink), var(--ink)) bottom / 100% var(--bw) no-repeat; }
-.tabs button { appearance: none; position: relative; flex: 1 1 0; min-width: 0; margin: 0; border: var(--bw) solid var(--ink); border-bottom: 0; border-radius: 8px 8px 0 0;
+.tabs button { appearance: none; position: relative; flex: 0 0 auto; width: 124px; min-width: 0; margin: 0; border: var(--bw) solid var(--ink); border-bottom: 0; border-radius: 8px 8px 0 0;
   padding: calc(var(--gap-s) + 1px) 6px calc(var(--gap-s) + 3px);
   background: rgb(var(--ink-rgb) / .1); box-shadow: inset 0 4px 7px rgb(0 0 0 / .2);
   display: flex; align-items: baseline; justify-content: center; gap: 6px; color: var(--muted); font-size: var(--fs-l); line-height: 1; text-transform: lowercase;
   white-space: nowrap; cursor: pointer; text-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
 .tabs button[hidden] { display: none; }
-.tabs button::before { counter-increment: tab; content: counter(tab, decimal-leading-zero); font-size: var(--fs-xs); color: var(--muted); }
+/* v0.20.0: the tab numbers are gone and each tab is half its old width (Johnny) */
+.tabs button::before { content: none; }
 .tabs button[aria-selected="true"] { background: none; box-shadow: none; color: var(--ink); border-top: 5px solid var(--accent, var(--ink));
   padding-top: calc(var(--gap-s) + 8px); padding-bottom: calc(var(--gap-s) + 3px + var(--bw)); margin-bottom: 0; }
 /* the active tab hides the base line under it, so it opens into the page */
@@ -332,7 +333,10 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .sec-h .tools { margin-left: auto; display: flex; gap: var(--gap-s) var(--gap); flex-wrap: wrap; align-items: center; }
 
 /* synth: the rack of modules in signal-flow order, every row stretched to the bottom of the glass */
-.rack { display: flex; flex-wrap: wrap; align-content: stretch; }
+/* v0.20.0: the rack keeps the same 16 px gutter as the other pages (margin plus each module's padding); the rules on its
+   outer edges fall just outside and are clipped, so only the rules between modules show */
+.rack { display: flex; flex-wrap: wrap; align-content: stretch; margin: 6px 4px; overflow: hidden; }
+.rack > .mod { margin: 0 -1px -1px 0; }
 .mod { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); min-width: 0; padding: calc(var(--pad) - 6px) calc(var(--pad) - 4px) calc(var(--pad) - 6px);
   border-right: var(--rule); border-bottom: var(--rule); }
 
@@ -362,10 +366,10 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
    rule on their left; the reverb row and the routing strip have a rule across the top. Each unit is a one-row header on
    the glass (On / Off, its name, its own menus or switch) over one row of dials. The 303's sizes are drawn 1.4x here,
    since its screen is 1000 px wide and this one 1400, so the two pages look the same. */
-#pan-fx { gap: 0; --knob: 60px; --kn-w: 82px; }
-.fxrow { flex: none; display: flex; flex-direction: column; gap: 0; margin-bottom: 36px; }
+#pan-fx { gap: 0; --knob: 60px; --kn-w: 82px; --fx-sp: 45px; }   /* --fx-sp: the space each side of a band rule (v0.20.0) */
+.fxrow { flex: none; display: flex; flex-direction: column; gap: 0; margin-bottom: var(--fx-sp); }
 .fxr { flex: none; display: flex; align-items: stretch; }
-.fxr1 { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+.fxr1 { margin-top: var(--fx-sp); padding-top: var(--fx-sp); border-top: 1px solid var(--line); }
 .fxu { flex: none; display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 0 20px; border-left: 1px solid var(--line); }
 .fxu:first-child { padding-left: 0; border-left: 0; }
 .fxr0 .fxu:last-child { flex: 1 1 auto; }   /* the compactor takes what is left of the first row */
@@ -395,7 +399,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .tmenu .fn-menu button { position: relative; justify-content: flex-start; padding: 0 14px 0 28px; }
 .tmenu .fn-menu button[aria-checked=true]::before { content: "✓"; position: absolute; left: 8px; }
 /* routing (the 303 app's strip): the block diagram on the left, the two switches stacked on the right */
-.fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: 24px; border-top: 1px solid var(--line); }
+.fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: var(--fx-sp); border-top: 1px solid var(--line); }
 .route-dia { width: 586px; height: 64px; flex: 0 1 auto; min-width: 0; overflow: visible; font-family: var(--f-lcd); }
 .route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
@@ -430,7 +434,8 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .slots button.playing { outline: 2px dashed var(--ink); outline-offset: 2px; }
 /* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
 .rmenu { position: relative; }
-.sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu { margin-left: 0; }
+.sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu, .sq-bank > .sq-side + .rmenu { margin-left: 0; }
+.sq-bank > .sq-side { margin-left: auto; margin-right: var(--gap); }   /* v0.20.0: randomise depth moved into the pattern row */
 .rm-btn { text-transform: none; }   /* Johnny: the menu buttons read "Randomise ▾" and "Tools ▾" */
 .rm-btn::after { content: " ▾"; }
 .fn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 70; min-width: 230px; display: flex; flex-direction: column; padding: 4px 0 6px;
@@ -487,9 +492,10 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 
 /* ---------- perform: the bender and transpose (arpeggio and the 101 sequencer were taken off in v0.13.2) ---------- */
 .perf101 { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
-.perf101 .grp { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 4px); padding: calc(var(--pad) - 6px) var(--pad) var(--pad); border-right: var(--rule); border-bottom: var(--rule); }
+.perf101 .grp { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--gap); padding: var(--pad); border-right: var(--rule); }
 .perf101 .grp:last-of-type { border-right: 0; }
 .perf101 .row { display: flex; gap: calc(var(--gap) + 6px); align-items: flex-start; flex-wrap: wrap; }
+#benderSlot .fdr { width: 5em; }   /* v0.20.0: equal columns so the three faders are evenly spaced */
 #benderSlot { flex: 1 1 auto; min-height: 0; align-items: stretch; flex-wrap: nowrap; gap: calc(var(--gap) * 4); justify-content: center; }
 .perf101 .row:has(.lever) { align-items: center; justify-content: center; gap: calc(var(--gap) * 3); }
 .lever { width: 180px; height: calc(var(--h) + 6px); border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; touch-action: none; cursor: ew-resize;
