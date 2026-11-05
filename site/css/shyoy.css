@@ -531,7 +531,12 @@ html.fit dialog#options { width: 1344px; height: 842px; inset: auto; left: 50%; 
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
 /* ---------- per-control step sequencer pop-up (v0.21.0, js/app/cseq.js; from Elixir Mobile's fader sequencers): a small
    card of the same glass over a dimmed screen. A control with one switched on gets a small square after its readout. ---------- */
-.fdr.cseq output::after, .dial.cseq output::after { content: ""; display: inline-block; width: .32em; height: .32em; margin-left: .22em; vertical-align: .12em; background: var(--ink); }
+/* v0.21.1 (Johnny): a control with a sequencer switched on has its name (on the strip, its readout) in an ink chip; while
+   it runs, the fill / ring stays at the control's setting and a marker shows the value heard */
+.fdr.cseq label, .dial.cseq label, .mslot .dial.cseq output { background: var(--ink); color: var(--glass); text-shadow: none; padding: 1px 5px 0; border-radius: 2px; }
+.fdr .sqm { display: none; position: absolute; left: -7px; right: -7px; height: 5px; bottom: calc(var(--m, 0) * 100% - 2.5px); background: var(--ink); box-shadow: 0 0 0 1.5px var(--glass); }
+.fdr .track.sq .sqm { display: block; }
+.dial .knob .sqm { fill: var(--ink); stroke: var(--glass); stroke-width: 1.4; paint-order: stroke; }
 html:has(dialog#cseq[open]) { overflow: hidden; }
 dialog#cseq { width: 620px; max-width: none; max-height: none; margin: auto; padding: 0; color: var(--ink); text-shadow: var(--shadow);
   border: 6px solid var(--bezel); border-radius: 12px; background-color: var(--glass);

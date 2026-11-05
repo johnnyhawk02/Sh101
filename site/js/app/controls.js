@@ -34,7 +34,7 @@ function fader(def, mount) {
   const id = def.f, store = def.bend ? state.bend : null;
   const get = () => (def.bend ? state.bend : state.params)[id];
   const el = document.createElement('div'); el.className = 'fdr' + (def.bend ? ' bend' : '');
-  el.innerHTML = `<div class="track" role="slider" tabindex="0" id="f-${id}" aria-label="${def.label}" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="ticks"></div><div class="cap"></div></div><label for="f-${id}">${def.label}</label><output></output>`;
+  el.innerHTML = `<div class="track" role="slider" tabindex="0" id="f-${id}" aria-label="${def.label}" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div><div class="sqm"></div><div class="ticks"></div><div class="cap"></div></div><label for="f-${id}">${def.label}</label><output></output>`;
   const tr = el.querySelector('.track'), cap = el.querySelector('.cap'), out = el.querySelector('output');
   const key = def.bend ? 'b:' + id : id;
   // paint: what the fader shows (its setting, or the value heard while its step sequencer runs)
@@ -71,7 +71,9 @@ function fader(def, mount) {
   mount.appendChild(el);
   (def.bend ? bui : ui)[id] = v => set(v, false);
   set(get(), false);
-  ctlReg(key, el, { paint, target: tr, cancel: () => { drag = null; }, get, set });
+  // the step sequencer's value heard, a marker across the track (null: none)
+  const mod = (v) => { tr.classList.toggle('sq', v != null); if (v != null) tr.style.setProperty('--m', v); };
+  ctlReg(key, el, { paint, mod, target: tr, cancel: () => { drag = null; }, get, set });
 }
 // A dial (the 303 app's look): a ring of wedge segments lit up to the value, readout above, label below.
 // Vertical drag (Shift = fine), arrows / Page keys, Home/End, double-click resets.
@@ -87,7 +89,7 @@ function dial(def, mount) {
   const id = def.f, get = () => state.params[id];
   const el = document.createElement('div'); el.className = 'dial';
   el.innerHTML = `<output></output><div class="knob" role="slider" tabindex="0" id="f-${id}" aria-label="${def.label}" aria-valuemin="0" aria-valuemax="100">` +
-    `<svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk" d="${DIAL_ALL.join('')}"/><path class="arc" d=""/></svg></div><label for="f-${id}">${def.label}</label>`;
+    `<svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk" d="${DIAL_ALL.join('')}"/><path class="arc" d=""/><path class="sqm" d=""/></svg></div><label for="f-${id}">${def.label}</label>`;
   const kn = el.querySelector('.knob'), arc = el.querySelector('.arc'), out = el.querySelector('output');
   const paint = (v) => {
     const n = Math.round(v * DIAL_SEGS); arc.setAttribute('d', n ? DIAL_LIT[n - 1] : '');
@@ -117,7 +119,15 @@ function dial(def, mount) {
   mount.appendChild(el);
   ui[id] = v => set(v, false);
   set(get(), false);
-  ctlReg(id, el, { paint, target: kn, cancel: end, get, set });
+  // the step sequencer's value heard: a pointer across the ring (null: none)
+  const sqm = el.querySelector('.sqm');
+  const mod = (v) => {
+    if (v == null) { sqm.setAttribute('d', ''); return; }
+    const a = (DIAL_A0 + v * DIAL_SWEEP - 90) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), w = 2.1;
+    const p = (r, d) => `${(32 + r * c - d * s).toFixed(2)} ${(32 + r * s + d * c).toFixed(2)}`;
+    sqm.setAttribute('d', `M${p(13, -w)}L${p(35, -w)}L${p(35, w)}L${p(13, w)}Z`);
+  };
+  ctlReg(id, el, { paint, mod, target: kn, cancel: end, get, set });
 }
 const bui = {};
 function switcher(def, mount) {

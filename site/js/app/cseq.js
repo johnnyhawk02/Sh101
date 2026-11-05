@@ -35,18 +35,20 @@ const cseqIsBend = (key) => key.startsWith('b:');
 const cseqBase = (key) => (cseqIsBend(key) ? state.bend[key.slice(2)] : state.params[key]);
 const cseqHeard = (key) => { const L = cseqLive[key], q = state.cseq[key], b = cseqBase(key);
   return L && q ? Math.max(0, Math.min(1, b + L.off * q.depth / 100)) : b; };
-const cseqPaint = (key, v) => { for (const r of ctlRegs[key] || []) if (r.el.isConnected) r.paint(v); };
+// a control shows its setting (fill, ring, readout) and, while its sequencer runs, the value heard as a marker
+const cseqPaint = (key) => { const b = cseqBase(key), h = cseqLive[key] ? cseqHeard(key) : null;
+  for (const r of ctlRegs[key] || []) if (r.el.isConnected) { r.paint(b); r.mod(h); } };
 function cseqSend(key) {
   if (!cseqIsBend(key)) { post({ type: 'param', id: key, v: cseqHeard(key) }); return; }
   const b = { ...state.bend }; for (const k in cseqLive) if (cseqIsBend(k)) b[k.slice(2)] = cseqHeard(k);
   post({ type: 'bend', b: bendPhysical(b) });
 }
 // the value heard: the setting moved by the current offset
-function cseqApply(key) { cseqPaint(key, cseqHeard(key)); cseqSend(key); }
+function cseqApply(key) { cseqPaint(key); cseqSend(key); }
 // back to the setting, the sequencer let go
 function cseqRelease(key) {
   if (!cseqLive[key]) return;
-  delete cseqLive[key]; cseqPaint(key, cseqBase(key)); cseqSend(key);
+  delete cseqLive[key]; cseqPaint(key); cseqSend(key);
 }
 const cseqReleaseAll = () => { for (const k of Object.keys(cseqLive)) cseqRelease(k); };
 // a hand (or MIDI) move of a control whose sequencer is running: it moves the setting, and the steps play round it

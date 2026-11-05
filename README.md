@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Sequenced controls show it (v0.21.1)
+
+A control with its step sequencer switched on has its name in an ink chip (on the strip, where the dials have no name, its readout). While the pattern runs, the fill, ring and readout stay at the control's own setting, and a marker shows the value being heard: a bar across a fader's track, a pointer across a dial's ring. The small square after the readout is gone.
+
 ### Per-control step sequencers (v0.21.0)
 
 From Elixir Mobile's fader sequencers, as a pop-up. Hold any fader or dial for half a second (a move of more than 6 px cancels it), or right-click it, and its own step sequencer opens over a dimmed screen: page buttons (1-16 to 49-64), 16 steps in two rows of eight (drag to paint; the height is the step's offset from the control's setting, the middle is none; steps past the length are dimmed, the one playing outlined), then length (2-64), slew (off to a whole step), speed (a 16th up to 8 bars) and depth (±0-100% of the control's range), and Randomise with its kind (random, drunk, wobbly, ramp, s&h, sparse). Done, Esc or a click outside closes it. Keys: Left / Right pick a step, Up / Down nudge it, 1-4 pick the page, R randomises.
