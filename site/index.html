@@ -29,7 +29,7 @@ try {
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.19.2</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.19.3</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -79,9 +79,9 @@ try {
             <span class="bk-lab">pattern</span>
             <div class="slots" id="slots" role="group" aria-label="Pattern slots"><button type="button" data-n="0" aria-pressed="false">1</button><button type="button" data-n="1" aria-pressed="false">2</button><button type="button" data-n="2" aria-pressed="false">3</button><button type="button" data-n="3" aria-pressed="false">4</button><button type="button" data-n="4" aria-pressed="false">5</button><button type="button" data-n="5" aria-pressed="false">6</button><button type="button" data-n="6" aria-pressed="false">7</button><button type="button" data-n="7" aria-pressed="false">8</button></div>
             <div class="chain-read" id="chain-read" hidden><span class="ch-list"></span><button type="button" id="chain-clear" aria-label="Clear chain">×</button></div>
-            <!-- step length (gate) as a menu, Johnny v0.19.2; the Gate slider above stays, hidden, and the menu sets it -->
-            <div class="rmenu"><button type="button" class="rm-btn" id="gm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="gm-menu">Step len <span id="gm-val">50%</span></button><div class="fn-menu" id="gm-menu" role="menu" aria-label="Step length" hidden>
-              <span class="mh" role="presentation">step length</span>
+            <!-- step length (gate) as a menu, Johnny v0.19.3; the Gate slider above stays, hidden, and the menu sets it -->
+            <div class="rmenu"><button type="button" class="rm-btn" id="gm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="gm-menu">Gate <span id="gm-val">50%</span></button><div class="fn-menu" id="gm-menu" role="menu" aria-label="Gate" hidden>
+              <span class="mh" role="presentation">gate</span>
               <button type="button" role="menuitemradio" aria-checked="false" data-gate="10">10%</button>
               <button type="button" role="menuitemradio" aria-checked="false" data-gate="25">25%</button>
               <button type="button" role="menuitemradio" aria-checked="false" data-gate="50">50%</button>
@@ -194,7 +194,7 @@ try {
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.19.2</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.19.3</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>

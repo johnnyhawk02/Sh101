@@ -49,7 +49,7 @@
       }
     });
   });
-  // Step len: each choice sets the (hidden) Gate slider and fires its input, so the gate code path is the same as before
+  // Gate menu: each choice sets the (hidden) Gate slider and fires its input, so the gate code path is the same as before
   for (const b of document.querySelectorAll('#gm-menu [data-gate]')) b.onclick = () => {
     const el = document.querySelector('input[data-a=gate]'); el.value = b.dataset.gate; el.dispatchEvent(new Event('input', { bubbles: true }));
   };
