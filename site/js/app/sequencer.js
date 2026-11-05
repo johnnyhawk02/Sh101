@@ -122,18 +122,8 @@ function preview(i) {
   post({ type: 'noteOn', n }); clearTimeout(prevT); prevT = setTimeout(() => post({ type: 'noteOff', n }), 160);
 }
 const keepUndo = () => { undoBuf = JSON.stringify({ steps: state.steps, tail }); };
-// length, gate and swing are plain sliders; shift and transpose are spring-loaded:
-// they act relative to the pattern as it was when the drag began, then snap back to 0
+// length, gate and swing are plain sliders (the Shift and Transpose spring sliders gave way to the D-pad under the roll)
 const sideIn = {}; for (const el of document.querySelectorAll('.sld input')) sideIn[el.dataset.a] = el;
-let sprBase = null;
-const sprReset = () => { sprBase = null; for (const a of ['shift', 'tr']) { sideIn[a].value = 0; document.getElementById('o-' + a).textContent = '0'; } };
-for (const a of ['shift', 'tr']) {
-  const el = sideIn[a];
-  el.addEventListener('pointerdown', () => { sprBase = state.steps.map(st => ({ ...st })); });
-  el.addEventListener('focus', () => { if (!sprBase) sprBase = state.steps.map(st => ({ ...st })); });
-  el.addEventListener('change', () => { if (el.matches(':focus-visible')) return; sprReset(); });
-  el.addEventListener('pointerup', sprReset); el.addEventListener('pointercancel', sprReset); el.addEventListener('blur', sprReset);
-}
 document.querySelector('.sq-side').addEventListener('input', e => {
   const el = e.target.closest('input[data-a]'); if (!el) return;
   const v = +el.value, P = state.steps, p = state.params;
@@ -141,19 +131,6 @@ document.querySelector('.sq-side').addEventListener('input', e => {
     case 'len': while (P.length > v && P.length > 1) tail.unshift(P.pop()); extendTo(v); break;
     case 'gate': p.gateLen = (v / 100 - 0.1) / 0.85; break;
     case 'swing': p.swing = v / 100; break;
-    case 'shift': {
-      if (!sprBase || sprBase.length !== P.length) sprBase = P.map(st => ({ ...st }));
-      const n = sprBase.length, k = ((v % n) + n) % n;
-      state.steps = sprBase.map((_, i) => ({ ...sprBase[(i - k + n) % n] }));
-      document.getElementById('o-shift').textContent = (v > 0 ? '+' : '') + v; break;
-    }
-    case 'tr': {
-      if (!sprBase || sprBase.length !== P.length) sprBase = P.map(st => ({ ...st }));
-      const pit = sprBase.map(st => st.n + 12 * st.o), lo = Math.min(...pit), hi = Math.max(...pit);
-      const d = Math.max(-24 - lo, Math.min(35 - hi, v));
-      state.steps = sprBase.map(st => { const c = { ...st }; setPitch(c, st.n + 12 * st.o + d); return c; });
-      document.getElementById('o-tr').textContent = (d > 0 ? '+' : '') + d; break;
-    }
   }
   stepChanged();
 });
@@ -169,20 +146,33 @@ document.getElementById('p-shuf').onclick = () => {
   for (let i = 0; i < P.length; i++) if (P[i].m === 'T' && i === 0) P[i].m = 'N';
   tail = []; stepChanged();
 };
-// Random: a minor-pentatonic line around the root, mostly notes, some rests and ties, accents on strong beats
+// Generate (from the TB-303 app): a new riff from the real acid basslines in patterns.js. It keeps the pattern's length but
+// writes all 64 steps; the steps past the length go into tail, so lengthening the pattern brings in more of the riff.
 document.getElementById('p-rnd').onclick = () => {
-  keepUndo(); const len = Math.max(16, Math.ceil(state.steps.length / 16) * 16), scale = [0, 3, 5, 7, 10];
-  const P = []; let prev = null;
-  for (let i = 0; i < len; i++) {
-    const r = Math.random(), m = i > 0 && r < 0.12 ? 'T' : r < 0.25 ? 'R' : 'N';
-    let v = scale[Math.floor(Math.random() * scale.length)] + (Math.random() < 0.2 ? 12 : Math.random() < 0.12 ? -12 : 0);
-    if (i % 4 === 0 && Math.random() < 0.5) v = 0;
-    const st = { n: 0, o: 0, m, a: (i % 4 === 0 ? 0.45 : 0.18) > Math.random(), s: Math.random() < 0.15 };
-    if (m === 'T' && prev) { st.n = prev.n; st.o = prev.o; } else setPitch(st, v);
-    P.push(st); if (m !== 'R') prev = st;
-  }
-  state.steps = P; tail = []; stepChanged();
+  keepUndo(); const g = generatePattern(SEQ_MAX), n = state.steps.length;
+  state.steps = g.steps.slice(0, n); tail = g.steps.slice(n); stepChanged();
 };
+// Move notes (Tools menu, ] [ ⇧] ⇧[ , . and the D-pad). A real transpose: B up a semitone becomes C one octave up, and
+// ties and rests move with their notes. If any note would go past octave -2 C or octave +2 B, nothing moves.
+function nudgeNotes(d) {
+  const P = state.steps, pit = st => st.n + 12 * st.o, notes = P.filter(st => st.m !== 'R');
+  if (!notes.length || notes.some(st => pit(st) + d < -24 || pit(st) + d > 35)) return;
+  keepUndo();
+  // the hidden tail (past the length) moves too, so lengthening afterwards stays in the new key
+  for (const st of P.concat(tail)) setPitch(st, Math.max(-24, Math.min(35, pit(st) + d)));
+  stepChanged();
+}
+// Shift a step: the first step goes to the end (k = -1), or the last comes to the front (k = 1)
+function rotateSteps(k) {
+  const P = state.steps, n = P.length; if (n < 2) return;
+  keepUndo(); state.steps = P.map((_, i) => P[(i - k + n) % n]); stepChanged();
+}
+// the cross under the roll: up and down move every note a semitone (Shift-click for an octave), left and right shift a step
+document.querySelector('.dpad').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.nudge) nudgeNotes(+b.dataset.nudge * (e.shiftKey ? 12 : 1));
+  else if (b.dataset.rot) rotateSteps(+b.dataset.rot);
+});
 // Randomise one row (oct / slide / acc / tie): the notes stay, only that row is dealt again, as wild as Rnd depth.
 // Ties take the pitch of the note before them, so repeated tie presses start again from the pattern before the first press.
 const sqDepthEl = document.getElementById('sqRndDepth'), sqDepthOut = document.getElementById('o-sqRndDepth');

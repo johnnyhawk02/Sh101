@@ -19,12 +19,18 @@
     ['rm-btn', 'KeyR', 'alt'], ['tm-btn', 'KeyT', 'alt'],
     ['r-acc', 'KeyA', 'alt'], ['r-slide', 'KeyS', 'alt'], ['r-oct', 'KeyO', 'alt'], ['r-tie', 'KeyI', 'alt'],
     ['a-acc', 'KeyA', 'shift alt'], ['a-slide', 'KeyS', 'shift alt'], ['a-oct', 'KeyO', 'shift alt'], ['a-tie', 'KeyI', 'shift alt'],
-    ['p-shuf', 'KeyH', 'alt'], ['p-rnd', 'KeyG', 'alt'],
+    ['p-shuf', 'KeyH', 'alt'], ['p-rnd', 'KeyG', 'alt'], ['p-refill', 'KeyG', 'shift alt'],
     ['p-copy', 'KeyC', 'cmd'], ['p-paste', 'KeyV', 'cmd'], ['p-dup', 'KeyD', 'alt'], ['p-clr', 'Backspace', 'shift'], ['p-undo', 'KeyZ', 'cmd'],
+    // move notes: plain keys, since ] [ , and . aren't note keys
+    ['nu-up', 'BracketRight', ''], ['nu-dn', 'BracketLeft', ''], ['nu-oup', 'BracketRight', 'shift'], ['nu-odn', 'BracketLeft', 'shift'],
+    ['rot-l', 'Comma', ''], ['rot-r', 'Period', ''],
+    ['p-join', 'KeyJ', 'alt'],
   ].map(([id, code, mods]) => ({ id, code, cmd: mods.includes('cmd'), shift: mods.includes('shift'), alt: mods.includes('alt'),
     run: id === 'rm-btn' ? toggle(0) : id === 'tm-btn' ? toggle(1) : click(id) }));
+  [['nu-up', 1], ['nu-dn', -1], ['nu-oup', 12], ['nu-odn', -12]].forEach(([id, d]) => { document.getElementById(id).onclick = () => nudgeNotes(d); });
+  [['rot-l', -1], ['rot-r', 1]].forEach(([id, k]) => { document.getElementById(id).onclick = () => rotateSteps(k); });
   const keyName = (a) => {
-    const k = a.code === 'Backspace' ? (mac ? '⌫' : 'Backspace') : a.code.slice(3);
+    const k = a.code === 'Backspace' ? (mac ? '⌫' : 'Backspace') : { BracketRight: ']', BracketLeft: '[', Comma: ',', Period: '.' }[a.code] || a.code.slice(3);
     return mac ? (a.cmd ? '⌘' : '') + (a.shift ? '⇧' : '') + (a.alt ? '⌥' : '') + k
                : (a.cmd ? 'Ctrl+' : '') + (a.shift ? 'Shift+' : '') + (a.alt ? 'Alt+' : '') + k;
   };

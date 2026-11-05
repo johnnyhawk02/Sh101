@@ -74,11 +74,19 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.6), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.14.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Sequencer extras from the TB-303 app: Generate, Refill slots, move notes, D-pad, Join chain (v0.14.0)
+
+- **Generate** (Randomise, ⌥G; was New pattern): `js/app/patterns.js` holds the TB-303 app's `patterns.json` (ABL3 and Phoscyon factory patterns) as `PATTERN_BANK`; `js/app/generate.js` turns each into Shyoy steps (`n = code % 12`, `o = floor(code / 12) - 2`, rests keep the pitch before them) and ports `generatePattern` and its four moves (loop, reverse, double, swap). It keeps the pattern's length but writes all 64 steps, the rest into `tail`, so lengthening brings in more riff. About 1 in 10 notes that repeat the pitch before them become ties.
+- **Auto slots**: a slot Generate filled by itself carries `auto: true` until its steps are edited. On load every empty slot except the current one gets a 16-step generated pattern. **Refill slots** (Randomise, ⇧⌥G) regenerates every auto or empty slot, never the current one or an edited one; no Undo.
+- **Move notes** (Tools): up/down a semitone (] [), an octave (⇧] ⇧[), shift a step left/right (, .). A real transpose (B up becomes C an octave up), ties and rests move along; if any note would leave octave -2 C to octave +2 B nothing moves. Shifting rotates the pattern.
+- **D-pad** under the roll at the right: ▲▼ a semitone (Shift-click an octave), ◀▶ a step. It replaces the Shift and Transpose spring sliders.
+- **Join chain and copy** (Tools, ⌥J): the chained slots in order as one pattern of up to 64 steps, with the first slot's swing and gate, onto the Copy/Paste clipboard and the system clipboard as `{ app: 'kestrel-ms1', steps }`. No chain: the current slot.
 
 ### Options sheet and MIDI CC (v0.13.6)
 
