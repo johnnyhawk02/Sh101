@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#161815">
+<script>
+// glass colours before first paint (Colours… in the ≡ menu): the swatch, and Mono or Grey + colour (on unless saved "mono")
+try {
+  const rd = (k) => { const v = localStorage.getItem('kestrel.' + k); try { return JSON.parse(v); } catch (e) { return v; } };
+  const t = rd('lcdTheme'), m = rd('lcdMode'), el = document.documentElement;
+  el.dataset.lcd = ['green', 'orange', 'amber', 'blue', 'red', 'grey'].includes(t) ? t : 'green';
+  el.dataset.lcdmode = m === 'mono' ? 'mono' : 'colour';
+} catch (e) {}
+</script>
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 </head>
@@ -23,15 +32,21 @@
 :root {
   --case: #161815;
   --bezel: #0b0c0a;
-  --glass: #c3d83a;   /* yellow-green backlit LCD (Johnny, v0.9.1) */
-  --ink: #0a0f04;
-  --muted: rgba(10, 15, 4, .72);
-  --ghost: rgba(10, 15, 4, .13);
-  --tint: rgba(10, 15, 4, .07);
-  --lit: rgba(195, 216, 58, .72);   /* glass-coloured text on an ink strip, dimmed */
-  --line: rgba(10, 15, 4, .42);
+  /* the glass: every colour on it comes from these triplets, so a theme only swaps them (see the themes below) */
+  --glass-rgb: 195 216 58;   /* yellow-green backlit LCD (Johnny, v0.9.1) */
+  --ink-rgb: 10 15 4;
+  --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;            /* the backlight's pale haze */
+  --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12;  /* shade at the top and in the corners */
+  --acc: #5f7f00;            /* the spot colour this swatch brings to Grey + colour */
+  --glass: rgb(var(--glass-rgb));
+  --ink: rgb(var(--ink-rgb));
+  --muted: rgb(var(--ink-rgb) / .72);
+  --ghost: rgb(var(--ink-rgb) / .13);
+  --tint: rgb(var(--ink-rgb) / .07);
+  --lit: rgb(var(--glass-rgb) / .72);   /* glass-coloured text on an ink strip, dimmed */
+  --line: rgb(var(--ink-rgb) / .42);
   --rule: 1px solid var(--line);
-  --shadow: 2px 2px 0 rgba(10, 15, 4, .17);
+  --shadow: 2px 2px 0 rgb(var(--ink-rgb) / .17);
   --f-lcd: "VT323", ui-monospace, "SF Mono", Menlo, monospace;
   /* scale */
   --bw: 2px;          /* outline weight */
@@ -51,6 +66,30 @@
     --fs-xs: 11px; --fs-s: 13px; --fs: 15px; --fs-l: 16px; --fs-xl: 22px; --trk: 16px; --trk-min: 30px; }
 }
 
+/* ---------- glass themes: Colours… in the ≡ menu ----------
+   Mono: one ink on one coloured glass (the swatch is the glass). Grey + colour (the default): black ink on grey glass,
+   and the swatch is one deep spot colour, like a printed filter on a real LCD, on a few small things only:
+   Run while running, the open tab, the pattern in use and the step playing, FX power when on, lit switch LEDs.
+   Dials, faders and sliders always stay ink. The head script sets data-lcd and data-lcdmode before first paint. */
+:root[data-lcd=green] { --glass-rgb: 195 216 58; --ink-rgb: 10 15 4; --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;
+  --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12; --acc: #5f7f00; }
+:root[data-lcd=orange] { --glass-rgb: 250 161 66; --ink-rgb: 28 10 0; --hl1-rgb: 255 236 200; --hl2-rgb: 255 228 190;
+  --dk1-rgb: 64 32 10; --dk2-rgb: 48 24 6; --dk3-rgb: 32 14 2; --acc: #d0600a; }
+:root[data-lcd=amber] { --glass-rgb: 244 194 74; --ink-rgb: 30 21 0; --hl1-rgb: 255 246 200; --hl2-rgb: 255 240 190;
+  --dk1-rgb: 62 46 12; --dk2-rgb: 46 34 8; --dk3-rgb: 30 22 4; --acc: #b58300; }
+:root[data-lcd=blue] { --glass-rgb: 123 182 226; --ink-rgb: 3 17 42; --hl1-rgb: 225 242 255; --hl2-rgb: 215 236 255;
+  --dk1-rgb: 20 40 70; --dk2-rgb: 14 30 55; --dk3-rgb: 8 20 40; --acc: #2a63ae; }
+:root[data-lcd=red] { --glass-rgb: 242 107 82; --ink-rgb: 34 4 3; --hl1-rgb: 255 225 210; --hl2-rgb: 255 215 200;
+  --dk1-rgb: 70 20 14; --dk2-rgb: 52 14 10; --dk3-rgb: 36 8 6; --acc: #c2352a; }
+:root[data-lcd=grey] { --glass-rgb: 211 214 204; --ink-rgb: 18 20 16; --hl1-rgb: 255 255 248; --hl2-rgb: 250 252 244;
+  --dk1-rgb: 45 48 40; --dk2-rgb: 34 36 30; --dk3-rgb: 22 24 18; --acc: var(--ink); }
+:root[data-lcdmode=colour] { --glass-rgb: 211 214 204; --ink-rgb: 18 20 16; --hl1-rgb: 255 255 248; --hl2-rgb: 250 252 244;
+  --dk1-rgb: 45 48 40; --dk2-rgb: 34 36 30; --dk3-rgb: 22 24 18; --accent: var(--acc); }
+[data-lcdmode=colour] .btn.play.on, [data-lcdmode=colour] .slots button[aria-pressed=true],
+[data-lcdmode=colour] .fxu .onoff[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--glass); }
+[data-lcdmode=colour] .tabs button[aria-selected="true"], [data-lcdmode=colour] .roll .hd.cur { background: var(--accent); color: var(--glass); }
+[data-lcdmode=colour] .sw button[aria-pressed="true"] .led { background: var(--accent); }
+
 * { box-sizing: border-box; }
 html, body { background: var(--case); color: var(--glass); margin: 0; }
 body { background-image: radial-gradient(120% 60% at 50% 0%, #2a2d28, var(--case)); background-repeat: no-repeat;
@@ -65,11 +104,11 @@ button, table, input, select { font: inherit; color: inherit; }
   background-color: var(--glass);
   background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
     repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px),
-    radial-gradient(60% 30% at 10% 100%, rgba(255,252,195,.55), rgba(255,252,200,0) 70%),
-    radial-gradient(50% 28% at 90% 102%, rgba(250,255,200,.4), rgba(250,255,205,0) 70%),
-    radial-gradient(38% 20% at 70% 30%, rgba(40,50,25,.14), rgba(40,50,25,0) 70%),
-    linear-gradient(180deg, rgba(30,38,20,.2) 0%, rgba(30,38,20,0) 22%),
-    radial-gradient(130% 100% at 50% 60%, rgba(0,0,0,0) 60%, rgba(20,26,12,.28) 100%);
+    radial-gradient(60% 30% at 10% 100%, rgb(var(--hl1-rgb) / .55), rgb(var(--hl1-rgb) / 0) 70%),
+    radial-gradient(50% 28% at 90% 102%, rgb(var(--hl2-rgb) / .4), rgb(var(--hl2-rgb) / 0) 70%),
+    radial-gradient(38% 20% at 70% 30%, rgb(var(--dk1-rgb) / .14), rgb(var(--dk1-rgb) / 0) 70%),
+    linear-gradient(180deg, rgb(var(--dk2-rgb) / .2) 0%, rgb(var(--dk2-rgb) / 0) 22%),
+    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / .28) 100%);
   box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset -4px 0 10px rgba(0,0,0,.15), 0 18px 40px rgba(0,0,0,.5); }
 .lower { display: contents; }
 
@@ -114,7 +153,7 @@ select.btn option { color: #000; }
 .fdr .track { position: relative; flex: 1 1 0; width: var(--trk); min-height: var(--trk-min); cursor: ns-resize; touch-action: none;
   background: repeating-linear-gradient(0deg, var(--ghost) 0 5px, transparent 5px 7px); }
 .fdr .fill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--v, 0) * 100%);
-  background: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px); background-position: bottom; filter: drop-shadow(2px 2px 0 rgba(10,15,4,.17)); }
+  background: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px); background-position: bottom; filter: drop-shadow(2px 2px 0 rgb(var(--ink-rgb) / .17)); }
 .fdr .ticks, .fdr .cap { display: none; }
 .fdr label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
 .fdr output { font-size: var(--fs-xs); color: var(--muted); min-height: 1em; line-height: 1; white-space: nowrap; text-shadow: none; font-variant-numeric: tabular-nums; }
@@ -164,11 +203,37 @@ select.btn option { color: #000; }
 .appmenu { position: relative; }
 .appmenu .btn { width: var(--h-top); padding: 0; font-size: calc(var(--fs-l) + 2px); }
 .menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; min-width: 200px; display: flex; flex-direction: column; padding: 4px;
-  background: var(--glass); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgba(10,15,4,.25), 0 10px 30px rgba(0,0,0,.35); }
+  background: var(--glass); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.35); }
 .menu-pop[hidden] { display: none; }
 .menu-pop button { appearance: none; background: none; border: 0; text-align: left; padding: 4px 8px; font-size: var(--fs); color: var(--ink); cursor: pointer; text-transform: lowercase; border-radius: 2px; }
 .menu-pop button:hover, .menu-pop button:focus-visible { background: var(--ink); color: var(--glass); text-shadow: none; outline: 0; }
 .menu-ver { font-size: var(--fs-xs); color: var(--muted); padding: 4px 8px 2px; border-top: var(--rule); margin-top: 4px; }
+
+/* Colours… panel: mode switch and six swatches, each drawn in its own Mono glass and ink */
+.lcd-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s) var(--gap-s) calc(var(--gap-s) + 2px);
+  background: var(--glass); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.35); text-shadow: none; }
+.lcd-pop[hidden] { display: none; }
+.lcd-pop h3 { margin: 0; padding: 0 var(--gap-s) 0 calc(var(--gap-s) + 2px); background: var(--ink); color: var(--glass); border-radius: var(--r);
+  font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; text-transform: lowercase; }
+.lcd-mode { display: flex; align-items: center; gap: var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
+.lcd-mode .lab { color: var(--muted); }
+.lcd-seg { display: inline-flex; }
+.lcd-seg button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-right-width: 0; border-radius: 0; color: var(--ink); height: var(--h);
+  padding: 0 calc(var(--gap-s) + 6px); font: inherit; font-size: var(--fs); line-height: 1; text-transform: lowercase; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lcd-seg button:first-child { border-radius: var(--r) 0 0 var(--r); } .lcd-seg button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
+.lcd-seg button[aria-pressed="true"] { background: var(--ink); color: var(--glass); }
+.lcd-sws { display: flex; gap: var(--gap-s); }
+.lcd-sw { appearance: none; position: relative; display: flex; flex-direction: column; gap: 4px; width: calc(var(--fs) * 4.2); padding: 4px 5px 3px; cursor: pointer;
+  background: var(--sg); color: var(--si); border: var(--bw) solid rgb(var(--ink-rgb) / .2); border-radius: var(--r); font: inherit; font-size: var(--fs-s); line-height: 1;
+  text-transform: lowercase; text-align: left; -webkit-tap-highlight-color: transparent; }
+.lcd-sw[aria-checked="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.lcd-sw[aria-checked="true"]::after { content: "✓"; position: absolute; top: -7px; right: -6px; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; font-size: var(--fs-xs); line-height: 1; }
+.lcd-sw:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.lcd-sw .bars { display: flex; align-items: flex-end; gap: 3px; height: calc(var(--fs) * 1.4); }
+.lcd-sw .bars i { flex: 1; height: var(--b); background: repeating-linear-gradient(0deg, var(--si) 0 3px, transparent 3px 5px); background-position: bottom; }
+.lcd-sw[data-t=green] { --sg: #c3d83a; --si: #0a0f04; } .lcd-sw[data-t=orange] { --sg: #faa142; --si: #1c0a00; }
+.lcd-sw[data-t=amber] { --sg: #f4c24a; --si: #1e1500; } .lcd-sw[data-t=blue] { --sg: #7bb6e2; --si: #03112a; }
+.lcd-sw[data-t=red] { --sg: #f26b52; --si: #220403; } .lcd-sw[data-t=grey] { --sg: #d3d6cc; --si: #121410; }
 
 /* preset menu (from the 303 app), drawn as LCD */
 .presets { position: relative; display: flex; align-items: center; gap: var(--gap-s); }
@@ -182,7 +247,7 @@ select.btn option { color: #000; }
 .pm .pm-step { padding: 0 8px; font-size: var(--fs-xs); border-left-width: 0; border-radius: 0; }
 .pm .pm-step:last-of-type { border-radius: 0 var(--r) var(--r) 0; }
 .pm-pop { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; width: 340px; max-height: min(62vh, 460px); display: flex; flex-direction: column;
-  background: var(--glass); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgba(10,15,4,.25), 0 10px 30px rgba(0,0,0,.45); text-shadow: none; }
+  background: var(--glass); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); box-shadow: 4px 4px 0 rgb(var(--ink-rgb) / .25), 0 10px 30px rgba(0,0,0,.45); text-shadow: none; }
 .pm-pop[hidden] { display: none; }
 .pm .pm-qrow { display: flex; gap: 6px; margin: 6px; }
 .pm .pm-q { flex: 1; min-width: 0; }
@@ -332,20 +397,20 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .rollwrap { flex: 1 1 auto; min-height: 0; overflow-x: auto; scrollbar-width: thin; }
 .roll { display: grid; grid-template-columns: calc(var(--fs) * 2.2) repeat(var(--steps, 32), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr);
   width: 100%; height: 100%; min-width: 0; border: var(--bw) solid var(--ink); user-select: none; -webkit-user-select: none; text-shadow: none; }
-.roll > * { border: 0; border-right: 1px solid rgba(10,15,4,.28); border-bottom: 1px solid rgba(10,15,4,.28); padding: 0; background: transparent; color: var(--ink);
+.roll > * { border: 0; border-right: 1px solid rgb(var(--ink-rgb) / .28); border-bottom: 1px solid rgb(var(--ink-rgb) / .28); padding: 0; background: transparent; color: var(--ink);
   min-width: 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); line-height: 1; border-radius: 0; }
 .roll .rh { justify-content: flex-start; padding-left: 5px; border-right: var(--bw) solid var(--ink); text-transform: lowercase; white-space: nowrap; }
 .roll .blk { background: var(--tint); }
-.roll .rh.blk { background: rgba(10,15,4,.17); }
-.roll .bar { border-right-color: rgba(10,15,4,.6); }
-.roll .gap { border-bottom: var(--bw) solid rgba(10,15,4,.65); }
+.roll .rh.blk { background: rgb(var(--ink-rgb) / .17); }
+.roll .bar { border-right-color: rgb(var(--ink-rgb) / .6); }
+.roll .gap { border-bottom: var(--bw) solid rgb(var(--ink-rgb) / .65); }
 .roll button { cursor: pointer; }
 .roll button[data-t] { touch-action: none; }
 .roll button:focus-visible { outline: 2px dashed var(--ink); outline-offset: -3px; }
 .roll .hd { font-size: var(--fs-xs); justify-content: flex-start; padding-left: 4px; }
 .roll .hd.sel { outline: 2px dashed var(--ink); outline-offset: -3px; }
 .roll .hd.cur { background: var(--ink); color: var(--glass); }
-.roll .cell.cur:not(.on) { background: rgba(10,15,4,.3); }
+.roll .cell.cur:not(.on) { background: rgb(var(--ink-rgb) / .3); }
 .roll .cell.on { background: var(--ink); box-shadow: inset 0 0 0 1px var(--glass); }
 .roll .cell.on.cur { box-shadow: inset 0 0 0 2px var(--glass); }
 .roll .cell.tie { background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 5px); }
@@ -451,7 +516,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.12.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.13.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -473,9 +538,17 @@ body > .hint { display: none; }
       </div>
       <div class="appmenu"><button class="btn" id="menuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Menu">≡</button>
         <div class="menu-pop" id="menuPop" role="menu" hidden>
+          <button role="menuitem" id="mColours">Colours…</button>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.12.0</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.13.0</span>
+        </div>
+        <div class="lcd-pop" id="lcdPop" role="dialog" aria-labelledby="lcdH" hidden>
+          <h3 id="lcdH">colours</h3>
+          <div class="lcd-mode"><span class="lab">mode</span>
+            <div class="lcd-seg" role="group" aria-label="Mode"><button data-m="mono" aria-pressed="false">Mono</button><button data-m="colour" aria-pressed="true">Grey + colour</button></div>
+          </div>
+          <div class="lcd-sws" id="lcdSws" role="radiogroup" aria-label="Colour"></div>
         </div>
       </div>
     </div>
@@ -3375,68 +3448,125 @@ function presetMenu(host) {
 }
 const PM_TAGS = []; const pmTags = () => new Set();
 // ---------- preset auto-namer ----------
-// Five styles, often mixed: alien word-part mashups, messed-up desserts, cosmology, ancient Greek-ish,
-// and a last pass where each s turns into z 60% of the time.
+// A name is either two or three real words, or one made-up word: alien syllables spliced with a spice.
+// Big word pools (acid gear, weather, rocks, creatures, desserts, cosmos, Greek, spices...) so names rarely repeat.
+// A last pass turns each s into z 60% of the time.
 const NAMER = (() => {
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
   const chance = (p) => Math.random() < p;
-  const WORDS = ['squelch', 'acid', 'resonance', 'filter', 'bubble', 'sludge', 'wobble', 'circuit', 'diode', 'ladder', 'voltage', 'quantum',
-    'thunder', 'velvet', 'crystal', 'murmur', 'fractal', 'glimmer', 'plasma', 'mollusc', 'saxophone', 'lantern', 'whisper', 'cobalt'];
-  const A_PRE = ['zor', 'qua', 'vex', 'thra', 'xil', 'oom', 'kry', 'bla', 'nyx', 'gor', 'fen', 'plu', 'yth', 'ska', 'zub', 'mor', 'quee', 'drax'];
-  const A_MID = ['la', 'ri', 'on', 'ex', 'ub', 'ae', 'ix', 'ol', 'ee', 'aa', 'u', 'yo'];
-  const A_END = ['th', 'x', 'nok', 'ar', 'ium', 'ozz', 'eep', 'ul', 'orb', 'ak', 'ish', 'oid'];
+  const ADJ = ['acid', 'burnt', 'melted', 'sideways', 'haunted', 'soggy', 'inverted', 'radioactive', 'fermented', 'exploded', 'backwards', 'feral',
+    'damp', 'cursed', 'rusty', 'velvet', 'liquid', 'molten', 'frozen', 'hollow', 'crooked', 'electric', 'magnetic', 'toxic', 'lunar', 'solar',
+    'nocturnal', 'sticky', 'greasy', 'fuzzy', 'jagged', 'wobbly', 'squelchy', 'rubber', 'chrome', 'plastic', 'neon', 'infrared', 'ultraviolet',
+    'subsonic', 'sunken', 'drowned', 'feverish', 'lazy', 'nervous', 'angry', 'polite', 'sleepy', 'restless', 'forbidden', 'secret', 'lost',
+    'forgotten', 'ancient', 'broken', 'bent', 'twisted', 'spiral', 'crystal', 'golden', 'silver', 'copper', 'cobalt', 'crimson', 'violet',
+    'amber', 'emerald', 'obsidian', 'ivory', 'scarlet', 'ochre', 'indigo', 'saffron', 'turquoise', 'bitter', 'sour', 'salty', 'spicy', 'smoky',
+    'pickled', 'candied', 'toasted', 'roasted', 'sugared', 'slippery', 'dusty', 'muddy', 'misty', 'stormy', 'humid', 'arctic', 'tropical',
+    'volcanic', 'tidal', 'orbital', 'quantum', 'cosmic', 'astral', 'mutant', 'synthetic', 'analog', 'digital', 'resonant', 'detuned',
+    'overdriven', 'squashed', 'stretched', 'reversed', 'mirrored', 'phantom', 'ghostly', 'savage', 'gentle', 'humble', 'royal', 'imperial',
+    'rogue', 'stolen', 'borrowed', 'blessed', 'unholy', 'sacred', 'pagan', 'midnight', 'dawn', 'dusk', 'eternal', 'hungry', 'thirsty', 'dizzy',
+    'giddy', 'grumpy', 'brave', 'clumsy', 'tiny', 'giant', 'infinite', 'hyper', 'mega', 'micro', 'proto', 'turbo', 'deep', 'shallow', 'wet',
+    'dry', 'hot', 'cold', 'loose', 'tight', 'bouncy', 'elastic', 'warped', 'glitched', 'static', 'dynamic', 'hypnotic', 'psychic', 'strange'];
+  const NOUN = [
+    // acid gear
+    'squelch', 'resonance', 'filter', 'cutoff', 'envelope', 'accent', 'slide', 'glide', 'diode', 'ladder', 'voltage', 'circuit', 'transistor',
+    'capacitor', 'oscillator', 'sawtooth', 'pulse', 'sequencer', 'pattern', 'step', 'tempo', 'groove', 'bassline', 'feedback', 'overdrive', 'fuzz',
+    'reverb', 'echo', 'delay', 'phaser', 'flanger', 'sidechain', 'warehouse', 'rave', 'strobe', 'smiley', 'acid', 'loop', 'signal', 'static',
+    'sub', 'arpeggio', 'portamento', 'bender', 'keytar', 'battery', 'strap',
+    // nature, weather, rocks
+    'thunder', 'lightning', 'monsoon', 'hailstorm', 'drizzle', 'fog', 'tornado', 'avalanche', 'glacier', 'canyon', 'swamp', 'marsh', 'bog',
+    'lagoon', 'reef', 'tide', 'riptide', 'whirlpool', 'geyser', 'volcano', 'lava', 'magma', 'basalt', 'granite', 'quartz', 'obsidian', 'pumice',
+    'sulphur', 'mercury', 'cobalt', 'bismuth', 'graphite', 'ember', 'cinder', 'ash', 'moss', 'lichen', 'fungus', 'spore', 'mycelium', 'thorn',
+    'bramble', 'cactus', 'orchid', 'lotus', 'mangrove', 'tundra', 'dune', 'oasis', 'mirage', 'eclipse', 'aurora',
+    // creatures
+    'mollusc', 'octopus', 'squid', 'jellyfish', 'eel', 'lobster', 'barnacle', 'axolotl', 'newt', 'salamander', 'gecko', 'iguana', 'chameleon',
+    'toad', 'beetle', 'mantis', 'hornet', 'moth', 'cicada', 'scorpion', 'tarantula', 'leech', 'slug', 'snail', 'worm', 'badger', 'otter',
+    'weasel', 'ferret', 'wombat', 'platypus', 'armadillo', 'sloth', 'lemur', 'baboon', 'hyena', 'jackal', 'vulture', 'raven', 'heron', 'pelican',
+    'flamingo', 'penguin', 'walrus', 'narwhal', 'kraken', 'leviathan', 'basilisk', 'griffin', 'chimera', 'wyvern', 'goblin', 'gremlin', 'imp',
+    // things, places, odd bits
+    'lantern', 'saxophone', 'trombone', 'accordion', 'kazoo', 'theremin', 'bagpipe', 'harmonica', 'teapot', 'kettle', 'spoon', 'ladle', 'colander',
+    'umbrella', 'bicycle', 'tractor', 'submarine', 'zeppelin', 'rocket', 'satellite', 'robot', 'android', 'cyborg', 'reactor', 'turbine',
+    'furnace', 'boiler', 'engine', 'piston', 'gearbox', 'antenna', 'radar', 'sonar', 'laser', 'hologram', 'mirror', 'prism', 'lens', 'compass',
+    'labyrinth', 'temple', 'pyramid', 'ziggurat', 'monolith', 'obelisk', 'cathedral', 'bunker', 'lighthouse', 'harbour', 'carnival', 'circus',
+    'casino', 'disco', 'basement', 'attic', 'cellar', 'garage', 'motorway', 'tunnel', 'bridge', 'factory', 'refinery', 'laboratory', 'asylum',
+    'whisper', 'murmur', 'rumble', 'gurgle', 'wobble', 'bubble', 'sludge', 'goo', 'slime', 'jelly', 'custard', 'gravy', 'syrup', 'treacle',
+    'marmalade', 'pickle', 'noodle', 'dumpling', 'waffle', 'pancake', 'crumpet', 'biscuit', 'pretzel', 'doughnut', 'fudge', 'toffee', 'nougat',
+    // desserts
+    'tiramisu', 'pavlova', 'eclair', 'baklava', 'profiterole', 'trifle', 'cheesecake', 'sorbet', 'macaron', 'strudel', 'meringue', 'parfait',
+    'clafoutis', 'cannoli', 'gelato', 'souffle', 'banoffee', 'brulee', 'cobbler', 'crumble', 'flapjack', 'brownie', 'sundae', 'mousse',
+    // cosmos
+    'redshift', 'blueshift', 'horizon', 'quasar', 'pulsar', 'magnetar', 'baryon', 'neutrino', 'singularity', 'nebula', 'perihelion', 'aphelion',
+    'parsec', 'supernova', 'wormhole', 'cepheid', 'comet', 'asteroid', 'meteor', 'galaxy', 'cosmos', 'void', 'orbit', 'equinox', 'solstice',
+    'zenith', 'nadir', 'photon', 'graviton', 'muon', 'gluon', 'quark', 'boson', 'plasma', 'fractal', 'vortex', 'tesseract', 'paradox', 'entropy',
+    // Greek
+    'aether', 'logos', 'kairos', 'chronos', 'pneuma', 'eidolon', 'hubris', 'nous', 'telos', 'apeiron', 'kosmos', 'eros', 'thanatos', 'hypnos',
+    'agora', 'oracle', 'amphora', 'odyssey', 'hydra', 'gorgon', 'elysion', 'tartaros', 'delphi', 'ithaka', 'cyclops', 'minotaur', 'siren',
+    'titan', 'nemesis', 'medusa', 'icarus', 'prometheus', 'pandora', 'charon', 'styx', 'olympus', 'acropolis'];
+  const SPICE = ['cinnamon', 'cardamom', 'turmeric', 'saffron', 'nutmeg', 'clove', 'cumin', 'coriander', 'fenugreek', 'paprika', 'cayenne',
+    'chilli', 'pepper', 'ginger', 'galangal', 'sumac', 'zaatar', 'harissa', 'asafoetida', 'tamarind', 'anise', 'fennel', 'caraway', 'mace',
+    'allspice', 'juniper', 'vanilla', 'wasabi', 'mustard', 'nigella', 'ajwain', 'mahleb', 'grains of paradise', 'lemongrass', 'kaffir', 'sansho',
+    'sichuan', 'garam masala', 'ras el hanout', 'berbere', 'baharat', 'dukkah', 'chipotle', 'ancho', 'habanero', 'jalapeno', 'oregano', 'thyme',
+    'rosemary', 'tarragon', 'sage', 'marjoram', 'dill', 'lovage', 'liquorice', 'myrrh', 'frankincense', 'mastic', 'pandan', 'curry'];
+  // made-up syllables for the alien half
+  const A_PRE = ['zor', 'qua', 'vex', 'thra', 'xil', 'oom', 'kry', 'bla', 'nyx', 'gor', 'fen', 'plu', 'yth', 'ska', 'zub', 'mor', 'quee', 'drax',
+    'chth', 'xan', 'vor', 'glo', 'zha', 'kth', 'ul', 'yog', 'shub', 'nar', 'az', 'ix', 'thul', 'krel', 'vrr', 'oog', 'zee', 'phla', 'gri', 'ssk',
+    'tzo', 'ka', 'xo', 'ny', 'quo', 'zim', 'bru', 'dzo', 'wub', 'ruu', 'tlo', 'mnok', 'eek', 'ozz', 'fth', 'gla', 'pt', 'hra', 'jhe', 'lyx'];
+  const A_MID = ['la', 'ri', 'on', 'ex', 'ub', 'ae', 'ix', 'ol', 'ee', 'aa', 'u', 'yo', 'oz', 'ath', 'ul', 'ik', 'or', 'ei', 'uu', 'yr', 'ag', 'esh'];
+  const A_END = ['th', 'x', 'nok', 'ar', 'ium', 'ozz', 'eep', 'ul', 'orb', 'ak', 'ish', 'oid', 'onoz', 'ix', 'ux', 'yth', 'aal', 'orr', 'ek',
+    'oth', 'ulon', 'ax', 'iq', 'zz', 'oon', 'ra', 'ka', 'ii', 'ogg', 'esk', 'alq', 'umph', 'izz', 'ond', 'ath', 'yx'];
+  const vowel = (c) => /[aeiouy]/.test(c);
   // front of one word up to a vowel, back of another from a consonant, so the joint stays sayable
   const splice = (a, b) => {
-    const cuts = [...a.slice(1, -1)].map((c, i) => (/[aeiouy]/.test(c) ? i + 2 : 0)).filter(Boolean);
-    const tails = [...b.slice(1)].map((c, i) => (!/[aeiouy]/.test(c) ? i + 1 : 0)).filter(i => i && i >= b.length / 3);
+    const cuts = [...a.slice(1, -1)].map((c, i) => (vowel(c) ? i + 2 : 0)).filter(Boolean);
+    const tails = [...b.slice(1)].map((c, i) => (!vowel(c) ? i + 1 : 0)).filter(i => i && i >= b.length / 3);
     return a.slice(0, cuts.length ? pick(cuts) : 2) + b.slice(tails.length ? pick(tails) : b.length >> 1);
   };
-  const alien = () => {
-    if (chance(0.5)) { // splice the front of one word onto the back of another
-      const a = pick(WORDS), b = pick(WORDS);
-      return cap(splice(a, b));
-    }
-    let w = pick(A_PRE); if (chance(0.7)) w += pick(A_MID); w += pick(A_END);
-    return cap(w) + (chance(0.25) ? '-' + cap(pick(A_PRE) + pick(A_END)) : '');
-  };
-  const DESSERTS = ['Tiramisu', 'Pavlova', 'Eclair', 'Creme Brulee', 'Baklava', 'Panna Cotta', 'Profiterole', 'Trifle', 'Cheesecake', 'Sorbet',
-    'Macaron', 'Strudel', 'Meringue', 'Parfait', 'Clafoutis', 'Mille-feuille', 'Cannoli', 'Gelato', 'Souffle', 'Sticky Toffee', 'Banoffee', 'Tarte Tatin', 'Spotted Dick', 'Jelly'];
-  const MESS = ['Burnt', 'Melted', 'Sideways', 'Haunted', 'Soggy', 'Inverted', 'Radioactive', 'Fermented', 'Exploded', 'Backwards', 'Feral', 'Damp', 'Cursed', 'Upside-down'];
-  const dessert = () => {
-    const d = pick(DESSERTS), r = Math.random();
-    if (r < 0.3) return pick(MESS) + ' ' + d;
-    if (r < 0.55) return splice(d.replace(/ .*/, ''), pick(DESSERTS).replace(/ .*/, '').toLowerCase()); // Tiramiclair
-    if (r < 0.75) return d.replace(/[aeiou]/g, (v) => (chance(0.5) ? { a: 'o', e: 'u', i: 'a', o: 'e', u: 'i' }[v] : v)); // vowels slipped
-    if (r < 0.9) { const w = d.split(' '); w[0] = w[0].split('').reverse().join('').toLowerCase(); w[0] = cap(w[0]); return w.join(' '); } // backwards
-    return d + ' ' + pick(['Incident', 'Collapse', 'Mishap', 'Disaster', 'Situation']);
-  };
-  const COSMOS = ['Redshift', 'Event Horizon', 'Dark Matter', 'Inflaton', 'Quasar', 'Pulsar', 'Magnetar', 'Cosmic Web', 'Baryon', 'Hubble Flow',
-    'Accretion Disk', 'Neutrino', 'Singularity', 'Nebula', 'Perihelion', 'Aphelion', 'Parsec', 'Lagrange Point', 'Oort Cloud', 'Lensing',
-    'Big Crunch', 'Supernova', 'Blueshift', 'Dyson Sphere', 'Wormhole', 'Planck Epoch', 'Cepheid', 'Kuiper Belt', 'Dark Energy', 'Spaghettification'];
-  const cosmos = () => pick(COSMOS) + (chance(0.2) ? ' ' + pick(['Prime', 'Remnant', 'Drift', 'Echo', 'Zero']) : '');
-  const GREEK = ['Aether', 'Logos', 'Kairos', 'Chronos', 'Pneuma', 'Eidolon', 'Arete', 'Hubris', 'Nous', 'Telos', 'Apeiron', 'Kosmos', 'Chthonia',
-    'Eros', 'Thanatos', 'Hypnos', 'Mneme', 'Agora', 'Oracle', 'Labyrinth', 'Amphora', 'Odyssey', 'Hydra', 'Gorgon', 'Elysion', 'Tartaros', 'Delphi', 'Ithaka'];
-  const greekify = (w) => {
-    const base = w.replace(/[^a-z]+$/i, '').replace(/[aeiouy]+$/i, '');
-    return (chance(0.3) ? pick(['Proto', 'Hyper', 'Neo', 'Pan', 'Archi', 'Meta']) : '') + cap(base.toLowerCase()) + pick(['os', 'ia', 'eion', 'ikon', 'ides', 'ax']);
-  };
-  const greek = () => (chance(0.55) ? pick(GREEK) : greekify(pick([...WORDS, ...GREEK]))) + (chance(0.15) ? ' ' + pick(['of Delphi', 'the Elder', 'Ascending', 'Rex']) : '');
-  const STYLES = [alien, dessert, cosmos, greek];
-  // mixes: two styles side by side, or a word from one greekified
-  const mix = () => {
+  const syll = () => pick(A_PRE) + (chance(0.6) ? pick(A_MID) : '') + pick(A_END);
+  const SPICE1 = SPICE.filter(w => !w.includes(' ')); // one-word spices, for the real-word names
+  const spice = () => pick(SPICE).replace(/ /g, '');
+  // one made-up word: alien syllables crossed with a spice, sometimes two halves joined with a hyphen
+  const alienSpice = () => {
     const r = Math.random();
-    if (r < 0.4) return pick([cosmos, greek, alien])() + ' ' + pick([dessert, cosmos])().split(' ').pop();
-    if (r < 0.7) return greekify(pick([...DESSERTS, ...COSMOS]).split(' ')[0]);
-    return pick(STYLES)() + ' ' + pick(STYLES)().split(' ')[0];
+    let w;
+    if (r < 0.3) w = splice(spice(), syll());               // Cardamozz
+    else if (r < 0.55) w = splice(syll(), spice());         // Zorameric
+    else if (r < 0.75) w = pick(A_PRE) + spice();           // Xilsaffron
+    else if (r < 0.9) w = spice().slice(0, 3 + Math.floor(Math.random() * 3)) + pick(A_MID) + pick(A_END); // Cumaexoid
+    else w = syll();                                        // Zorlanok
+    w = cap(w);
+    if (chance(0.3)) w += '-' + cap(chance(0.5) ? syll() : splice(syll(), spice())); // Fenixozz-Blaoid
+    return w;
+  };
+  const greekify = (w) => {
+    const base = w.replace(/[aeiouy]+$/i, '');
+    return (chance(0.3) ? pick(['proto', 'hyper', 'neo', 'pan', 'archi', 'meta']) : '') + base + pick(['os', 'ia', 'eion', 'ikon', 'ides', 'ax']);
+  };
+  const noun = () => (chance(0.12) ? pick(SPICE1) : chance(0.06) ? greekify(pick(NOUN)) : pick(NOUN));
+  // two or three real words
+  const phrase = () => {
+    const r = Math.random();
+    if (r < 0.25) return [pick(ADJ), noun()];
+    if (r < 0.42) return [noun(), noun()];
+    if (r < 0.54) return [pick(ADJ), noun(), noun()];
+    if (r < 0.64) return [pick(ADJ), pick(ADJ), noun()];
+    if (r < 0.74) return [noun(), pick(['of', 'in', 'on', 'for', 'and', 'from', 'versus']), noun()];
+    if (r < 0.82) return [pick(SPICE1), noun()];
+    if (r < 0.9) return [alienSpice().split('-')[0], noun()];
+    if (r < 0.95) return [pick(ADJ), alienSpice().split('-')[0]];
+    return ['the', pick(ADJ), noun()];
   };
   const zed = (t) => t.replace(/s/g, (c) => (chance(0.6) ? 'z' : c)).replace(/S/g, (c) => (chance(0.6) ? 'Z' : c));
   return (taken = {}) => {
-    for (let i = 0; i < 20; i++) {
-      let n = chance(0.4) ? mix() : pick(STYLES)();
-      const w = n.split(/\s+/).filter((x, j, a) => x && a.indexOf(x) === j).slice(0, 3); // no repeats, three words at most
-      n = zed(w.join(' ')).slice(0, 40);
-      if (n && !(n in taken)) return n;
+    for (let i = 0; i < 30; i++) {
+      let n;
+      if (chance(0.3)) n = alienSpice();
+      else {
+        const w = phrase();
+        if (new Set(w).size < w.length) continue; // no repeated words
+        n = w.map((x, j) => (j && /^(of|in|on|for|and|from|versus)$/.test(x) ? x : cap(x))).join(' ');
+      }
+      n = zed(n);
+      if (n.length <= 32 && !(n in taken)) return n;
     }
     return 'Preset ' + (Object.keys(taken).length + 1);
   };
@@ -3653,6 +3783,33 @@ const closeMenu = () => { menuPop.hidden = true; menuBtn.setAttribute('aria-expa
 menuBtn.onclick = (e) => { e.stopPropagation(); const open = menuPop.hidden; menuPop.hidden = !open; menuBtn.setAttribute('aria-expanded', open); if (open) menuPop.querySelector('button').focus(); };
 document.addEventListener('click', (e) => { if (!menuPop.hidden && !menuPop.contains(e.target)) closeMenu(); });
 menuPop.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu(); menuBtn.focus(); } });
+// Colours…: Mono (one ink on the swatch's glass) or Grey + colour (grey glass, the swatch as one spot colour); applies at once
+const LCD_T = ['green', 'orange', 'amber', 'blue', 'red', 'grey'];
+const lcdPop = document.getElementById('lcdPop'), lcdSws = document.getElementById('lcdSws'), lcdSeg = lcdPop.querySelectorAll('.lcd-seg button');
+const rootEl = document.documentElement;
+let lcdTheme = LCD_T.includes(rootEl.dataset.lcd) ? rootEl.dataset.lcd : 'green', lcdMode = rootEl.dataset.lcdmode === 'mono' ? 'mono' : 'colour';
+lcdSws.innerHTML = LCD_T.map(t => `<button class="lcd-sw" role="radio" data-t="${t}"><span class="bars" aria-hidden="true">${[.45, .8, .6, 1, .3].map(b => `<i style="--b:${b * 100}%"></i>`).join('')}</span>${t}</button>`).join('');
+const lcdBtns = [...lcdSws.children];
+function showLcd() {
+  rootEl.dataset.lcd = lcdTheme; rootEl.dataset.lcdmode = lcdMode;
+  lcdSeg.forEach(b => b.setAttribute('aria-pressed', b.dataset.m === lcdMode));
+  lcdBtns.forEach(b => { const on = b.dataset.t === lcdTheme; b.setAttribute('aria-checked', on); b.tabIndex = on ? 0 : -1; });
+}
+function setLcd(t, m) { lcdTheme = t; lcdMode = m; store.set('lcdTheme', t); store.set('lcdMode', m); showLcd(); }
+showLcd();
+lcdSeg.forEach(b => b.onclick = () => setLcd(lcdTheme, b.dataset.m));
+lcdBtns.forEach(b => b.onclick = () => setLcd(b.dataset.t, lcdMode));
+lcdSws.addEventListener('keydown', (e) => {
+  const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
+  e.preventDefault(); e.stopPropagation();
+  const i = (LCD_T.indexOf(lcdTheme) + d + LCD_T.length) % LCD_T.length; setLcd(LCD_T[i], lcdMode); lcdBtns[i].focus();
+});
+const closeLcd = () => { lcdPop.hidden = true; };
+document.getElementById('mColours').onclick = (e) => {
+  e.stopPropagation(); closeMenu(); lcdPop.hidden = false; lcdBtns[LCD_T.indexOf(lcdTheme)].focus();
+};
+document.addEventListener('pointerdown', (e) => { if (!lcdPop.hidden && !lcdPop.contains(e.target)) closeLcd(); }, true);
+lcdPop.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeLcd(); menuBtn.focus(); } });
 document.getElementById('mInstall').onclick = async () => {
   closeMenu(); store.set('installNo', 0);
   if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; return; }

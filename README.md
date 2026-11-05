@@ -40,11 +40,17 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.12.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Colours and the bigger preset namer (v0.13.0)
+
+From the TB-303 app. **Colours…** in the ≡ menu picks **Mono** (one ink on one coloured glass, the old look) or **Grey + colour** (the default): grey glass with black ink and one deep spot colour on a few small things only (Run while running, the open tab, the pattern slot in use and the step playing in the roll, FX power when on, lit switch LEDs). Dials, faders and sliders always stay ink. Six swatches: Green (Shyoy's own), Orange, Amber, Blue, Red, Grey. Every glass colour is a token on `:root` (`--glass-rgb`, `--ink-rgb`, the haze's `--hl*-rgb` and `--dk*-rgb`), and a theme only swaps them; Mono Green is the pre-v0.13.0 look exactly. Saved as `kestrel.lcdTheme` and `kestrel.lcdMode`, and applied by a small script in `<head>` before first paint.
+
+The 🎲 preset namer is the TB-303 app's: two or three real words from big pools, or one made-up word of alien syllables spliced with a spice, plus a few monosynth words (sub, arpeggio, portamento, bender, keytar, battery, strap).
 
 ### Sequencer Randomise and Tools menus (v0.12.0)
 
