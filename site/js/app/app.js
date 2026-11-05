@@ -1,32 +1,20 @@
-// Shyoy: Install prompt, Install app and Check for update (Options › About), auto-update.
-// ---------- install as an app (Chrome on Android shows its own prompt when we ask) ----------
-const installEl = document.getElementById('install');
+// Shyoy: Install app and Check for update (Options › About), auto-update.
+// ---------- install as an app: no pop-up (Johnny: no messages). Install app in Options › About asks the browser, or
+// says how beside the button when the browser can't be asked (from the TB-303 app's functions.js) ----------
 let installEvt = null;
 // installed app only: the first touch puts the page itself into fullscreen, which also matches display-mode
-// fullscreen, so that case is not counted (it was hiding the install pop-up in the browser)
+// fullscreen, so that case is not counted
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone
   || (matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement);
-const snoozed = () => Date.now() - (store.get('installNo', 0) || 0) < 7 * 864e5;
-addEventListener('beforeinstallprompt', e => {
-  e.preventDefault(); installEvt = e;
-  if (!standalone() && !snoozed()) { installTxt.textContent = INSTALL_TXT; installGo.hidden = false; installEl.hidden = false; }
-});
-const installTxt = document.getElementById('installTxt'), installGo = document.getElementById('installGo');
-const INSTALL_TXT = installTxt.textContent;
-document.getElementById('installGo').onclick = async () => {
-  installEl.hidden = true; if (!installEvt) return;
-  installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null;
-};
-// Options › About: Install app is always there, because the browser's own prompt can be held back (after a "Not now",
-// or for a while after the app was removed) and then the pop-up never appears
-document.getElementById('mInstall').onclick = async () => {
-  store.set('installNo', 0);
+const mInstall = document.getElementById('mInstall'), installHow = document.getElementById('mInstallHow');
+const installSay = (t) => { installHow.textContent = t; installHow.hidden = !t; };
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+if (standalone()) mInstall.hidden = true;
+mInstall.onclick = async () => {
   if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; return; }
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  installTxt.textContent = standalone() ? 'You are already running the installed app.'
-    : ios ? 'In Safari, tap Share, then Add to Home Screen.'
-    : "Your browser hasn't offered the install yet. Open the browser menu (⋮) and choose Install app or Add to Home screen.";
-  installGo.hidden = true; closeOptions(); installEl.hidden = false;
+  installSay(ios ? 'In Safari, tap Share, then Add to Home Screen.'
+    : "Open the browser menu (⋮) and choose Install app or Add to Home screen.");
 };
 document.getElementById('mUpdate').onclick = async () => {
   const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration().catch(() => null) : null;
@@ -34,8 +22,7 @@ document.getElementById('mUpdate').onclick = async () => {
   clearTimeout(saveT); try { localStorage.setItem('kestrel-ms1-v2', JSON.stringify(state)); } catch (e) {}
   location.reload();
 };
-document.getElementById('installNo').onclick = () => { installEl.hidden = true; store.set('installNo', Date.now()); };
-addEventListener('appinstalled', () => { installEl.hidden = true; installEvt = null; });
+addEventListener('appinstalled', () => { installEvt = null; mInstall.hidden = true; installSay(''); });
 // Auto-update: check for a new build on launch, whenever the app comes back to the front, and every 15 minutes.
 // A new build activates straight away (skipWaiting + clients.claim) and the page reloads itself, but never mid-pattern:
 // if the sequencer is running it waits until you stop or switch away. Patch and pattern are saved, so nothing is lost.

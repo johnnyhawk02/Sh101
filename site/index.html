@@ -26,14 +26,10 @@ try {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
 <link rel="stylesheet" href="css/shyoy.css">
 
-<div class="rotate" role="alert">
-  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><rect x="20" y="6" width="24" height="44" rx="3"/><path d="M29 44h6"/></svg>
-  Turn your phone sideways
-  <small>Shyoy is laid out like the hardware, so it plays in landscape.</small>
-</div>
+<div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.16.1</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.16.2</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -154,11 +150,6 @@ try {
     </section>
   </div>
 </div>
-<div class="install" id="install" role="dialog" aria-labelledby="installH" hidden>
-  <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M9 24v-5M14 24V9M19 24v-8M24 24v-11" stroke="currentColor" stroke-width="3"/></svg>
-  <div><b id="installH">Install Shyoy</b><span id="installTxt">Add it to your home screen. It opens full screen in landscape and works offline.</span></div>
-  <button class="btn" id="installGo">Install</button><button class="btn light" id="installNo">Not now</button>
-</div>
 
 <dialog id="options" aria-labelledby="opt-title">
   <div class="opt-head">
@@ -187,7 +178,8 @@ try {
     </section>
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
-      <p class="opt-ver" id="mVer">Shyoy v0.16.1</p>
+      <p class="opt-ver" id="mInstallHow" hidden></p>
+      <p class="opt-ver" id="mVer">Shyoy v0.16.2</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>

@@ -471,27 +471,15 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
   font-variant-numeric: tabular-nums; }
 .status { font-size: var(--fs-s); color: var(--muted); }
 
-/* ---------- install pop-up: an LCD card along the bottom edge ---------- */
-.install { position: fixed; z-index: 60; left: 50%; bottom: max(12px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(560px, calc(100vw - 24px));
-  display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--glass); color: var(--ink); border: 4px solid var(--bezel); border-radius: 10px;
-  box-shadow: 0 12px 34px rgba(0,0,0,.55); text-shadow: var(--shadow); }
-.install[hidden] { display: none; }
-.install .how { display: block; margin-top: 2px; }
-.install svg { width: 34px; height: 34px; flex: none; }
-.install div { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.1; }
-.install b { font-weight: 400; font-size: var(--fs-l); text-transform: lowercase; }
-.install span { font-size: var(--fs-s); color: var(--muted); }
-
-/* ---------- phones are played sideways: portrait shows a turn-your-phone card ---------- */
+/* ---------- portrait on a touch screen: the same scaled screen, just small, so a quiet hint under it says to turn it
+   (from the TB-303 app's responsive.css; nothing is covered or hidden) ---------- */
 .rotate { display: none; }
-@media (orientation: portrait) and (pointer: coarse) and (max-width: 900px) {
-  .rotate { display: flex; position: fixed; inset: 0; z-index: 50; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-    background: var(--glass); color: var(--ink); border: 6px solid var(--bezel); text-align: center; padding: 24px; font-size: 26px; text-shadow: var(--shadow); }
-  .rotate svg { width: 120px; height: 120px; animation: tilt 2.4s ease-in-out infinite; }
-  .rotate small { font-size: 19px; color: var(--muted); max-width: 26ch; }
-  .unit { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate { position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom, 0px)); z-index: 1; display: flex; justify-content: center; align-items: center; gap: 8px;
+    pointer-events: none; color: rgb(var(--glass-rgb) / .55); font-size: 16px; }
+  .rotate svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .rotate p { margin: 0; }
 }
-@keyframes tilt { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 /* ---------- one fixed screen, scaled to fit the window (js/app/fit.js sets --k; after the TB-303 app's html.fit) ----------

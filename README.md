@@ -75,11 +75,16 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.16.1), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.16.2), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### No install pop-up, no portrait cover (v0.16.2)
+
+- The install pop-up along the bottom edge is gone. **Options › About › Install app** asks the browser to install, or says how beside the button when it can't, as in the TB-303 app. The button hides in the installed app.
+- Portrait on a phone no longer covers the screen with a turn-your-phone card. The same scaled screen shows, with a quiet "Turn sideways for a bigger view" hint under it, as in the TB-303 app.
 
 ### LCD look sliders, and two audit fixes (v0.16.1)
 
