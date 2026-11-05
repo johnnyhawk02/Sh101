@@ -59,7 +59,7 @@
   --dk1-rgb: 45 48 40; --dk2-rgb: 34 36 30; --dk3-rgb: 22 24 18; --accent: var(--acc); }
 [data-lcdmode=colour] .btn.play.on, [data-lcdmode=colour] .slots button[aria-pressed=true],
 [data-lcdmode=colour] .fxu .onoff[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--glass); }
-[data-lcdmode=colour] .tabs button[aria-selected="true"], [data-lcdmode=colour] .roll .hd.cur { background: var(--accent); color: var(--glass); }
+[data-lcdmode=colour] .roll .hd.cur { background: var(--accent); color: var(--glass); }
 [data-lcdmode=colour] .sw button[aria-pressed="true"] .led { background: var(--accent); }
 
 * { box-sizing: border-box; }
@@ -305,19 +305,24 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .mslot:first-child .mpick .fn-menu { left: 0; transform: none; }
 .mslot:last-child .mpick .fn-menu { left: auto; right: 0; transform: none; }
 
-/* ---------- tabs: one segmented selector the full width of the glass, along the bottom edge (v0.19.0) ---------- */
-.tabs { order: 3; flex: none; display: flex; counter-reset: tab; border-top: var(--bw) solid var(--ink); }
-.tabs button { appearance: none; flex: 1 1 0; min-width: 0; background: none; border: 0; border-right: var(--rule); border-radius: 0; padding: calc(var(--gap-s) + 1px) 6px;
-  display: flex; align-items: baseline; justify-content: center; gap: 6px; color: var(--ink); font-size: var(--fs-l); line-height: 1; text-transform: lowercase;
+/* ---------- tabs: folder tabs under the strip (v0.19.1, after the TB-303 app). The active tab is open into the page below,
+   with no line under it and a coloured top edge; the others sit lower, shaded and recessed ---------- */
+.tabs { order: 1; flex: none; display: flex; align-items: flex-end; gap: 6px; padding: 8px var(--pad) 0; counter-reset: tab;
+  background: linear-gradient(var(--ink), var(--ink)) bottom / 100% var(--bw) no-repeat; }
+.tabs button { appearance: none; position: relative; flex: 1 1 0; min-width: 0; margin: 0; border: var(--bw) solid var(--ink); border-bottom: 0; border-radius: 8px 8px 0 0;
+  padding: calc(var(--gap-s) + 1px) 6px calc(var(--gap-s) + 3px);
+  background: rgb(var(--ink-rgb) / .1); box-shadow: inset 0 4px 7px rgb(0 0 0 / .2);
+  display: flex; align-items: baseline; justify-content: center; gap: 6px; color: var(--muted); font-size: var(--fs-l); line-height: 1; text-transform: lowercase;
   white-space: nowrap; cursor: pointer; text-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
-.tabs button:last-of-type { border-right: 0; }
 .tabs button[hidden] { display: none; }
 .tabs button::before { counter-increment: tab; content: counter(tab, decimal-leading-zero); font-size: var(--fs-xs); color: var(--muted); }
-.tabs button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
-.tabs button[aria-selected="true"]::before { color: var(--lit); }
+.tabs button[aria-selected="true"] { background: none; box-shadow: none; color: var(--ink); border-top: 5px solid var(--accent, var(--ink));
+  padding-top: calc(var(--gap-s) + 8px); padding-bottom: calc(var(--gap-s) + 3px + var(--bw)); margin-bottom: 0; }
+/* the active tab hides the base line under it, so it opens into the page */
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--bw); background: var(--glass); }
 .tabs button:focus-visible { outline-offset: -4px; }
 
-/* ---------- views: exactly one fills the space between the strip and the tabs ---------- */
+/* ---------- views: exactly one fills the space under the tabs ---------- */
 .rack, .panel, .perf101 { order: 2; flex: 1 1 auto; min-height: 0; overflow: auto; }
 .panel { display: flex; flex-direction: column; gap: var(--gap); padding: var(--pad); }
 .panel[hidden] { display: none !important; }
