@@ -529,3 +529,5 @@ html.fit .unit { position: absolute; left: 50%; top: 50%; width: 1400px; height:
 html.fit dialog#options { width: 1344px; height: 842px; inset: auto; left: 50%; top: 50%; margin: 0; max-width: none; max-height: none;
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
 html.fit { touch-action: pan-x pan-y; overscroll-behavior: none; }
+/* v0.20.2: text isn't selectable (Johnny); typing boxes still are */
+body, body *:not(input):not(textarea) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
