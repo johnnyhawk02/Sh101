@@ -5,7 +5,7 @@
 // because Option+A types "å" on a Mac. Copy, Paste and Undo are Cmd on a Mac, Ctrl elsewhere.
 (() => {
   const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-  const MENUS = [['rm-btn', 'rm-menu'], ['tm-btn', 'tm-menu']].map(([b, m]) => ({ btn: document.getElementById(b), menu: document.getElementById(m) }));
+  const MENUS = [['rm-btn', 'rm-menu'], ['tm-btn', 'tm-menu'], ['gm-btn', 'gm-menu']].map(([b, m]) => ({ btn: document.getElementById(b), menu: document.getElementById(m) }));
   const items = (M) => [...M.menu.querySelectorAll('button:not(:disabled)')];
   const open = (M, on) => {
     for (const o of MENUS) if (o !== M || !on) { o.menu.hidden = true; o.btn.setAttribute('aria-expanded', 'false'); }
@@ -49,6 +49,10 @@
       }
     });
   });
+  // Step len: each choice sets the (hidden) Gate slider and fires its input, so the gate code path is the same as before
+  for (const b of document.querySelectorAll('#gm-menu [data-gate]')) b.onclick = () => {
+    const el = document.querySelector('input[data-a=gate]'); el.value = b.dataset.gate; el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
   document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.rmenu')) closeAll(); });
   document.addEventListener('keydown', (e) => {
     if (e.repeat || e.isComposing || typing(e.target) || e.target.matches?.('input[type=number], select')) return;

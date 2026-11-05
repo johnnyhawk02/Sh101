@@ -48,6 +48,8 @@ function renderSide() {
   const P = state.steps, p = state.params;
   document.getElementById('o-len').textContent = P.length;
   document.getElementById('o-gate').textContent = Math.round((0.1 + p.gateLen * 0.85) * 100) + '%';
+  { const g = Math.round((0.1 + p.gateLen * 0.85) * 100); document.getElementById('gm-val').textContent = g + '%';
+    for (const b of document.querySelectorAll('#gm-menu [data-gate]')) b.setAttribute('aria-checked', String(+b.dataset.gate === g)); }
   document.getElementById('o-swing').textContent = Math.round(p.swing * 100) + '%';
   const sv = (a, v) => { const el = sideIn[a]; if (el && !el.matches(':active')) el.value = v; };
   sv('len', P.length); sv('gate', Math.round((0.1 + p.gateLen * 0.85) * 100)); sv('swing', Math.round(p.swing * 100));
