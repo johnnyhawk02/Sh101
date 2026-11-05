@@ -32,7 +32,7 @@
   --gap-s: 6px;       /* gap inside a group */
   --h: 28px; --menu-h: 22px;          /* control height */
   --h-top: 34px;      /* header control height */
-  --fs-xs: 16px; --fs-s: 19px; --fs: 21px; --fs-l: 23px; --fs-xl: 40px;
+  --fs-xs: 18px; --fs-s: 21px; --fs: 23px; --fs-l: 25px; --fs-xl: 40px;
   --trk: 22px;        /* fader width */
   --trk-min: 56px;    /* shortest a fader may get */
   color-scheme: light;
@@ -324,7 +324,7 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
 table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: var(--fs-s); }
 .mx th { font-size: var(--fs-s); font-weight: 400; text-transform: lowercase; padding: 0 4px 2px; text-align: center; white-space: nowrap; }
-.mx th.src { text-align: left; width: 1%; padding-right: 14px; }
+.mx th.src { text-align: left; width: 1%; padding-right: calc(4.2em + 28px); position: relative; }
 .mx .jack { width: 9px; height: 9px; display: inline-block; border: var(--bw) solid var(--ink); margin-right: 6px; vertical-align: middle; }
 .cell { width: 64px; height: 28px; border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; cursor: ns-resize; touch-action: none; user-select: none;
   display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--muted); }
@@ -333,7 +333,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .cell span { position: relative; z-index: 1; }
 .cell.active { color: var(--ink); }
 .cell.active span { background: var(--glass); padding: 0 3px; }
-.mx .volt { font-size: var(--fs-s); color: var(--muted); display: inline-block; width: 4.2em; text-align: right; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.mx .volt { font-size: var(--fs-s); color: var(--muted); position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 4.2em; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* effects (from the 303 app): one box per unit, a power switch in its label strip */
 .fxrow { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--gap); }
@@ -353,10 +353,10 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
 .route-dia .rsum { fill: none; stroke: var(--ink); stroke-width: 1.5; }
-.route-dia .rt { fill: var(--ink); font-size: 17px; }
-.route-dia .rs { fill: var(--muted); font-size: 15px; text-anchor: middle; }
+.route-dia .rt { fill: var(--ink); font-size: 19px; }
+.route-dia .rs { fill: var(--muted); font-size: 17px; text-anchor: middle; }
 .route-dia .rb rect { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 2; }
-.route-dia .rb text { fill: var(--muted); font-size: 17px; text-anchor: middle; }
+.route-dia .rb text { fill: var(--muted); font-size: 19px; text-anchor: middle; }
 .route-dia .rb.on rect { fill: var(--ink); stroke-dasharray: none; }
 .route-dia .rb.on text { fill: var(--glass); }
 [data-lcdmode=colour] .route-dia .rb.on rect { fill: var(--accent); stroke: var(--accent); }
@@ -383,7 +383,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .rv-lcd { font-size: var(--fs-s); letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rv-progs { flex: none; display: grid; grid-template-columns: repeat(var(--n, 9), minmax(0, 1fr)); gap: var(--gap-s); }
 .rv-progs button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink); min-width: 0;
-  padding: 2px 2px 3px; font: inherit; font-size: calc(var(--fs-s) - 2px); line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
+  padding: 2px 2px 3px; font: inherit; font-size: var(--fs-xs); letter-spacing: -.03em; line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
 .rv-progs button b { display: block; font-weight: 400; font-size: var(--fs); }
 .rv-progs button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
@@ -401,7 +401,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .slots { display: flex; gap: 4px; }
 .slots button, .rm-btn { min-width: calc(var(--h) + 4px); padding: 0 6px; font-size: var(--fs-s); position: relative; -webkit-touch-callout: none; user-select: none; }
 .slots button.used:not([aria-pressed=true]) { background: var(--ghost); }
-.slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 12px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
+.slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 14px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
 .slots button.playing { outline: 2px dashed var(--ink); outline-offset: 2px; }
 /* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
 .rmenu { position: relative; }
@@ -427,7 +427,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 /* the D-pad under the roll, at its right-hand end (from the TB-303 app): square outlined buttons, ink arrows, in a cross */
 .sq-foot { flex: none; display: flex; justify-content: flex-end; }
 .dpad { display: grid; grid-template-columns: repeat(3, calc(var(--h) + 4px)); grid-template-rows: repeat(3, calc(var(--h) * .68)); gap: 1px 2px; flex: none; }
-.dpad button { min-width: 0; height: auto; margin: 0; padding: 0; font-size: calc(var(--fs-xs) * .8); line-height: 1; letter-spacing: 0; }
+.dpad button { min-width: 0; height: auto; margin: 0; padding: 0; font-size: calc(var(--fs-xs) * .9); line-height: 1; letter-spacing: 0; }
 .dp-up { grid-area: 1 / 2; } .dp-lt { grid-area: 2 / 1; } .dp-rt { grid-area: 2 / 3; } .dp-dn { grid-area: 3 / 2; }
 
 /* piano roll: key rows, octave lanes, tie/slide/accent rows; dim columns past the end extend the pattern */
@@ -436,7 +436,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
   width: 100%; height: 100%; min-width: 0; border: var(--bw) solid var(--ink); user-select: none; -webkit-user-select: none; text-shadow: none; }
 .roll > * { border: 0; border-right: 1px solid rgb(var(--ink-rgb) / .28); border-bottom: 1px solid rgb(var(--ink-rgb) / .28); padding: 0; background: transparent; color: var(--ink);
   min-width: 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); line-height: 1; border-radius: 0; }
-.roll .rh { justify-content: flex-start; padding-left: 5px; border-right: var(--bw) solid var(--ink); text-transform: lowercase; white-space: nowrap; }
+.roll .rh { font-size: var(--fs-s); justify-content: flex-start; padding-left: 5px; border-right: var(--bw) solid var(--ink); text-transform: lowercase; white-space: nowrap; }
 .roll .blk { background: var(--tint); }
 .roll .rh.blk { background: rgb(var(--ink-rgb) / .17); }
 .roll .bar { border-right-color: rgb(var(--ink-rgb) / .6); }
@@ -444,7 +444,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .roll button { cursor: pointer; }
 .roll button[data-t] { touch-action: none; }
 .roll button:focus-visible { outline: 2px dashed var(--ink); outline-offset: -3px; }
-.roll .hd { font-size: var(--fs-xs); justify-content: flex-start; padding-left: 4px; }
+.roll .hd { font-size: var(--fs-s); justify-content: flex-start; padding-left: 4px; }
 .roll .hd.sel { outline: 2px dashed var(--ink); outline-offset: -3px; }
 .roll .hd.cur { background: var(--ink); color: var(--glass); }
 .roll .cell.cur:not(.on) { background: rgb(var(--ink-rgb) / .3); }
@@ -461,8 +461,8 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .perf101 .grp { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 4px); padding: calc(var(--pad) - 6px) var(--pad) var(--pad); border-right: var(--rule); border-bottom: var(--rule); }
 .perf101 .grp:last-of-type { border-right: 0; }
 .perf101 .row { display: flex; gap: calc(var(--gap) + 6px); align-items: flex-start; flex-wrap: wrap; }
-#benderSlot { flex: 1 1 auto; min-height: 0; align-items: stretch; flex-wrap: nowrap; gap: var(--gap); }
-.perf101 .row:has(.lever) { align-items: center; }
+#benderSlot { flex: 1 1 auto; min-height: 0; align-items: stretch; flex-wrap: nowrap; gap: calc(var(--gap) * 4); justify-content: center; }
+.perf101 .row:has(.lever) { align-items: center; justify-content: center; gap: calc(var(--gap) * 3); }
 .lever { width: 180px; height: calc(var(--h) + 6px); border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; touch-action: none; cursor: ew-resize;
   background: repeating-linear-gradient(90deg, var(--ghost) 0 4px, transparent 4px 7px); }
 .lever::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2px; background: var(--muted); }

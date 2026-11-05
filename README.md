@@ -75,11 +75,14 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.16.3), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.16.4), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Bigger text again, and a tidy (v0.16.4)
+The type scale went up one more step: `--fs-xs` 18px, `--fs-s` 21px, `--fs` 23px, `--fs-l` 25px. The piano roll's row names and step numbers use `--fs-s`, and the D-pad arrows are a bit bigger. Reverb program names use `--fs-xs` with slightly tighter tracking, so all nine fit. On Bridges the tap voltages now sit in one right-aligned column instead of trailing each name. On Perform the bender faders, lever, mod push and transpose are centred instead of packed into the left corner, and the lever's knob springs back to the true centre (it had been 5px left). Every tab, the menus and Options still fit with no scrolling at 1440 x 900 and 915 x 412 (the About text scrolls, as before).
 
 ### Bigger small text (v0.16.3)
 The type scale in `site/css/shyoy.css` went up about 15%: `--fs-xs` 14 to 16px, `--fs-s` 16 to 19px, `--fs` 18 to 21px, `--fs-l` 21 to 23px (the big logo size stays 40px). The routing diagram's labels and the MIDI channel badge on the pattern slots went up to match. Reverb program names sit 2px under `--fs-s` with tighter padding so "small hall b" still fits its button. Every tab still fits with no scrolling at 1440 x 900 and 915 x 412.
