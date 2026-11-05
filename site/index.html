@@ -39,7 +39,7 @@
   --pad: 16px;        /* panel padding */
   --gap: 12px;        /* gap between groups */
   --gap-s: 6px;       /* gap inside a group */
-  --h: 28px;          /* control height */
+  --h: 28px; --menu-h: 22px;          /* control height */
   --h-top: 34px;      /* header control height */
   --fs-xs: 14px; --fs-s: 16px; --fs: 18px; --fs-l: 21px; --fs-xl: 40px;
   --trk: 22px;        /* fader width */
@@ -47,7 +47,7 @@
   color-scheme: light;
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  :root { --bw: 1.5px; --r: 2px; --pad: 6px; --gap: 6px; --gap-s: 3px; --h: 20px; --h-top: 22px;
+  :root { --bw: 1.5px; --r: 2px; --pad: 6px; --gap: 6px; --gap-s: 3px; --h: 20px; --h-top: 22px; --menu-h: 18px;
     --fs-xs: 11px; --fs-s: 13px; --fs: 15px; --fs-l: 16px; --fs-xl: 22px; --trk: 16px; --trk-min: 30px; }
 }
 
@@ -74,7 +74,7 @@ button, table, input, select { font: inherit; color: inherit; }
 .lower { display: contents; }
 
 /* ---------- shared controls ---------- */
-.btn, .stp button, .acts button, .slots button, .sq-ed button, .chain-read button, .fxu .onoff,
+.btn, .stp button, .acts button, .slots button, .rm-btn, .chain-read button, .fxu .onoff,
 .pm button, .pm-foot button, .pm input[type=text], .pm-foot input[type=text] {
   appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink);
   height: var(--h); padding: 0 calc(var(--gap-s) + 4px); font-family: var(--f-lcd); font-size: var(--fs); line-height: 1;
@@ -82,12 +82,12 @@ button, table, input, select { font: inherit; color: inherit; }
   display: inline-flex; align-items: center; justify-content: center; gap: var(--gap-s); -webkit-tap-highlight-color: transparent; }
 .btn { box-shadow: var(--shadow); }
 .btn:active, .btn.held, .btn[aria-pressed="true"], .btn.on,
-.acts button:active, .stp button:active, .sq-ed button:active, .chain-read button:active,
+.acts button:active, .stp button:active, .rm-btn:active, .rm-btn[aria-expanded=true], .chain-read button:active,
 .slots button[aria-pressed=true], .slots button:active, .fxu .onoff[aria-pressed="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
 button:disabled { opacity: .35; cursor: default; }
 @media (hover: hover) {
   .btn:hover:not(:disabled):not(.on):not([aria-pressed="true"]), .acts button:hover:not(:disabled), .stp button:hover:not(:disabled),
-  .slots button:hover:not([aria-pressed=true]), .sq-ed button:hover:not(:disabled), .tabs button:hover:not([aria-selected="true"]),
+  .slots button:hover:not([aria-pressed=true]), .rm-btn:hover:not([aria-expanded=true]), .tabs button:hover:not([aria-selected="true"]),
   .sw button:hover:not([aria-pressed="true"]), .pm-foot button:hover { background: var(--tint); }
 }
 .led { display: inline-block; width: 9px; height: 9px; background: var(--ghost); flex: none; }
@@ -296,19 +296,31 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .sq-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
 .sq-side { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) calc(var(--gap) + 6px); }
 .acts { display: flex; gap: var(--gap-s); }
-.rnd { display: flex; align-items: center; gap: var(--gap-s) var(--gap); padding-left: calc(var(--gap) + 6px); border-left: var(--rule); }
-.rnd .acts button { min-width: 0; padding: 0 6px; text-transform: uppercase; }
-.rnd-lab { text-transform: lowercase; margin-left: 6px; }
 .sq-msg { flex: 1 1 200px; font-size: var(--fs-xs); color: var(--muted); line-height: 1.15; }
 .sq-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
 .sq-bank { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
 .bk-lab { color: var(--muted); }
 .slots { display: flex; gap: 4px; }
-.slots button, .sq-ed button { min-width: calc(var(--h) + 4px); padding: 0 6px; font-size: var(--fs-s); position: relative; -webkit-touch-callout: none; user-select: none; }
+.slots button, .rm-btn { min-width: calc(var(--h) + 4px); padding: 0 6px; font-size: var(--fs-s); position: relative; -webkit-touch-callout: none; user-select: none; }
 .slots button.used:not([aria-pressed=true]) { background: var(--ghost); }
 .slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 10px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
 .slots button.playing { outline: 2px dashed var(--ink); outline-offset: 2px; }
-.sq-ed { display: flex; gap: 4px; }
+/* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
+.rmenu { position: relative; }
+.sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu { margin-left: 0; }
+.rm-btn::after { content: " ▾"; }
+.fn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 70; min-width: 230px; display: flex; flex-direction: column; padding: 4px 0 6px;
+  background: var(--glass); color: var(--ink); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 0 10px 30px rgb(0 0 0 / .45); text-shadow: none; }
+.fn-menu[hidden] { display: none; }
+.fn-menu button { appearance: none; background: none; border: 0; border-radius: 0; box-shadow: none; margin: 0; width: 100%; height: var(--menu-h);
+  display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 0 12px 0 22px;
+  font-family: var(--f-lcd); font-size: var(--fs); line-height: 1; letter-spacing: 0; text-transform: none; text-align: left; color: var(--ink); text-shadow: none;
+  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fn-menu .mh { padding: 6px 12px 2px; font-size: var(--fs-s); line-height: 1; color: var(--muted); text-transform: lowercase; }
+.fn-menu kbd { font-family: var(--f-lcd); font-size: var(--fs-s); line-height: 1; color: var(--muted); text-transform: none; }
+.fn-menu button:not(:disabled):hover, .fn-menu button:focus-visible { background: var(--ink); color: var(--glass); outline: 0; }
+.fn-menu button:not(:disabled):hover kbd, .fn-menu button:focus-visible kbd { color: var(--glass); }
+.fn-menu button:disabled { opacity: .4; cursor: default; }
 .chain-read { display: flex; align-items: center; gap: 6px; } .chain-read[hidden] { display: none; }
 .chain-read .now { background: var(--ink); color: var(--glass); padding: 0 3px; } .chain-read .arr { opacity: .5; }
 .chain-read button { min-width: 0; height: calc(var(--h) - 4px); padding: 0 6px; }
@@ -417,8 +429,6 @@ body > .hint { display: none; }
   .sld { grid-template-columns: auto 70px 2.2em; gap: 0 4px; }
   .br-depth { grid-template-columns: auto 90px 2.2em; }
   .sld input::-webkit-slider-runnable-track { height: 9px; } .sld input::-webkit-slider-thumb { width: 9px; height: 16px; margin-top: -5px; }
-  .rnd { padding-left: 10px; }
-  .rnd .acts button { min-width: 0; padding: 0 4px; }
   .slots button::after { top: -6px; right: -4px; font-size: 9px; }
   .roll { grid-template-columns: 30px repeat(var(--steps, 32), minmax(0, 1fr)); }
   .roll .rh { padding-left: 3px; }
@@ -441,7 +451,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.11.1</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.12.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -465,7 +475,7 @@ body > .hint { display: none; }
         <div class="menu-pop" id="menuPop" role="menu" hidden>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.11.1</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.12.0</span>
         </div>
       </div>
     </div>
@@ -491,32 +501,7 @@ body > .hint { display: none; }
           <label class="sld"><span>Swing</span><input type="range" data-a="swing" min="0" max="75" step="1" aria-label="Swing"><output id="o-swing">0%</output></label>
           <label class="sld spr" title="Drag to rotate the pattern; springs back to centre"><span>Shift</span><input type="range" data-a="shift" min="-16" max="16" step="1" value="0" aria-label="Shift pattern by steps"><output id="o-shift">0</output></label>
           <label class="sld spr" title="Drag to transpose the pattern; springs back to centre"><span>Transpose</span><input type="range" data-a="tr" min="-12" max="12" step="1" value="0" aria-label="Transpose pattern by semitones"><output id="o-tr">0</output></label>
-          <div class="acts">
-            <button id="p-dup" title="Repeat the pattern out to 16, 32 or 64 steps">Double</button>
-            <button id="p-shuf" title="Deal the steps out in a new order">Shuffle</button>
-            <button id="p-rnd" title="Make a new pattern">Random</button>
-            <button id="p-clr">Clear</button>
-            <button id="p-undo" disabled>Undo</button>
-          </div>
-          <div class="rnd" role="group" aria-label="Randomise one row">
-            <label class="sld rnd-depth" title="How much Randomise and Alter change: Randomise re-deals that share of steps, Alter flips a few (about half as many)"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
-            <span class="rnd-lab">rnd</span>
-            <div class="acts">
-              <button id="r-acc" title="Randomise accents only">acc</button>
-              <button id="r-slide" title="Randomise slides only">sld</button>
-              <button id="r-oct" title="Randomise octaves only; notes stay">oct</button>
-              <button id="r-tie" title="Randomise ties only; press again for another set">tie</button>
-            </div>
-          </div>
-          <div class="rnd alt" role="group" aria-label="Alter one row">
-            <span class="rnd-lab">alter</span>
-            <div class="acts">
-              <button id="a-acc" title="Alter a few accents: flip some on or off">acc</button>
-              <button id="a-slide" title="Alter a few slides: flip some on or off">sld</button>
-              <button id="a-oct" title="Alter a few octaves: nudge some notes up or down one octave">oct</button>
-              <button id="a-tie" title="Alter a few ties: flip some on or off">tie</button>
-            </div>
-          </div>
+          <label class="sld" title="How much Randomise and Alter change: Randomise re-deals that share of steps, Alter flips a few (about half as many)"><span>Depth</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Randomise depth"><output id="o-sqRndDepth">30%</output></label>
           <span class="sq-msg" id="sq-msg" role="status">Tap a note to set or rest a step. Drag to paint. Tap a step number, then play keys to write.</span>
         </div>
         <div class="sq-main">
@@ -524,7 +509,29 @@ body > .hint { display: none; }
             <span class="bk-lab">pattern</span>
             <div class="slots" id="slots" role="group" aria-label="Pattern slots"><button type="button" data-n="0" aria-pressed="false">1</button><button type="button" data-n="1" aria-pressed="false">2</button><button type="button" data-n="2" aria-pressed="false">3</button><button type="button" data-n="3" aria-pressed="false">4</button><button type="button" data-n="4" aria-pressed="false">5</button><button type="button" data-n="5" aria-pressed="false">6</button><button type="button" data-n="6" aria-pressed="false">7</button><button type="button" data-n="7" aria-pressed="false">8</button></div>
             <div class="chain-read" id="chain-read" hidden><span class="ch-list"></span><button type="button" id="chain-clear" aria-label="Clear chain">×</button></div>
-            <div class="sq-ed"><button type="button" id="p-copy">Copy</button><button type="button" id="p-paste" disabled>Paste</button></div>
+            <div class="rmenu"><button type="button" class="rm-btn" id="rm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="rm-menu">Randomise</button><div class="fn-menu" id="rm-menu" role="menu" aria-label="Randomise" hidden>
+              <span class="mh" role="presentation">randomise</span>
+              <button type="button" role="menuitem" id="r-acc">Accents</button>
+              <button type="button" role="menuitem" id="r-slide">Slides</button>
+              <button type="button" role="menuitem" id="r-oct">Octaves</button>
+              <button type="button" role="menuitem" id="r-tie">Ties</button>
+              <span class="mh" role="presentation">alter</span>
+              <button type="button" role="menuitem" id="a-acc">Accents</button>
+              <button type="button" role="menuitem" id="a-slide">Slides</button>
+              <button type="button" role="menuitem" id="a-oct">Octaves</button>
+              <button type="button" role="menuitem" id="a-tie">Ties</button>
+              <span class="mh" role="presentation">pattern</span>
+              <button type="button" role="menuitem" id="p-shuf">Shuffle steps</button>
+              <button type="button" role="menuitem" id="p-rnd">New pattern</button>
+            </div></div>
+            <div class="rmenu"><button type="button" class="rm-btn" id="tm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="tm-menu">Tools</button><div class="fn-menu" id="tm-menu" role="menu" aria-label="Tools" hidden>
+              <span class="mh" role="presentation">pattern</span>
+              <button type="button" role="menuitem" id="p-copy">Copy</button>
+              <button type="button" role="menuitem" id="p-paste" disabled>Paste</button>
+              <button type="button" role="menuitem" id="p-dup">Double</button>
+              <button type="button" role="menuitem" id="p-clr">Clear</button>
+              <button type="button" role="menuitem" id="p-undo" disabled>Undo</button>
+            </div></div>
           </div>
           <div class="rollwrap"><div class="roll" id="roll" role="grid" aria-label="Pattern"></div></div>
         </div>
@@ -3098,6 +3105,63 @@ document.getElementById('p-paste').onclick = () => {
   state.steps = cleanSteps(clip.steps); state.params.swing = clip.swing ?? state.params.swing; state.params.gateLen = clip.gateLen ?? state.params.gateLen;
   tail = []; stepChanged(); say(`Pasted into pattern ${state.slot + 1}. Undo puts it back.`);
 };
+// ---------- Randomise and Tools menus, and their key commands (from the 303 app's seqmenu.js) ----------
+// Johnny: the pattern buttons live in two menus at the right of the pattern row. Every item has a key, shown in the
+// menu. Plain letters play notes, so the keys use Option/Alt (Shift for the gentler Alter versions), matched on e.code
+// because Option+A types "å" on a Mac. Copy, Paste and Undo are Cmd on a Mac, Ctrl elsewhere.
+(() => {
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const MENUS = [['rm-btn', 'rm-menu'], ['tm-btn', 'tm-menu']].map(([b, m]) => ({ btn: document.getElementById(b), menu: document.getElementById(m) }));
+  const items = (M) => [...M.menu.querySelectorAll('button:not(:disabled)')];
+  const open = (M, on) => {
+    for (const o of MENUS) if (o !== M || !on) { o.menu.hidden = true; o.btn.setAttribute('aria-expanded', 'false'); }
+    if (on) { M.menu.hidden = false; M.btn.setAttribute('aria-expanded', 'true'); items(M)[0]?.focus(); }
+  };
+  const closeAll = () => { for (const M of MENUS) if (!M.menu.hidden) open(M, false); };
+  const toggle = (i) => () => open(MENUS[i], MENUS[i].menu.hidden);
+  const click = (id) => () => { const b = document.getElementById(id); if (b && !b.disabled) b.click(); };
+  // id: the element that runs (a real button with its own onclick) and shows the key; code, alt, shift, cmd: the key
+  const ACTS = [
+    ['rm-btn', 'KeyR', 'alt'], ['tm-btn', 'KeyT', 'alt'],
+    ['r-acc', 'KeyA', 'alt'], ['r-slide', 'KeyS', 'alt'], ['r-oct', 'KeyO', 'alt'], ['r-tie', 'KeyI', 'alt'],
+    ['a-acc', 'KeyA', 'shift alt'], ['a-slide', 'KeyS', 'shift alt'], ['a-oct', 'KeyO', 'shift alt'], ['a-tie', 'KeyI', 'shift alt'],
+    ['p-shuf', 'KeyH', 'alt'], ['p-rnd', 'KeyG', 'alt'],
+    ['p-copy', 'KeyC', 'cmd'], ['p-paste', 'KeyV', 'cmd'], ['p-dup', 'KeyD', 'alt'], ['p-clr', 'Backspace', 'shift'], ['p-undo', 'KeyZ', 'cmd'],
+  ].map(([id, code, mods]) => ({ id, code, cmd: mods.includes('cmd'), shift: mods.includes('shift'), alt: mods.includes('alt'),
+    run: id === 'rm-btn' ? toggle(0) : id === 'tm-btn' ? toggle(1) : click(id) }));
+  const keyName = (a) => {
+    const k = a.code === 'Backspace' ? (mac ? '⌫' : 'Backspace') : a.code.slice(3);
+    return mac ? (a.cmd ? '⌘' : '') + (a.shift ? '⇧' : '') + (a.alt ? '⌥' : '') + k
+               : (a.cmd ? 'Ctrl+' : '') + (a.shift ? 'Shift+' : '') + (a.alt ? 'Alt+' : '') + k;
+  };
+  for (const a of ACTS) { const el = document.getElementById(a.id); if (el.closest('.fn-menu')) el.insertAdjacentHTML('beforeend', `<kbd>${keyName(a)}</kbd>`); }
+  MENUS.forEach((M, i) => {
+    M.btn.onclick = toggle(i);
+    // capture: the menu closes before the item's own onclick runs it
+    M.menu.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && !b.disabled) open(M, false); }, true);
+    M.menu.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); open(M, false); M.btn.focus(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); e.stopPropagation();
+        const it = items(M); if (!it.length) return;
+        const j = it.indexOf(document.activeElement), d = e.key === 'ArrowDown' ? 1 : -1;
+        it[j < 0 ? (d > 0 ? 0 : it.length - 1) : (j + d + it.length) % it.length].focus();
+      }
+    });
+  });
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.rmenu')) closeAll(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.repeat || e.isComposing || typing(e.target) || e.target.matches?.('input[type=number], select')) return;
+    const c = mac ? e.metaKey : e.ctrlKey, other = mac ? e.ctrlKey : e.metaKey;
+    if (other) return;
+    const a = ACTS.find((a) => a.code === e.code && a.cmd === c && a.shift === e.shiftKey && a.alt === e.altKey);
+    if (!a) return;
+    e.preventDefault();
+    if (!menuPop.hidden) closeMenu();
+    if (a.id !== 'rm-btn' && a.id !== 'tm-btn') closeAll();
+    a.run();
+  });
+})();
 renderBank();
 
 // ---------- transport ----------

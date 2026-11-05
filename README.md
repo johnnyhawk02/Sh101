@@ -40,11 +40,15 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.11.1), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.12.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Sequencer Randomise and Tools menus (v0.12.0)
+
+The sequencer's pattern buttons moved off the page into two menus at the right of the pattern row, as in the TB-303 app (`seqmenu.js`): **Randomise** (randomise and alter accents, slides, octaves and ties; Shuffle steps; New pattern) and **Tools** (Copy, Paste, Double, Clear, Undo). The actions are unchanged. Every item has a key, shown in the menu: Option/Alt plus the 303 app's letters (Shift for Alter, I for Ties), Cmd/Ctrl for Copy, Paste and Undo, Shift+Backspace for Clear, Option/Alt+R and +T open the menus. Keys are matched on `e.code` and ignored while typing. The Depth slider stays on the page with the others.
 
 ### Buchla 259 folder level and folding (v0.11.1)
 
