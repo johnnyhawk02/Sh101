@@ -491,6 +491,8 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
    Pop-ups inside the glass scale with it; the Options sheet sits in the top layer, so it gets its own fixed size and the same scale. */
 html.fit, html.fit body { height: 100dvh; overflow: hidden; }
 html.fit body { padding: 0; position: relative; }
+/* v0.17.3: the page round the screen is flat near-black, so the screen's edge reads as the shape of the plugin window. */
+html.fit, html.fit body { background: #111; background-image: none; }
 html.fit .unit { position: absolute; left: 50%; top: 50%; width: 1400px; height: 906px; max-width: none; min-height: 0; margin: 0;
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
 html.fit dialog#options { width: 1344px; height: 842px; inset: auto; left: 50%; top: 50%; margin: 0; max-width: none; max-height: none;

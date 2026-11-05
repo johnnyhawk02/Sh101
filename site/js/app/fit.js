@@ -11,7 +11,7 @@ const fitK = () => fitScale;
   root.classList.add('fit');
   const fit = () => {
     const vw = (window.visualViewport && visualViewport.width) || innerWidth, vh = (window.visualViewport && visualViewport.height) || innerHeight;
-    const pad = Math.min(vw, vh) < 600 ? 4 : 16;   // a phone needs every pixel
+    const pad = Math.min(vw, vh) < 600 ? 4 : 64;   // a phone needs every pixel; on a desktop leave a clear dark margin so the window's shape shows
     fitScale = Math.max(0.1, Math.min((vw - pad) / FIT_W, (vh - pad) / FIT_H, 2.2));
     root.style.setProperty('--k', fitScale.toFixed(4));
   };
