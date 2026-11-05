@@ -443,7 +443,11 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .chain-read button { min-width: 0; height: calc(var(--h) - 4px); padding: 0 6px; }
 
 /* the D-pad under the roll, at its right-hand end (from the TB-303 app): square outlined buttons, ink arrows, in a cross */
-.sq-foot { flex: none; display: flex; justify-content: flex-end; }
+.sq-foot { flex: none; display: flex; align-items: center; gap: calc(var(--gap) * 2); }
+/* length and gate run the width of the roll under it, label left and value right, as in the TB-303 app */
+.sq-foot .sq-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 2px; }
+.sq-foot .sld, .lcd-look .sq-foot .sld { grid-template-columns: calc(var(--fs) * 4) 1fr 3em; }
+.sq-bank > .sq-depth { margin-left: auto; } .sq-bank > .sq-depth + .rmenu { margin-left: 0; }
 .dpad { display: grid; grid-template-columns: repeat(3, calc(var(--h) + 4px)); grid-template-rows: repeat(3, calc(var(--h) * .68)); gap: 1px 2px; flex: none; }
 .dpad button { min-width: 0; height: auto; margin: 0; padding: 0; font-size: calc(var(--fs-xs) * .9); line-height: 1; letter-spacing: 0; }
 .dp-up { grid-area: 1 / 2; } .dp-lt { grid-area: 2 / 1; } .dp-rt { grid-area: 2 / 3; } .dp-dn { grid-area: 3 / 2; }
