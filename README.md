@@ -75,11 +75,16 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.16.4), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.17.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### FX page laid out like the TB-303 app's, and new Compactor defaults (v0.17.0)
+Only the look of the FX page changed; every effect, parameter and saved value is the same. The page is three bands with no boxes: folder, drive, delay and compactor across the top; the reverb then the flanger; the routing strip. Units in a band are split by a thin rule, and the second band and the strip have a rule across the top. Each unit's header is one row on the glass: an On / Off button (accent-filled when on in Grey + colour), the name in lowercase, then its own selectors. The pedal, the reverb type and the reverb program are dropdown menus (the 303 app's `drawTypeMenu`, in the sequencer menu style with a ✓ by the current item); the program button grid and the reverb readout are gone. Delay Mono / Ping-pong and Flanger / Chorus are small segmented switches in the header. Every continuous control is a dial, one row per unit, using the 303 app's short names (symmetry, distortion, volume, feedback, low cut, high cut). When a unit is off only its dials dim, to 50%. The subtitles are gone. The 303's sizes are drawn 1.4x, since its screen is 1000 px wide and Shyoy's 1400.
+
+A new or init sound's Compactor now starts at Amount 30% and Release 250 ms (was 40% and 20 ms). Saved sounds and the built-in presets keep their own values, and a sound saved before the two-dial Compactor still migrates to 40% / 20 ms.
 
 ### Bigger text again, and a tidy (v0.16.4)
 The type scale went up one more step: `--fs-xs` 18px, `--fs-s` 21px, `--fs` 23px, `--fs-l` 25px. The piano roll's row names and step numbers use `--fs-s`, and the D-pad arrows are a bit bigger. Reverb program names use `--fs-xs` with slightly tighter tracking, so all nine fit. On Bridges the tap voltages now sit in one right-aligned column instead of trailing each name. On Perform the bender faders, lever, mod push and transpose are centred instead of packed into the left corner, and the lever's knob springs back to the true centre (it had been 5px left). Every tab, the menus and Options still fit with no scrolling at 1440 x 900 and 915 x 412 (the About text scrolls, as before).

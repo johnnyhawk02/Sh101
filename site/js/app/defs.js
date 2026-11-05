@@ -111,13 +111,14 @@ const flgMs = (v) => 1000 * 1024 / (2 * (500e3 - v * (500e3 - 40e3)));
 const exr = (lo, hi, p) => lo * Math.pow(hi / lo, p);
 const hz = f => f >= 1000 ? (f / 1000).toFixed(f < 10000 ? 2 : 1) + 'k' : f.toFixed(0) + 'Hz';
 const sec = t => t < 10 ? t.toFixed(1) + 's' : t.toFixed(0) + 's';
-// Compactor defaults for every sound (Johnny): Amount 40%, Release 20 ms (the knob is 1000 ms × p², so p = √0.02)
-const CMP_AMT_DEF = 0.4, CMP_REL_DEF = Math.sqrt(0.02);
+// Compactor defaults for a new or init sound (Johnny, v0.17.0): Amount 30%, Release 250 ms (the knob is 1000 ms × p², so p = √0.25).
+// A sound saved before the two-dial Compactor still migrates to the old 40% / 20 ms, so saved sounds don't change.
+const CMP_AMT_DEF = 0.3, CMP_REL_DEF = Math.sqrt(0.25), CMP_AMT_MIG = 0.4, CMP_REL_MIG = Math.sqrt(0.02);
 const CMP_OLD = ['cmpthr', 'cmprng', 'cmpatk', 'cmphold', 'cmpmix', 'cmpmode'];
 // a sound saved before the two-dial Compactor gets 40% / 20 ms; its old settings are dropped, not mapped
 function migrateCmp(p) {
   if (!p || typeof p !== 'object') return p;
-  if (!('cmpamt' in p)) { p.cmpamt = CMP_AMT_DEF; p.cmprel = CMP_REL_DEF; }
+  if (!('cmpamt' in p)) { p.cmpamt = CMP_AMT_MIG; p.cmprel = CMP_REL_MIG; }
   for (const k of CMP_OLD) delete p[k];
   return p;
 }
@@ -125,18 +126,18 @@ const FX = [
   // the Buchla 259 timbre folder, ahead of the drive slot
   { id: 'fold', name: 'Folder', sub: 'Buchla 259', items: [
     { f: 'fldtimbre', label: 'Timbre', def: .5, fmt: v => (0.5 + 9.5 * v * v).toFixed(1) + 'V' },
-    { f: 'fldsym', label: 'Symm', def: .5, fmt: v => { const o = (v - .5) * 4; return (o > 0.05 ? '+' : '') + o.toFixed(1) + 'V'; } },
+    { f: 'fldsym', label: 'Symmetry', def: .5, fmt: v => { const o = (v - .5) * 4; return (o > 0.05 ? '+' : '') + o.toFixed(1) + 'V'; } },
     { f: 'fldlevel', label: 'Level', def: .5, fmt: pct } ] },
   // the drive slot: one switch picks the pedal (fx.rat still switches the slot on, so older sounds keep their RAT);
   // drv: which pedal a fader belongs to
   { id: 'rat', name: 'Drive', sub: 'LM308 + diodes', dv: true, items: [
     { s: 'drvtype', label: 'Pedal', opts: DRV_NAMES, def: 0, val: i => i / 2 },
-    { f: 'dist', drv: 'rat', label: 'Dist', def: .5, fmt: pct }, { f: 'filter', drv: 'rat', label: 'Filter', def: .4, fmt: pct }, { f: 'ratvol', drv: 'rat', label: 'Level', def: .5, fmt: pct },
+    { f: 'dist', drv: 'rat', label: 'Distortion', def: .5, fmt: pct }, { f: 'filter', drv: 'rat', label: 'Filter', def: .4, fmt: pct }, { f: 'ratvol', drv: 'rat', label: 'Volume', def: .5, fmt: pct },
     { f: 'dsdist', drv: 'ds', label: 'Dist', def: .5, fmt: pct }, { f: 'dstone', drv: 'ds', label: 'Tone', def: .5, fmt: pct }, { f: 'dslevel', drv: 'ds', label: 'Level', def: .5, fmt: pct },
     { f: 'tsdrive', drv: 'ts', label: 'Drive', def: .5, fmt: pct }, { f: 'tstone', drv: 'ts', label: 'Tone', def: .5, fmt: pct }, { f: 'tslevel', drv: 'ts', label: 'Level', def: .5, fmt: pct } ] },
   { id: 'dly', name: 'Delay', sub: 'tempo synced', items: [
-    { f: 'dlytime', label: 'Time', def: .7, fmt: v => DLY_DIV_NAMES[Math.round(v * 10)] }, { f: 'dlyfb', label: 'Fdbk', def: .35, fmt: v => Math.round(v * 95) + '%' },
-    { f: 'dlylo', label: 'Lo cut', def: .3, fmt: v => hz(20 * Math.pow(50, v)) }, { f: 'dlyhi', label: 'Hi cut', def: .55, fmt: v => hz(1000 * Math.pow(20, v)) },
+    { f: 'dlytime', label: 'Time', def: .7, fmt: v => DLY_DIV_NAMES[Math.round(v * 10)] }, { f: 'dlyfb', label: 'Feedback', def: .35, fmt: v => Math.round(v * 95) + '%' },
+    { f: 'dlylo', label: 'Low cut', def: .3, fmt: v => hz(20 * Math.pow(50, v)) }, { f: 'dlyhi', label: 'High cut', def: .55, fmt: v => hz(1000 * Math.pow(20, v)) },
     { f: 'dlymix', label: 'Return', def: .35, fmt: pct }, { s: 'dlypp', label: 'Mode', opts: ['Mono', 'Ping-pong'], def: 1, val: i => i } ] },
   // the reverb slot (from the 303 app): one switch picks the unit, each unit has its program buttons and its own faders.
   // rev: which unit an item belongs to; prog: the program buttons (stored as an index, sent as 0..1 like the 303's knobs).

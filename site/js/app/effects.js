@@ -1,65 +1,80 @@
 // Shyoy: FX page: units, the reverb slot, recorded impulse responses, the drive slot.
 // ---------- UI: effects ----------
+// Laid out like the TB-303 app's FX page (Johnny): three bands with no boxes (folder, drive, delay, compactor; the reverb
+// and the flanger; the routing strip), each unit a one-row header on the glass (On / Off, its name, its own selectors) over
+// one row of dials. The pedal, the reverb type and its program are picked from dropdown menus.
 const fxrow = document.getElementById('fxrow'), fxBox = {};
 const fxRows = [0, 1].map(i => { const r = document.createElement('div'); r.className = 'fxr fxr' + i; fxrow.appendChild(r); return r; });
+// a small segmented switch in a unit's header (delay mode, flanger mode)
+const fxSeg = (cls, label, names) => `<span class="fx-seg ${cls}" role="radiogroup" aria-label="${label}">` +
+  names.map((n, i) => `<button type="button" data-t="${i}" role="radio" aria-checked="false">${n}</button>`).join('') + `</span>`;
+const fxName = (u) => `<span class="fxname">${u.name.toLowerCase()}</span>`;
 for (const u of FX) {
-  const el = document.createElement('section'); el.className = 'fxu'; el.setAttribute('aria-label', u.name);
-  const sw = u.id === 'cmp' ? '' : `<button class="onoff" id="fx-${u.id}-on" aria-pressed="false">off</button>`;
-  if (u.rv) {
-    el.classList.add('rv');
-    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type" role="radiogroup" aria-label="Reverb type">` +
-      REV_TYPE_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n}</button>`).join('') +
-      `</span><span class="rv-lcd" id="rvLcd" aria-live="polite"></span><small>${u.sub}</small></div>` +
-      `<div class="rv-progs" id="rvProgs" role="radiogroup" aria-label="Program"></div><div class="ctrls"></div>`;
-    const c = el.querySelector('.ctrls');
-    for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.rev = it.rev; }
-  } else if (u.dv) {
-    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type dv-type" role="radiogroup" aria-label="Pedal">` +
-      DRV_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n}</button>`).join('') + `</span><small id="dvSub">${u.sub}</small></div><div class="ctrls"></div>`;
-    const c = el.querySelector('.ctrls');
-    for (const it of u.items) if (it.f) { fader(it, c); c.lastElementChild.dataset.drv = it.drv; }
-    el.querySelector('.dv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); const i = +b.dataset.t; state.params.drvtype = i; post({ type: 'param', id: 'drvtype', v: FX_SW.drvtype.val(i) }); save(); drawDrv(); });
-  } else if (u.fg) { // the flanger: Flanger / Chorus in the header, four dials
-    el.classList.add('fg');
-    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><span class="rv-type fg-mode" role="radiogroup" aria-label="Flanger mode">` +
-      FLG_MODE_NAMES.map((n, i) => `<button data-t="${i}" role="radio" aria-checked="false">${n.toLowerCase()}</button>`).join('') + `</span><small>${u.sub}</small></div><div class="ctrls"></div>`;
-    const c = el.querySelector('.ctrls');
-    for (const it of u.items) if (it.dial) dial(it, c);
-    el.querySelector('.fg-mode').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); const i = +b.dataset.t; state.params.flgmode = i; post({ type: 'param', id: 'flgmode', v: FX_SW.flgmode.val(i) }); save(); drawFlg(); });
-  } else {
-    el.innerHTML = `<div class="fxh">${sw}<b>${u.name}</b><small>${u.sub}</small></div><div class="ctrls"></div>`;
-    const c = el.querySelector('.ctrls');
-    for (const it of u.items) it.dial ? dial(it, c) : it.f ? fader(it, c) : switcher(it, c);
+  const el = document.createElement('section'); el.className = 'fxu fx-' + u.id; el.setAttribute('aria-label', u.name);
+  const sw = u.id === 'cmp' ? '' : `<button type="button" class="onoff" id="fx-${u.id}-on" aria-pressed="false">Off</button>`;
+  let head = fxName(u);
+  if (u.rv) { el.classList.add('rv'); head += `<div class="rmenu tmenu" id="rev-type" data-label="Reverb type"></div><div class="rmenu tmenu" id="rev-prog" data-label="Program"></div>`; }
+  else if (u.dv) head += `<div class="rmenu tmenu" id="drv-type" data-label="Drive pedal"></div>`;
+  else if (u.id === 'dly') head += fxSeg('dly-mode', 'Delay mode', FX_SW.dlypp.opts);
+  else if (u.fg) { el.classList.add('fg'); head = fxSeg('fg-mode', 'Flanger mode', FLG_MODE_NAMES); }
+  el.innerHTML = `<div class="fxh">${sw}${head}</div><div class="ctrls"></div>`;
+  const c = el.querySelector('.ctrls');
+  for (const it of u.items) if (it.f) { // every continuous control is a dial; the switches live in the header
+    dial(it, c); const d = c.lastElementChild;
+    if (it.rev) d.dataset.rev = it.rev; if (it.drv) d.dataset.drv = it.drv;
   }
   fxRows[u.rv || u.fg ? 1 : 0].appendChild(el); fxBox[u.id] = el; // the reverb and the flanger share the second row
   const b = el.querySelector('.onoff');
   if (b) b.onclick = () => { boot(); state.fx[u.id] = !state.fx[u.id]; post({ type: 'fx', name: u.id, on: state.fx[u.id] }); renderFx(); save(); };
 }
-// ---------- the reverb slot: type switch, program buttons, the selected unit's faders, the note ----------
-const RV_PROG = {}; for (const it of FX.find(u => u.rv).items) if (it.prog) RV_PROG[it.rev] = it;
-const rvProgs = document.getElementById('rvProgs');
-let rvShown = '';
-function setRev(id, i) { // a type or program button: these switch at once (like the 303 app, no slewing)
-  const it = FX_SW[id]; state.params[id] = i; post({ type: 'param', id, v: it.val(i) }); save(); drawRev();
+// a switch stored as an index and sent as 0..1, as the old button rows did
+function setFxSw(id, i) { const it = FX_SW[id]; state.params[id] = i; post({ type: 'param', id, v: it.val(i) }); save(); }
+// ---------- type menus (the 303 app's drawTypeMenu): a button showing the current choice and ▾, a menu below it with
+// a ✓ by the current one. Arrow keys move, Enter picks, Escape or a click outside closes. Picking switches at once.
+function typeMenu(el, pick) {
+  el.innerHTML = `<button type="button" class="rm-btn" aria-haspopup="menu" aria-expanded="false" aria-label="${el.dataset.label}"></button><div class="fn-menu" role="menu" hidden></div>`;
+  const btn = el.firstElementChild, menu = el.lastElementChild;
+  const open = (on) => {
+    menu.hidden = !on; btn.setAttribute('aria-expanded', on);
+    if (on) (menu.querySelector('[aria-checked=true]') || menu.querySelector('button')).focus();
+  };
+  btn.onclick = () => { for (const m of document.querySelectorAll('.tmenu .fn-menu:not([hidden])')) if (m !== menu) m.parentElement.firstElementChild.click(); open(menu.hidden); };
+  menu.addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (!b) return; open(false); boot(); pick(+b.dataset.t); btn.focus(); });
+  menu.addEventListener('keydown', (e) => {
+    const bs = [...menu.querySelectorAll('button')], j = bs.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); open(false); btn.focus(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); bs[(j + (e.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length].focus(); }
+  });
+  document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !el.contains(e.target)) open(false); });
 }
-fxBox.lex.querySelector('.rv-type').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { boot(); setRev('revtype', +b.dataset.t); } });
-rvProgs.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) { boot(); setRev(RV_PROG[REV_IDS[state.params.revtype | 0] || 'lex'].s, +b.dataset.i); } });
+function setTypeItems(el, names) {
+  el.lastElementChild.innerHTML = names.map((n, i) => `<button type="button" role="menuitemradio" aria-checked="false" data-t="${i}">${n}</button>`).join('');
+}
+function drawTypeMenu(el, t) {
+  const items = el.querySelectorAll('.fn-menu button');
+  for (const b of items) b.setAttribute('aria-checked', +b.dataset.t === t);
+  if (items[t]) el.firstElementChild.textContent = items[t].textContent;
+}
+// ---------- the reverb slot: type and program menus, the selected unit's dials ----------
+const RV_PROG = {}; for (const it of FX.find(u => u.rv).items) if (it.prog) RV_PROG[it.rev] = it;
+const revTypeEl = document.getElementById('rev-type'), revProgEl = document.getElementById('rev-prog');
+let rvShown = '';
+function setRev(id, i) { setFxSw(id, i); drawRev(); } // a type or program: these switch at once (like the 303 app, no slewing)
+typeMenu(revTypeEl, (i) => setRev('revtype', i)); setTypeItems(revTypeEl, REV_TYPE_NAMES);
+typeMenu(revProgEl, (i) => setRev(RV_PROG[REV_IDS[state.params.revtype | 0] || 'lex'].s, i));
 const LEX_CHORUS_NAMES = { lexbass: 'Pair 1', lexmid: 'Pair 2', lexxover: 'Pair 3', lextreble: 'Pair 4', lexdepth: 'Wander' };
 const fdrLabel = id => document.querySelector(`label[for="f-${id}"]`);
 function drawRev() {
   const t = Math.max(0, Math.min(3, state.params.revtype | 0)), T = REV_IDS[t], pit = RV_PROG[T], n = pit.opts.length;
   const sel = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0));
-  for (const b of fxBox.lex.querySelectorAll('.rv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
+  drawTypeMenu(revTypeEl, t);
   if (rvShown !== T) {
     rvShown = T;
-    rvProgs.style.setProperty('--n', n);
     const full = T === 'lex' ? LEX_PROGS.map(p => p[3]) : T === 'plate' ? PLATE_PROGS.map(p => p[1]) : T === 'spring' ? SPRING_PROGS.map(p => p[1]) : CNV_PROGS.map(p => p[1]);
-    rvProgs.innerHTML = pit.opts.map((o, i) => `<button data-i="${i}" role="radio" aria-checked="false" aria-label="${i + 1} ${full[i]}"><b>${i + 1}</b>${o}</button>`).join('');
-    for (const f of fxBox.lex.querySelectorAll('.fdr[data-rev]')) f.hidden = f.dataset.rev !== T;
+    setTypeItems(revProgEl, full.map((f, i) => `${T === 'lex' ? 'P' : ''}${i + 1} ${f}`));
+    for (const d of fxBox.lex.querySelectorAll('.dial[data-rev]')) d.hidden = d.dataset.rev !== T;
   }
-  for (const b of rvProgs.children) b.setAttribute('aria-checked', +b.dataset.i === sel);
-  const lcd = T === 'lex' ? `P${sel + 1} ${LEX_PROGS[sel][3]}` : `${sel + 1} ${(T === 'plate' ? PLATE_PROGS : T === 'spring' ? SPRING_PROGS : CNV_PROGS)[sel][1]}`;
-  document.getElementById('rvLcd').textContent = lcd.toUpperCase();
+  drawTypeMenu(revProgEl, sel);
   if (T === 'lex') for (const id in LEX_CHORUS_NAMES) fdrLabel(id).textContent = (sel === 8 ? LEX_CHORUS_NAMES[id] : FX.find(u => u.rv).items.find(x => x.f === id).label).toLowerCase();
   if (T === 'conv') { fdrLabel('cnvdecay').textContent = CNV_PROGS[sel][3] ? 'gate' : CNV_PROGS[sel][2] ? 'length' : 'decay'; if (!irFailed) { loadIRMeta(); loadIRs(); } }
   for (const it of FX.find(u => u.rv).items) if (it.f && it.rev === T) ui[it.f](state.params[it.f]); // readouts that depend on the program
@@ -85,26 +100,34 @@ async function loadIRs() {
   }
 }
 for (const id of ['revtype', 'lexprog', 'plateprog', 'sprprog', 'cnvprog']) ui[id] = () => drawRev(); // preset loads redraw the slot
-// the drive slot: the pedal switch shows that pedal's three faders and its circuit in the strip
+// the drive slot: the pedal menu shows that pedal's three dials and its circuit in the strip
+const drvTypeEl = document.getElementById('drv-type');
+typeMenu(drvTypeEl, (i) => { setFxSw('drvtype', i); drawDrv(); }); setTypeItems(drvTypeEl, DRV_NAMES);
 function drawDrv() {
   const t = Math.max(0, Math.min(2, state.params.drvtype | 0)), T = DRV_IDS[t];
-  for (const b of fxBox.rat.querySelectorAll('.dv-type button')) b.setAttribute('aria-checked', +b.dataset.t === t);
-  for (const f of fxBox.rat.querySelectorAll('.fdr[data-drv]')) f.hidden = f.dataset.drv !== T;
-  document.getElementById('dvSub').textContent = DRV_SUBS[t];
+  drawTypeMenu(drvTypeEl, t);
+  for (const d of fxBox.rat.querySelectorAll('.dial[data-drv]')) d.hidden = d.dataset.drv !== T;
   drawRoute();
 }
 ui.drvtype = () => drawDrv();
 // the flanger's mode: Flanger or Chorus; chorus has no feedback, so Res dims, and Manual reads the chorus delay
+const fgModeEl = fxBox.flg.querySelector('.fg-mode');
+fgModeEl.addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); setFxSw('flgmode', +b.dataset.t); drawFlg(); });
 function drawFlg() {
   const m = (state.params.flgmode | 0) ? 1 : 0;
-  for (const b of fxBox.flg.querySelectorAll('.fg-mode button')) b.setAttribute('aria-checked', +b.dataset.t === m);
+  for (const b of fgModeEl.children) b.setAttribute('aria-checked', +b.dataset.t === m);
   document.getElementById('f-flgres').closest('.dial').classList.toggle('dim', m === 1);
   ui.flgman(state.params.flgman);
   drawRoute();
 }
+// the delay's mode: Mono or Ping-pong
+const dlyModeEl = fxBox.dly.querySelector('.dly-mode');
+dlyModeEl.addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (!b) return; boot(); setFxSw('dlypp', +b.dataset.t); drawDly(); });
+function drawDly() { const m = (state.params.dlypp | 0) ? 1 : 0; for (const b of dlyModeEl.children) b.setAttribute('aria-checked', +b.dataset.t === m); }
+ui.dlypp = () => drawDly();
 ui.flgmode = () => drawFlg();
 function renderFx() {
-  for (const n of FX_UNITS) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'on' : 'off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
+  for (const n of FX_UNITS) { const b = document.getElementById(`fx-${n}-on`); b.setAttribute('aria-pressed', !!state.fx[n]); b.textContent = state.fx[n] ? 'On' : 'Off'; fxBox[n].classList.toggle('on', !!state.fx[n]); }
   fxBox.cmp.classList.toggle('on', !!(state.fx.dly || state.fx.lex));
   drawRoute();
 }
@@ -161,4 +184,4 @@ function drawRoute() {
   routeDia.addEventListener('click', hit);
   routeDia.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hit(e); } });
 }
-renderFx(); drawRev(); drawDrv(); drawFlg();
+renderFx(); drawRev(); drawDrv(); drawFlg(); drawDly();

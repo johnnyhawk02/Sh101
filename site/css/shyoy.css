@@ -113,11 +113,11 @@ select.btn option { color: #000; }
   padding: 0 4px; text-align: center; text-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
 
 /* label strip: the one heading style for every module, group and effect */
-.mod h2, .bend-grp h3, .perf101 h3, .fxu .fxh {
+.mod h2, .bend-grp h3, .perf101 h3 {
   margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: calc(var(--fs-l) + 4px);
   padding: 0 var(--gap-s) 0 calc(var(--gap-s) + 2px); background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
   font-size: var(--fs-l); font-weight: 400; line-height: 1.1; text-transform: lowercase; letter-spacing: .03em; white-space: nowrap; }
-.mod h2 small, .fxu .fxh small { color: var(--lit); font-size: var(--fs-xs); letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
+.mod h2 small { color: var(--lit); font-size: var(--fs-xs); letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* faders: a column of LCD segments, lit up to the value; they stretch to the height of their row */
 .ctrls { display: flex; gap: var(--gap); align-items: stretch; flex: 1 1 auto; min-height: 0; }
@@ -336,20 +336,44 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .cell.active span { background: var(--glass); padding: 0 3px; }
 .mx .volt { font-size: var(--fs-s); color: var(--muted); position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 4.2em; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* effects (from the 303 app): one box per unit, a power switch in its label strip */
-.fxrow { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--gap); }
-.fxr { flex: 1 1 0; min-height: 0; display: flex; gap: var(--gap); }
-.fxr1 { flex-grow: 1.35; }
-.fxu { flex: 1 1 auto; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); padding: var(--gap-s); border: var(--bw) solid var(--ink); border-radius: calc(var(--r) + 1px); opacity: .55; }
-.fxu.on { opacity: 1; }
-.fxu.rv { flex: 1 1 0; min-width: 0; }   /* the reverb slot and the flanger share the second row: folder, drive, delay and compactor the first */
-.fxu.fg { flex: none; }
-.fg .fxh { justify-content: flex-start; gap: calc(var(--gap) - 2px); }
-.fg .ctrls { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-s) var(--gap); }
-.fg .dial .knob { min-height: 0; }
+/* effects, laid out like the TB-303 app's FX page (v0.17.0): three bands, no boxes. Units in a row are split by a thin
+   rule on their left; the reverb row and the routing strip have a rule across the top. Each unit is a one-row header on
+   the glass (On / Off, its name, its own menus or switch) over one row of dials. The 303's sizes are drawn 1.4x here,
+   since its screen is 1000 px wide and this one 1400, so the two pages look the same. */
+#pan-fx { gap: 0; --knob: 60px; --kn-w: 82px; }
+.fxrow { flex: none; display: flex; flex-direction: column; gap: 0; margin-bottom: 36px; }
+.fxr { flex: none; display: flex; align-items: stretch; }
+.fxr1 { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+.fxu { flex: none; display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 0 20px; border-left: 1px solid var(--line); }
+.fxu:first-child { padding-left: 0; border-left: 0; }
+.fxr0 .fxu:last-child { flex: 1 1 auto; }   /* the compactor takes what is left of the first row */
+.fxu.rv { flex: 1 1 auto; }                  /* the reverb most of the second row, the flanger at its right */
+.fxu.fg { padding-right: 0; }
+.fxu .fxh { display: flex; align-items: center; gap: 14px; height: var(--h-top); flex-wrap: nowrap; white-space: nowrap; }
+.fxname { font-size: var(--fs); line-height: 1; color: var(--ink); text-transform: lowercase; }
+.fxu .onoff { min-width: 72px; padding: 0 10px; text-transform: none; }
+/* a small segmented switch in a header: delay Mono / Ping-pong, flanger Flanger / Chorus */
+.fx-seg { display: inline-flex; flex: none; }
+.fx-seg button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-right-width: 0; border-radius: 0; color: var(--ink);
+  height: var(--h); padding: 0 12px; font-family: var(--f-lcd); font-size: var(--fs); line-height: 1; text-transform: none; text-shadow: var(--shadow); cursor: pointer;
+  white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+.fx-seg button:first-child { border-radius: var(--r) 0 0 var(--r); } .fx-seg button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
+.fx-seg button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+@media (hover: hover) { .fx-seg button:hover:not([aria-checked="true"]) { background: var(--tint); } }
+/* the dials: one row per unit, dimmed (and only they) while the unit is off */
+.fxu .ctrls { flex: none; display: flex; flex-wrap: nowrap; gap: 4px; justify-content: flex-start; transition: opacity .15s; }
+.fxu:not(.on) .ctrls { opacity: .5; }
+.fxu .dial { flex: none; min-width: var(--kn-w); gap: 6px; }
+.fxu .dial .knob { flex: none; width: var(--knob); height: var(--knob); min-height: 0; }
+.dial[hidden] { display: none; }
 .dial.dim { opacity: .4; }
+/* the type menus (the 303 app's .tmenu): a button with the current choice and ▾, the menu below it at its left edge */
+.tmenu > .rm-btn { font-size: var(--fs); padding: 0 12px; }
+.tmenu .fn-menu { left: 0; right: auto; min-width: 200px; }
+.tmenu .fn-menu button { position: relative; justify-content: flex-start; padding: 0 14px 0 28px; }
+.tmenu .fn-menu button[aria-checked=true]::before { content: "✓"; position: absolute; left: 8px; }
 /* routing (the 303 app's strip): the block diagram on the left, the two switches stacked on the right */
-.fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: var(--gap-s); border-top: 1px solid var(--line); }
+.fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: 24px; border-top: 1px solid var(--line); }
 .route-dia { width: 586px; height: 64px; flex: 0 1 auto; min-width: 0; overflow: visible; font-family: var(--f-lcd); }
 .route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
@@ -366,29 +390,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .route-dia [data-u]:focus-visible { outline: none; }
 .route-ctl { display: grid; gap: var(--gap-s); justify-items: stretch; margin-left: auto; flex: none; }
 .route-ctl .lcd-seg { display: flex; } .route-ctl .lcd-seg button { flex: 1; }
-.fxu .ctrls, .mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
-.fxu .fxh { justify-content: flex-start; padding-left: 3px; }
-.fxu .fxh b { font-weight: 400; }
-.fxu .fxh small { margin-left: auto; }
-.fxu .onoff { height: calc(var(--fs-l) - 2px); padding: 0 6px; font-size: var(--fs-xs); border-color: var(--glass); color: var(--glass); text-shadow: none; }
-.fxu .onoff[aria-pressed="true"] { background: var(--glass); color: var(--ink); }
-.fxu .lcd { font-size: var(--fs-s); border: var(--bw) solid var(--ink); padding: 0 6px; border-radius: var(--r); white-space: nowrap; }
-/* the reverb slot (from the 303 app): type switch and program readout in the strip, a full-width row of program buttons,
-   the selected unit's faders, a two-line note */
-.rv .fxh { justify-content: flex-start; gap: calc(var(--gap) - 2px); }
-.rv-type { display: inline-flex; }
-.rv-type button { appearance: none; background: none; border: var(--bw) solid var(--glass); border-right-width: 0; border-radius: 0; color: var(--glass);
-  height: calc(var(--fs-l) - 2px); padding: 0 calc(var(--gap-s) + 2px); font: inherit; font-size: var(--fs-xs); line-height: 1; text-transform: lowercase; cursor: pointer; }
-.rv-type button:first-child { border-radius: var(--r) 0 0 var(--r); } .rv-type button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
-.rv-type button[aria-checked="true"] { background: var(--glass); color: var(--ink); }
-.rv-lcd { font-size: var(--fs-s); letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.rv-progs { flex: none; display: grid; grid-template-columns: repeat(var(--n, 9), minmax(0, 1fr)); gap: var(--gap-s); }
-.rv-progs button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink); min-width: 0;
-  padding: 2px 2px 3px; font: inherit; font-size: var(--fs-xs); letter-spacing: -.03em; line-height: 1.05; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
-.rv-progs button b { display: block; font-weight: 400; font-size: var(--fs); }
-.rv-progs button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
-@media (hover: hover) { .rv-progs button:hover:not([aria-checked="true"]), .rv-type button:hover:not([aria-checked="true"]) { background: var(--tint); } }
+.mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
 .fdr[hidden] { display: none; }
 
 /* ---------- sequencer: controls in one strip, the piano roll fills the rest ---------- */
