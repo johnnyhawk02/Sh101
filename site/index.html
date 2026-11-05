@@ -167,14 +167,13 @@ select.btn option { color: #000; }
 .dial label { font-size: var(--fs-s); text-transform: lowercase; text-align: center; line-height: 1; white-space: nowrap; margin-top: 2px; }
 .dial output { font-size: var(--fs-s); color: var(--ink); min-height: 1em; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-/* switches: an LED list, the chosen one inverted */
+/* switches: an LED list, the chosen one shown by its lit LED only */
 .sw { display: flex; flex-direction: column; gap: 2px; }
 .sw .lab { font-size: var(--fs-s); color: var(--muted); text-transform: lowercase; margin-bottom: 2px; }
 .sw button { appearance: none; border: 0; background: none; padding: 1px 6px 1px 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;
   font-size: var(--fs); line-height: 1.05; color: var(--ink); text-align: left; text-transform: lowercase; text-shadow: var(--shadow); border-radius: 2px; white-space: nowrap; }
 .sw button .led { width: 8px; height: 8px; }
-.sw button[aria-pressed="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
-.sw button[aria-pressed="true"] .led { background: var(--glass); }
+.sw button[aria-pressed="true"] .led { background: var(--ink); }
 .sw .btn { justify-content: flex-start; border: var(--bw) solid var(--ink); height: var(--h); padding: 0 10px; box-shadow: var(--shadow); margin-bottom: 4px; }
 
 /* horizontal sliders (sequencer, bridges depth): a segmented strip with an ink block */
@@ -516,7 +515,7 @@ body > .hint { display: none; }
 </div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.13.0</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.13.1</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu" title="Supply: battery voltage and rail">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -541,7 +540,7 @@ body > .hint { display: none; }
           <button role="menuitem" id="mColours">Colours…</button>
           <button role="menuitem" id="mInstall">Install app</button>
           <button role="menuitem" id="mUpdate">Check for update</button>
-          <span class="menu-ver" id="mVer">Shyoy v0.13.0</span>
+          <span class="menu-ver" id="mVer">Shyoy v0.13.1</span>
         </div>
         <div class="lcd-pop" id="lcdPop" role="dialog" aria-labelledby="lcdH" hidden>
           <h3 id="lcdH">colours</h3>

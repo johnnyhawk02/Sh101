@@ -40,11 +40,15 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.0), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.1), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Switch LEDs only (v0.13.1)
+
+On the Synth page the chosen option of a switch (wave, range, sub, env trigger and the rest) no longer gets an ink fill. Only its small square LED lights: ink in Mono, the spot colour in Grey + colour.
 
 ### Colours and the bigger preset namer (v0.13.0)
 
