@@ -40,11 +40,15 @@ npm run build   # inlines src/dsp.js into src/ui.html -> index.html
 
 ## Live app (Shyoy)
 
-`site/` holds the current Shyoy build (v0.13.1), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
+`site/` holds the current Shyoy build (v0.13.2), moved here from johnnyhawk02.github.io/sh101. It is served at https://shyoy.pages.dev:
 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### Perform page: bender only (v0.13.2)
+
+The Arpeggio, Load/Play sequencer, Hold, Rest and Clear seq buttons are gone from the Perform page; it now holds the bender (its faders, lever and Mod push) and Transpose. The Sequencer page is unchanged. The arpeggio and the 101's 100-step sequencer are still in the engine but have no controls, so they stay off.
 
 ### Switch LEDs only (v0.13.1)
 
