@@ -450,6 +450,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .fn-menu button:not(:disabled):hover, .fn-menu button:focus-visible { background: var(--ink); color: var(--glass); outline: 0; }
 .fn-menu button:not(:disabled):hover kbd, .fn-menu button:focus-visible kbd { color: var(--glass); }
 .fn-menu [aria-checked=true]::after { content: "✓"; }
+.tmenu .fn-menu [aria-checked=true]::after { content: none; }   /* v0.20.3: the type menus have theirs on the left: one tick, not two (Johnny) */
 .fn-menu button:disabled { opacity: .4; cursor: default; }
 .chain-read { display: flex; align-items: center; gap: 6px; } .chain-read[hidden] { display: none; }
 .chain-read .now { background: var(--ink); color: var(--glass); padding: 0 3px; } .chain-read .arr { opacity: .5; }
