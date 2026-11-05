@@ -317,7 +317,7 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .tabs button[hidden] { display: none; }
 /* v0.20.0: the tab numbers are gone and each tab is half its old width (Johnny) */
 .tabs button::before { content: none; }
-.tabs button[aria-selected="true"] { background: none; box-shadow: none; color: var(--ink); border-top: 5px solid var(--accent, var(--ink));
+.tabs button[aria-selected="true"] { background: none; box-shadow: none; color: var(--ink); border-top: 5px solid var(--ink);   /* v0.20.1: ink, no spot colour (Johnny) */
   padding-top: calc(var(--gap-s) + 8px); padding-bottom: calc(var(--gap-s) + 3px + var(--bw)); margin-bottom: 0; }
 /* the active tab hides the base line under it, so it opens into the page */
 .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--bw); background: var(--glass); }
