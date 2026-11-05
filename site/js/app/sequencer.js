@@ -122,9 +122,9 @@ function preview(i) {
   post({ type: 'noteOn', n }); clearTimeout(prevT); prevT = setTimeout(() => post({ type: 'noteOff', n }), 160);
 }
 const keepUndo = () => { undoBuf = JSON.stringify({ steps: state.steps, tail }); };
-// length, gate and swing are plain sliders (the Shift and Transpose spring sliders gave way to the D-pad under the roll)
+// length (under the roll), gate and swing (up top) are plain sliders (the Shift and Transpose spring sliders gave way to the D-pad under the roll)
 const sideIn = {}; for (const el of document.querySelectorAll('.sld input')) sideIn[el.dataset.a] = el;
-document.querySelector('.sq-side').addEventListener('input', e => {
+document.querySelector('.sq-body').addEventListener('input', e => {
   const el = e.target.closest('input[data-a]'); if (!el) return;
   const v = +el.value, P = state.steps, p = state.params;
   switch (el.dataset.a) {

@@ -153,10 +153,12 @@ select.btn option { color: #000; }
 .sld[hidden] { display: none; }
 .sld output { text-align: right; font-size: var(--fs); font-variant-numeric: tabular-nums; }
 .sld input { -webkit-appearance: none; appearance: none; width: 100%; height: var(--h); margin: 0; background: none; cursor: pointer; touch-action: none; }
-.sld input::-webkit-slider-runnable-track { height: 12px; border: var(--bw) solid var(--ink); border-radius: 2px; background: repeating-linear-gradient(90deg, var(--ghost) 0 3px, transparent 3px 6px); }
-.sld input::-moz-range-track { height: 8px; border: var(--bw) solid var(--ink); border-radius: 2px; background: repeating-linear-gradient(90deg, var(--ghost) 0 3px, transparent 3px 6px); }
-.sld input::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 22px; margin-top: -7px; background: var(--ink); border: 0; border-radius: 2px; box-shadow: var(--shadow); }
-.sld input::-moz-range-thumb { width: 12px; height: 22px; background: var(--ink); border: 0; border-radius: 2px; }
+/* the track is a row of LCD segments lit up to the value, like the Synth page faders (--v is 0..1, set in controls.js) */
+.sld input { --seg: repeating-linear-gradient(90deg, var(--ink) 0 5px, transparent 5px 7px); --off: repeating-linear-gradient(90deg, var(--ghost) 0 5px, transparent 5px 7px); }
+.sld input::-webkit-slider-runnable-track { height: 16px; border: 0; background: var(--seg) left / calc(var(--v, 0) * 100%) 100% no-repeat, var(--off); filter: drop-shadow(var(--shadow)); }
+.sld input::-moz-range-track { height: 16px; border: 0; background: var(--seg) left / calc(var(--v, 0) * 100%) 100% no-repeat, var(--off); }
+.sld input::-webkit-slider-thumb { -webkit-appearance: none; width: 2px; height: 16px; margin: 0; background: transparent; border: 0; box-shadow: none; }
+.sld input::-moz-range-thumb { width: 2px; height: 16px; background: transparent; border: 0; }
 .sld input:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
 
 /* ---------- header ---------- */
@@ -445,9 +447,8 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 /* the D-pad under the roll, at its right-hand end (from the TB-303 app): square outlined buttons, ink arrows, in a cross */
 .sq-foot { flex: none; display: flex; align-items: center; gap: calc(var(--gap) * 2); }
 /* length and gate run the width of the roll under it, label left and value right, as in the TB-303 app */
-.sq-foot .sq-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 2px; }
-.sq-foot .sld, .lcd-look .sq-foot .sld { grid-template-columns: calc(var(--fs) * 4) 1fr 3em; }
-.sq-bank > .sq-depth { margin-left: auto; } .sq-bank > .sq-depth + .rmenu { margin-left: 0; }
+.sq-len { flex: 1 1 auto; min-width: 0; }
+.sq-len .sld { grid-template-columns: calc(var(--fs) * 4) 1fr 3em; }
 .dpad { display: grid; grid-template-columns: repeat(3, calc(var(--h) + 4px)); grid-template-rows: repeat(3, calc(var(--h) * .68)); gap: 1px 2px; flex: none; }
 .dpad button { min-width: 0; height: auto; margin: 0; padding: 0; font-size: calc(var(--fs-xs) * .9); line-height: 1; letter-spacing: 0; }
 .dp-up { grid-area: 1 / 2; } .dp-lt { grid-area: 2 / 1; } .dp-rt { grid-area: 2 / 3; } .dp-dn { grid-area: 3 / 2; }

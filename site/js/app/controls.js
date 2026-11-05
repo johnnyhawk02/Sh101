@@ -1,3 +1,11 @@
+// Every .sld slider shows its value as lit LCD segments: --v (0..1) drives the track fill in shyoy.css. The value setter
+// is wrapped per slider so values set from code (preset loads, pattern changes, saved looks) light the right segments too.
+for (const el of document.querySelectorAll('.sld input[type=range]')) {
+  const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const fill = () => { const lo = +el.min || 0, hi = +el.max || 100; el.style.setProperty('--v', (d.get.call(el) - lo) / (hi - lo)); };
+  Object.defineProperty(el, 'value', { get() { return d.get.call(el); }, set(v) { d.set.call(el, v); fill(); }, configurable: true });
+  el.addEventListener('input', fill); fill();
+}
 // Shyoy: Faders, dials and switches, and the synth rack built from them.
 // ---------- UI: faders ----------
 const ui = {};
