@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Depth renamed Complexity (v0.22.5)
+
+The sequencer's randomise **Depth** slider is now labelled **Complexity** (Johnny). Nothing else changes: same behaviour, same element id (`sqRndDepth`) and `localStorage` key (`kestrel.sqRndDepth`), so saved settings carry over. Older notes below still call it Depth.
+
 ### Density and Depth both move the pattern that is there (v0.22.4)
 
 - **Density** now works live too: turning it adds notes or turns notes into rests until that share of the steps plays (`densLive()`). Each step has a weight and the lowest play: rests on the beat fill first, notes off the beat go first, step 1 and notes held by a tie stay longest, a tie goes before its note. A note that goes keeps its accent and slide for when it comes back; a new note takes a pitch the pattern uses. There and back gives the same pattern. One drag is one Undo. Generate and Refill still use it as before.
