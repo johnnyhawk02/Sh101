@@ -486,7 +486,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .roll .cell.on { background: var(--ink); box-shadow: inset 0 0 0 1px var(--glass); }
 .roll .cell.on.cur { box-shadow: inset 0 0 0 2px var(--glass); }
 .roll .cell.tie { background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 5px); }
-.roll .cell.mem { box-shadow: inset 0 0 0 1px var(--muted); }
+/* v0.22.6: a rest keeps its remembered pitch, but the roll draws nothing for it: no empty boxes (Johnny) */
 .roll .ghost { opacity: .3; }
 .roll .cell.ghost:hover { opacity: .55; }
 .roll .end { border-right: 3px solid var(--ink); }
