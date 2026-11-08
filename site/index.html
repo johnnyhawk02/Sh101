@@ -29,8 +29,9 @@ try {
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.22.9</i></b><span>Circuit-modelled monosynth · bendable</span></div>
-    <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.22.10</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <!-- v0.22.10: battery readout and Bend board tab taken off the page (Johnny); both stay in the HTML, hidden -->
+    <span class="psu" id="psu" hidden>Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
       <label class="num">Tempo<input id="bpm" type="number" min="40" max="240" value="124"></label>
@@ -61,7 +62,7 @@ try {
     <nav class="tabs" role="tablist" aria-label="Panels">
       <button role="tab" id="tab-synth" aria-controls="rack" aria-selected="false">Synth</button>
       <button role="tab" id="tab-seq" aria-controls="pan-seq" aria-selected="true">Sequencer</button>
-      <button role="tab" id="tab-bend" aria-controls="pan-bend" aria-selected="false">Bend board</button>
+      <button role="tab" id="tab-bend" aria-controls="pan-bend" aria-selected="false" hidden>Bend board</button>
       <button role="tab" id="tab-br" aria-controls="pan-br" aria-selected="false" hidden>Bridges</button>
       <button role="tab" id="tab-fx" aria-controls="pan-fx" aria-selected="false">FX</button>
       <button role="tab" id="tab-perf" aria-controls="perf101" aria-selected="false">Perform</button>
