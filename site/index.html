@@ -29,7 +29,7 @@ try {
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
-    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.22.7</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b>SHYOY <i class="ver" id="ver">v0.22.8</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <span class="psu" id="psu">Battery 9.0 V · rail 100%</span>
     <div class="transport">
       <button class="btn play" id="play"><span class="led"></span><span id="playLab">Run</span></button>
@@ -79,6 +79,8 @@ try {
               <label class="sld" hidden><span>Gate</span><input type="range" data-a="gate" min="10" max="95" step="1" aria-label="Gate time"><output id="o-gate">50%</output></label>
               <label class="sld" hidden><span>Swing</span><input type="range" data-a="swing" min="0" max="75" step="1" aria-label="Swing"><output id="o-swing">0%</output></label>
               <label class="sld"><span>Complexity</span><input type="range" id="sqRndDepth" min="0" max="100" step="1" value="30" aria-label="Complexity"><output id="o-sqRndDepth">30%</output></label>
+              <!-- v0.22.8: Density sits beside Complexity (Johnny), with RND: a new pattern from both -->
+              <div class="sq-dens"><span class="dname">density</span><div class="knob" id="sq-dens" role="slider" tabindex="0" aria-label="Density" aria-valuemin="10" aria-valuemax="100"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk"/><path class="arc"/></svg></div><output id="o-dens">60%</output></div><button type="button" class="rm-btn sq-rnd" id="sq-rnd" aria-label="Generate a new pattern">RND</button>
             </div>
             <!-- step length (gate) as a menu, Johnny v0.19.2; the Gate slider above stays, hidden, and the menu sets it -->
             <div class="rmenu"><button type="button" class="rm-btn" id="gm-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="gm-menu">Gate <span id="gm-val">50%</span></button><div class="fn-menu" id="gm-menu" role="menu" aria-label="Gate" hidden>
@@ -130,8 +132,7 @@ try {
                Swing (shuffle) is hidden at Johnny's request; its slider, handler and engine code all stay. -->
           <div class="sq-foot"><div class="sq-len">
             <label class="sld"><span>Length</span><input type="range" data-a="len" min="1" max="64" step="1" aria-label="Pattern length"><output id="o-len">16</output></label>
-          </div><!-- Density (from the TB-303 app, Johnny: "needs a density knob"): how many steps Generate and Refill fill with notes -->
-          <div class="sq-dens"><span class="dname">density</span><div class="knob" id="sq-dens" role="slider" tabindex="0" aria-label="Density" aria-valuemin="10" aria-valuemax="100"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="trk"/><path class="arc"/></svg></div><output id="o-dens">60%</output></div><div class="dpad" role="group" aria-label="Move the notes">
+          </div><div class="dpad" role="group" aria-label="Move the notes">
             <button type="button" class="dp-up" data-nudge="1" aria-label="Notes up">▲</button>
             <button type="button" class="dp-lt" data-rot="-1" aria-label="Shift the pattern left">◀</button>
             <button type="button" class="dp-rt" data-rot="1" aria-label="Shift the pattern right">▶</button>
@@ -200,7 +201,7 @@ try {
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.22.7</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.22.8</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>

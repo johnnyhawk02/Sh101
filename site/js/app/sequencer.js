@@ -504,3 +504,5 @@ function densLive() {
   });
   draw();
 }
+// v0.22.8: RND beside Density and Complexity runs Generate with both (Johnny)
+document.getElementById('sq-rnd').onclick = () => document.getElementById('p-rnd').click();

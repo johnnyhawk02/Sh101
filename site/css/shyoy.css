@@ -588,3 +588,10 @@ body, body *:not(input):not(textarea) { -webkit-user-select: none; user-select: 
 .sq-dens .knob:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
 .sq-dens .dname { text-transform: lowercase; font-size: var(--fs); }
 .sq-dens output { min-width: 4ch; text-align: right; font-size: var(--fs); font-variant-numeric: tabular-nums; }
+/* v0.22.8: Density moved into the top row beside Complexity, with RND (Johnny) */
+.sq-side .sq-dens { gap: var(--gap-s); }
+.sq-side .sq-dens .knob { width: calc(var(--h) + 4px); height: calc(var(--h) + 4px); }
+.sq-side .sq-dens .dname { text-transform: none; font-size: var(--fs-s); }
+.sq-side .sq-dens output { font-size: var(--fs-s); }
+.sq-rnd { font-size: var(--fs-s); }
+.rm-btn.sq-rnd::after { content: none; }
