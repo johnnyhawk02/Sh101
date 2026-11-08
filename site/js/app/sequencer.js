@@ -476,33 +476,23 @@ function densLive() {
   dw.sig = JSON.stringify(P);
   return dw.sig !== before;
 }
-// the density dial in the sequencer foot (TB-303 app v165): 10-100% of the steps play when Generate or Refill writes a pattern
+// Density (TB-303 app v165), a slider beside Complexity since v0.22.9: 10-100% of the steps play when Generate or Refill
+// writes a pattern, and moving it adds or removes notes in the current one (densLive), one Undo per drag
 {
-  const kn = document.getElementById('sq-dens'), out = document.getElementById('o-dens'), arc = kn.querySelector('.arc'), lo = 0.1;
-  kn.querySelector('.trk').setAttribute('d', DIAL_ALL.join(''));
-  const pos = () => (genDens - lo) / (1 - lo);
-  const draw = () => { const s = Math.round(pos() * DIAL_SEGS); arc.setAttribute('d', s ? DIAL_LIT[s - 1] : '');
-    out.textContent = Math.round(genDens * 100) + '%'; kn.setAttribute('aria-valuenow', Math.round(genDens * 100)); };
-  let held = false; // one Undo per drag
-  const put = (p) => { const was = genDens; genDens = Math.round((lo + (1 - lo) * Math.max(0, Math.min(1, p))) * 100) / 100;
-    try { localStorage.setItem('kestrel.genDens', genDens); } catch (e) {} draw();
+  const el = document.getElementById('sqDens'), out = document.getElementById('o-dens');
+  const draw = () => { out.textContent = Math.round(genDens * 100) + '%'; };
+  el.value = Math.round(genDens * 100); draw();
+  let held = false;
+  el.addEventListener('pointerdown', () => { held = false; });
+  el.addEventListener('input', e => {
+    e.stopPropagation(); const was = genDens; genDens = (+el.value) / 100;
+    try { localStorage.setItem('kestrel.genDens', genDens); } catch (er) {} draw();
     if (genDens === was) return;
     const snap = JSON.stringify({ steps: state.steps, tail });
-    if (densLive()) { if (!held || !drag) { undoStack.push(snap); if (undoStack.length > 30) undoStack.shift(); held = true; } tail = []; stepChanged(); }
-  };
-  let drag = null;
-  kn.addEventListener('pointerdown', e => { if (e.button !== 0) return; held = false; kn.setPointerCapture(e.pointerId); drag = { y: e.clientY, p: pos(), id: e.pointerId }; });
-  kn.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id) return;
-    if (e.pointerType === 'mouse' && !(e.buttons & 1)) { drag = null; return; }
-    put(drag.p + (drag.y - e.clientY) / fitK() / (e.shiftKey ? 600 : 160)); });
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) kn.addEventListener(ev, () => { drag = null; });
-  kn.addEventListener('dblclick', () => put((0.6 - lo) / (1 - lo)));
-  kn.addEventListener('keydown', e => {
-    const d = { ArrowUp: .02, ArrowRight: .02, ArrowDown: -.02, ArrowLeft: -.02, PageUp: .1, PageDown: -.1 }[e.key];
-    if (d) { e.preventDefault(); e.stopPropagation(); put(pos() + (e.shiftKey ? d / 4 : d)); }
-    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); put(e.key === 'End' ? 1 : 0); }
+    if (densLive()) { if (!held) { undoStack.push(snap); if (undoStack.length > 30) undoStack.shift(); held = true; } tail = []; stepChanged(); }
   });
-  draw();
+  el.addEventListener('change', () => { held = false; });
+  el.addEventListener('dblclick', () => { el.value = 60; el.dispatchEvent(new Event('input')); held = false; });
 }
 // v0.22.8: RND beside Density and Complexity runs Generate with both (Johnny)
 document.getElementById('sq-rnd').onclick = () => document.getElementById('p-rnd').click();
