@@ -167,7 +167,13 @@ select.btn option { color: #000; }
 .brand b { display: inline-flex; align-items: flex-start; gap: 6px; padding: 2px 10px 0 12px; background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
   font-size: var(--fs-xl); font-weight: 400; letter-spacing: .14em; line-height: 1; }
 .ver { font-style: normal; font-size: var(--fs-xs); letter-spacing: 0; color: var(--lit); margin-top: 3px; }
-.brand span { font-size: var(--fs-s); color: var(--muted); line-height: 1.05; max-width: 22ch; }
+/* v0.22.11: logo from Johnny's PSD (icons/logo.png, black art on transparent) used as a mask, so it is drawn in the current
+   ink colour and multiplied onto the glass like the rest of the LCD; the version sits top right in muted ink */
+.brand b:has(.logo) { align-items: center; gap: 8px; padding: 0; background: none; color: var(--ink); }
+.brand .logo { display: block; height: 46px; aspect-ratio: 547 / 200; max-width: none; background: var(--ink); mix-blend-mode: multiply;
+  -webkit-mask: url(../icons/logo.png) center / contain no-repeat; mask: url(../icons/logo.png) center / contain no-repeat; }
+.brand b:has(.logo) .ver { align-self: flex-start; margin-top: 2px; color: var(--muted); }
+.brand > span { font-size: var(--fs-s); color: var(--muted); line-height: 1.05; max-width: 22ch; }
 .psu[hidden] { display: none; } .brand:has(+ .psu[hidden]) { margin-right: auto; }
 .psu { display: inline-flex; align-items: center; gap: 8px; height: var(--h); padding: 0 10px; margin-right: auto; border: var(--bw) solid var(--ink); border-radius: var(--r);
   font-size: var(--fs-s); white-space: nowrap; font-variant-numeric: tabular-nums; }
