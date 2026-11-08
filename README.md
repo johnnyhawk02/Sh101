@@ -81,6 +81,11 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Density and Depth both move the pattern that is there (v0.22.4)
+
+- **Density** now works live too: turning it adds notes or turns notes into rests until that share of the steps plays (`densLive()`). Each step has a weight and the lowest play: rests on the beat fill first, notes off the beat go first, step 1 and notes held by a tie stay longest, a tie goes before its note. A note that goes keeps its accent and slide for when it comes back; a new note takes a pitch the pattern uses. There and back gives the same pattern. One drag is one Undo. Generate and Refill still use it as before.
+- **Depth** now reaches the notes as well as accents, slides and octave jumps: each note has a neighbour in the pattern's key (a scale step or two away, or the repeat note, as Alter whole pattern picks) and moves to it where its weight is under 15% x Depth / 30. Lower Depth brings the notes back. Rests are Density's job.
+
 ### Density dial (v0.22.3)
 
 From the TB-303 app (v165): a small **density** dial in the sequencer foot, between Length and the D-pad, 10-100%, default 60% (double-click). It sets the share of steps Generate (G) and Refill slots (⇧G) fill with notes, exactly to the step over the 64 written (`generatePattern(len, genDens)`: built near it, then notes added on off-beats last or removed from off-beats first, never step 1). Alter whole pattern (L) leans its rest/fill changes towards it when the pattern is more than 5% over or under. Kept in `localStorage` (`kestrel.genDens`); not in presets or slots, not an engine parameter, no step sequencer on it.

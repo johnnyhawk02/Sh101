@@ -164,7 +164,7 @@ document.getElementById('p-shuf').onclick = () => {
 // Generate (the TB-303 app's AcidLab-style generator in generate.js): a new riff with no stored patterns. It keeps the pattern's length but
 // writes all 64 steps; the steps past the length go into tail, so lengthening the pattern brings in more of the riff.
 document.getElementById('p-rnd').onclick = () => {
-  keepUndo(); const g = generatePattern(SEQ_MAX, genDens), n = state.steps.length; rw.base = null; rw.jump = 0.25;
+  keepUndo(); const g = generatePattern(SEQ_MAX, genDens), n = state.steps.length; rw.base = null; rw.jump = 0.25; rw.pn = []; rw.p = [];
   state.steps = g.steps.slice(0, n); tail = g.steps.slice(n); stepChanged();
 };
 // Move notes (Tools menu, ] [ ⇧] ⇧[ , . and the D-pad). A real transpose: B up a semitone becomes C one octave up, and
@@ -205,7 +205,7 @@ showSqDepth();
 // off again in the reverse order, so a move there and back gives the same pattern. A roll that no longer fits the step
 // (it was drawn, edited, generated or altered since) is drawn again inside the range that fits, so the pattern as it
 // stands is always kept at the Depth it is at, and only what the move adds or takes away changes.
-const rw = { a: [], s: [], o: [], dir: [], base: null, jump: 0.25, sig: null };
+const rw = { a: [], s: [], o: [], p: [], pn: [], dir: [], base: null, jump: 0.25, sig: null };
 let depthWas = +sqDepthEl.value, depthDrag = false;
 function depthLive(from, to) {
   const P = state.steps, n = P.length, r = Math.random, pit = (st) => st.n + 12 * st.o;
@@ -225,17 +225,36 @@ function depthLive(from, to) {
     const oc = {}; for (const st of N) oc[st.o] = (oc[st.o] || 0) + 1;
     rw.base = +Object.keys(oc).sort((a, b) => oc[b] - oc[a])[0];
   }
-  const kc = {}; for (const st of N) kc[st.n] = (kc[st.n] || 0) + 1;
+  // a note the pitch lane has moved counts as the note it was, so the repeat note doesn't move with Depth
+  if (rw.sig != null && rw.sig !== before) { rw.pn = []; rw.p = []; } // something else changed the notes: they are the base now
+  const baseN = (st, i) => { const q = rw.pn[i]; return q && st.n === q.alt && q.alt !== q.base ? q.base : st.n; };
+  const kc = {}; P.forEach((st, i) => { if (st.m === 'N') kc[baseN(st, i)] = (kc[baseN(st, i)] || 0) + 1; });
   const hold = +Object.keys(kc).sort((a, b) => kc[b] - kc[a])[0], base = rw.base;
   if (!rw.dir) rw.dir = [];
   P.forEach((st, i) => {
     if (st.m !== 'N') return;
-    const j = rw.jump * (st.n === hold ? 1 / 3 : 1), on = st.o !== base;
+    const j = rw.jump * (baseN(st, i) === hold ? 1 / 3 : 1), on = st.o !== base;
     if (on) rw.dir[i] = st.o - base; else if (!rw.dir[i]) rw.dir[i] = r() < 0.7 ? 1 : -1;
     if (Math.abs(base + rw.dir[i]) > 2) rw.dir[i] = -Math.sign(rw.dir[i]);
     st.o = Math.max(-2, Math.min(2, fit('o', i, on, cap(j, from)) < cap(j, to) ? base + rw.dir[i] : base));
   });
-  for (let i = 1; i < n; i++) if (P[i].m === 'T') P[i].o = P[i - 1].o;
+  // notes (v0.22.4): each note has a neighbour in the pattern's key, a scale step or two away inside its octave, or the
+  // repeat note (as Alter whole pattern picks), and moves to it where its roll is under 15% of the odds x Depth / 30
+  const pcs = Object.keys(kc).map(Number).map(k => (((k - hold) % 12) + 12) % 12);
+  const scale = Object.values(GEN_SCALES).map(sc => [sc, pcs.filter(pc => sc.includes(pc)).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const keyN = scale.map(pc => (hold + pc) % 12).sort((a, b) => a - b);
+  const nb = (k) => { let j = keyN.indexOf(k); if (j < 0) j = keyN.findIndex(x => x > k), j = j < 0 ? keyN.length - 1 : j;
+    let t = j + (r() < 0.5 ? -1 : 1) * (r() < 0.7 ? 1 : 2); if (t < 0 || t >= keyN.length) t = j - (t - j);
+    return keyN[Math.max(0, Math.min(keyN.length - 1, t))]; };
+  P.forEach((st, i) => {
+    if (st.m !== 'N') return;
+    let q = rw.pn[i];
+    if (!q || (st.n !== q.base && st.n !== q.alt)) { q = rw.pn[i] = { base: st.n, alt: null }; rw.p[i] = null; }
+    if (q.alt == null || q.alt === q.base) { q.alt = st.n !== hold && r() < 0.35 ? hold : nb(st.n); if (q.alt === q.base) q.alt = nb(st.n); }
+    if (q.alt === q.base) return;
+    st.n = fit('p', i, st.n === q.alt, cap(0.15, from)) < cap(0.15, to) ? q.alt : q.base;
+  });
+  for (let i = 1; i < n; i++) if (P[i].m === 'T') { P[i].n = P[i - 1].n; P[i].o = P[i - 1].o; }
   // slides: only where the next step plays, most across an octave jump (one into a rest, which does nothing, is left be). The odds before the move are worked out on the
   // pitches as they were, the odds after on the pitches the octave move left, so a move there and back undoes itself.
   const sp = P.map((_, i) => sldP(i));
@@ -406,6 +425,38 @@ document.getElementById('p-undo').onclick = () => {
   if (!undoStack.length) return; const u = JSON.parse(undoStack.pop()); state.steps = u.steps; tail = u.tail; stepChanged();
 };
 renderSeq();
+// Density works on the pattern that is there too (v0.22.4): turning it adds notes to rests or turns notes into rests until
+// that share of the steps plays. Every step has a weight; the lowest weights play. Rests on the beat are filled first and
+// notes off the beat go first, step 1 and a note that a tie holds stay longest, and a tie goes before the note it holds.
+// A note that goes keeps its accent and slide for when it comes back, and a new note takes a pitch the pattern already
+// uses. Weights that no longer fit the pattern (it was changed some other way) are drawn again, so turning the dial there
+// and back gives the same pattern.
+const dw = { k: [], note: [], rest: [], sig: null };
+function densLive() {
+  const P = state.steps, n = P.length, r = Math.random, plays = (st) => st.m !== 'R';
+  const want = Math.max(1, Math.round(genDens * n)), on = P.filter(plays).length, before = JSON.stringify(P);
+  if (want === on) return false;
+  const order = () => [...P.keys()].sort((a, b) => dw.k[a] - dw.k[b]);
+  const fits = dw.sig === before && dw.k.length === n && order().slice(0, on).every(i => plays(P[i]));
+  if (!fits) {
+    dw.note = []; dw.rest = [];
+    const beat = (i) => (i % 4 === 0 ? 0 : i % 2 === 0 ? 1 : 2);
+    dw.k = P.map((st, i) => plays(st) ? (i === 0 ? -1 : P[(i + 1) % n].m === 'T' && i + 1 < n ? -0.5 : (beat(i) + r()) / 6)
+                                      : 0.5 + (beat(i) + r()) / 6);
+    for (let i = 1; i < n; i++) if (P[i].m === 'T') dw.k[i] = Math.max(dw.k[i], dw.k[i - 1] + 1e-3); // a tie after its note
+  }
+  const pitches = P.filter(st => st.m === 'N');
+  const idx = order();
+  idx.forEach((i, rank) => {
+    const st = P[i], should = rank < want;
+    if (should === plays(st)) return;
+    if (should) { dw.rest[i] = { ...st }; const pk = pitches.length ? pitches[Math.floor(r() * pitches.length)] : st;
+      P[i] = dw.note[i] ? { ...dw.note[i] } : { n: pk.n, o: pk.o, m: 'N', a: false, s: false }; }
+    else { dw.note[i] = { ...st }; P[i] = dw.rest[i] ? { ...dw.rest[i] } : { ...st, m: 'R', a: false, s: false }; }
+  });
+  dw.sig = JSON.stringify(P);
+  return dw.sig !== before;
+}
 // the density dial in the sequencer foot (TB-303 app v165): 10-100% of the steps play when Generate or Refill writes a pattern
 {
   const kn = document.getElementById('sq-dens'), out = document.getElementById('o-dens'), arc = kn.querySelector('.arc'), lo = 0.1;
@@ -413,10 +464,15 @@ renderSeq();
   const pos = () => (genDens - lo) / (1 - lo);
   const draw = () => { const s = Math.round(pos() * DIAL_SEGS); arc.setAttribute('d', s ? DIAL_LIT[s - 1] : '');
     out.textContent = Math.round(genDens * 100) + '%'; kn.setAttribute('aria-valuenow', Math.round(genDens * 100)); };
-  const put = (p) => { genDens = Math.round((lo + (1 - lo) * Math.max(0, Math.min(1, p))) * 100) / 100;
-    try { localStorage.setItem('kestrel.genDens', genDens); } catch (e) {} draw(); };
+  let held = false; // one Undo per drag
+  const put = (p) => { const was = genDens; genDens = Math.round((lo + (1 - lo) * Math.max(0, Math.min(1, p))) * 100) / 100;
+    try { localStorage.setItem('kestrel.genDens', genDens); } catch (e) {} draw();
+    if (genDens === was) return;
+    const snap = JSON.stringify({ steps: state.steps, tail });
+    if (densLive()) { if (!held || !drag) { undoStack.push(snap); if (undoStack.length > 30) undoStack.shift(); held = true; } tail = []; stepChanged(); }
+  };
   let drag = null;
-  kn.addEventListener('pointerdown', e => { if (e.button !== 0) return; kn.setPointerCapture(e.pointerId); drag = { y: e.clientY, p: pos(), id: e.pointerId }; });
+  kn.addEventListener('pointerdown', e => { if (e.button !== 0) return; held = false; kn.setPointerCapture(e.pointerId); drag = { y: e.clientY, p: pos(), id: e.pointerId }; });
   kn.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id) return;
     if (e.pointerType === 'mouse' && !(e.buttons & 1)) { drag = null; return; }
     put(drag.p + (drag.y - e.clientY) / fitK() / (e.shiftKey ? 600 : 160)); });
