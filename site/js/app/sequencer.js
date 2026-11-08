@@ -164,7 +164,7 @@ document.getElementById('p-shuf').onclick = () => {
 // Generate (the TB-303 app's AcidLab-style generator in generate.js): a new riff with no stored patterns. It keeps the pattern's length but
 // writes all 64 steps; the steps past the length go into tail, so lengthening the pattern brings in more of the riff.
 document.getElementById('p-rnd').onclick = () => {
-  keepUndo(); const g = generatePattern(SEQ_MAX), n = state.steps.length; rw.base = null; rw.jump = 0.25;
+  keepUndo(); const g = generatePattern(SEQ_MAX, genDens), n = state.steps.length; rw.base = null; rw.jump = 0.25;
   state.steps = g.steps.slice(0, n); tail = g.steps.slice(n); stepChanged();
 };
 // Move notes (Tools menu, ] [ ⇧] ⇧[ , . and the D-pad). A real transpose: B up a semitone becomes C one octave up, and
@@ -381,7 +381,9 @@ function alterAll() {
     else if (x < 0.52) { const up = st.o < 2 && (st.o <= -2 || r() < 0.5); st.o += up ? 1 : -1; }
     else if (x < 0.66) st.a = !st.a;
     else if (x < 0.8) st.s = !st.s;
-    else if (i > 0 && (plays ? !beat && (off || r() < 0.4) : !off || r() < 0.5)) {
+    // rests and fills lean towards the density dial: over it, notes become rests; under it, rests get filled
+    else if (i > 0 && (() => { const now = P.filter(s => s.m !== 'R').length / n;
+        return now > genDens + 0.05 ? plays && !beat : now < genDens - 0.05 ? !plays : (plays ? !beat && (off || r() < 0.4) : !off || r() < 0.5); })()) {
       if (plays) st.m = 'R'; else { setPitch(st, hold); st.m = 'N'; }
     }
     else st.a = !st.a;
@@ -404,3 +406,26 @@ document.getElementById('p-undo').onclick = () => {
   if (!undoStack.length) return; const u = JSON.parse(undoStack.pop()); state.steps = u.steps; tail = u.tail; stepChanged();
 };
 renderSeq();
+// the density dial in the sequencer foot (TB-303 app v165): 10-100% of the steps play when Generate or Refill writes a pattern
+{
+  const kn = document.getElementById('sq-dens'), out = document.getElementById('o-dens'), arc = kn.querySelector('.arc'), lo = 0.1;
+  kn.querySelector('.trk').setAttribute('d', DIAL_ALL.join(''));
+  const pos = () => (genDens - lo) / (1 - lo);
+  const draw = () => { const s = Math.round(pos() * DIAL_SEGS); arc.setAttribute('d', s ? DIAL_LIT[s - 1] : '');
+    out.textContent = Math.round(genDens * 100) + '%'; kn.setAttribute('aria-valuenow', Math.round(genDens * 100)); };
+  const put = (p) => { genDens = Math.round((lo + (1 - lo) * Math.max(0, Math.min(1, p))) * 100) / 100;
+    try { localStorage.setItem('kestrel.genDens', genDens); } catch (e) {} draw(); };
+  let drag = null;
+  kn.addEventListener('pointerdown', e => { if (e.button !== 0) return; kn.setPointerCapture(e.pointerId); drag = { y: e.clientY, p: pos(), id: e.pointerId }; });
+  kn.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id) return;
+    if (e.pointerType === 'mouse' && !(e.buttons & 1)) { drag = null; return; }
+    put(drag.p + (drag.y - e.clientY) / fitK() / (e.shiftKey ? 600 : 160)); });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) kn.addEventListener(ev, () => { drag = null; });
+  kn.addEventListener('dblclick', () => put((0.6 - lo) / (1 - lo)));
+  kn.addEventListener('keydown', e => {
+    const d = { ArrowUp: .02, ArrowRight: .02, ArrowDown: -.02, ArrowLeft: -.02, PageUp: .1, PageDown: -.1 }[e.key];
+    if (d) { e.preventDefault(); e.stopPropagation(); put(pos() + (e.shiftKey ? d / 4 : d)); }
+    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); put(e.key === 'End' ? 1 : 0); }
+  });
+  draw();
+}

@@ -3,6 +3,10 @@
 // a held "repeat note" layer that keeps pulling the line back to one pitch, odd octave jumps, then 303 slides; later bars
 // are the first one varied with the moves below. It works in the 303's note codes (0-59 = Shyoy pitch + 24) and turns
 // the result into Shyoy steps at the end.
+// Density (TB-303 app v165, Johnny: "needs a density knob"): the share of steps Generate and Refill fill with notes, set by
+// the dial in the sequencer foot; Alter whole pattern leans its new rests and fills towards it. Kept across reloads, not in presets
+let genDens = 0.6;
+try { const v = parseFloat(localStorage.getItem('kestrel.genDens')); if (v >= 0.1 && v <= 1) genDens = v; } catch (e) {}
 const GEN_SCALES = {
   minor: [0, 2, 3, 5, 7, 8, 10], phrygian: [0, 1, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10],
   'minor pentatonic': [0, 3, 5, 7, 10], blues: [0, 3, 5, 6, 7, 10], 'harmonic minor': [0, 2, 3, 5, 7, 8, 11],
@@ -97,9 +101,10 @@ function genToSteps(out) {
   return S;
 }
 // build one bar, move it, then later bars are the first one with one more move each
-function generatePattern(len) {
+function generatePattern(len, dens = null) {
   const style = genPick(GEN_STYLES), sn = genPick(Object.keys(GEN_SCALES)), root = rint(21, 33);
-  const o = { root, scale: GEN_SCALES[sn], style, dens: 0.5 + Math.random() * 0.35, rep: Math.random() * 0.5, oct: 0.04 + Math.random() * 0.16 };
+  const o = { root, scale: GEN_SCALES[sn], style, dens: dens != null ? Math.max(0.2, Math.min(0.95, dens * 1.1)) : 0.5 + Math.random() * 0.35,
+    rep: Math.random() * 0.5, oct: 0.04 + Math.random() * 0.16 };
   const barLen = Math.min(len, 16), P = makeBar(barLen, o);
   const did = Object.keys(GEN_MOVES).sort(() => Math.random() - 0.5).slice(0, rint(0, 2)).map(m => GEN_MOVES[m](P));
   const out = [...P];
@@ -108,6 +113,15 @@ function generatePattern(len) {
     out.push(...seg.slice(0, len - out.length));
   }
   if (len > barLen) did.push(`bars 2–${Math.ceil(len / 16)} varied`);
+  if (dens != null) {
+    const want = Math.max(1, Math.round(dens * len)), pitches = out.filter(st => st.gate).map(st => st.code);
+    const idx = (g) => [...out.keys()].filter(i => out[i].gate === g).sort(() => Math.random() - 0.5);
+    let on = out.filter(st => st.gate).length;
+    // add notes on off-beats last, remove them from off-beats first, so the downbeats survive
+    const beat = (i) => (i % 4 === 0 ? 0 : i % 2 === 0 ? 1 : 2);
+    if (on < want) for (const i of idx(false).sort((a, b) => beat(a) - beat(b))) { if (on >= want) break; out[i].gate = true; out[i].code = pitches.length ? pitches[rint(0, pitches.length - 1)] : out[i].code; out[i].slide = false; on++; }
+    if (on > want) for (const i of idx(true).sort((a, b) => beat(b) - beat(a))) { if (on <= want) break; if (i === 0) continue; out[i].gate = false; out[i].accent = false; out[i].slide = false; on--; }
+  }
   if (!out.some(st => st.gate)) out[0].gate = true;
   return { steps: genToSteps(out), src: `${style} ${NOTE[root % 12]} ${sn}`, did };
 }

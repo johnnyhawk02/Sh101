@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Density dial (v0.22.3)
+
+From the TB-303 app (v165): a small **density** dial in the sequencer foot, between Length and the D-pad, 10-100%, default 60% (double-click). It sets the share of steps Generate (G) and Refill slots (⇧G) fill with notes, exactly to the step over the 64 written (`generatePattern(len, genDens)`: built near it, then notes added on off-beats last or removed from off-beats first, never step 1). Alter whole pattern (L) leans its rest/fill changes towards it when the pattern is more than 5% over or under. Kept in `localStorage` (`kestrel.genDens`); not in presets or slots, not an engine parameter, no step sequencer on it.
+
 ### Depth moves the pattern that is there (v0.22.2)
 
 Turning **Depth** now changes the current pattern live, not only the next Randomise. Every step keeps a weight (a roll from 0 to 1) per lane, for accents, slides and octave jumps, and a lane is on where its roll is under the Randomise odds at the current Depth (the same odds: accents lean on the beat, slides only into a played step and most across an octave, octave jumps away from the riff's register and the repeat note a third as often). Turning up switches on the lowest-rolled steps first, turning down takes them off in reverse, so up and back gives the same pattern; Depth 0 clears them. A roll that no longer fits its step (after an edit, Generate, Alter or a slot change) is drawn again in the range that fits, so the pattern as it stands is kept at its Depth. Ties and notes are left alone, as are slides into rests. One drag is one Undo.

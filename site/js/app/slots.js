@@ -15,7 +15,7 @@ function fillSlots(force) {
   for (let k = 0; k < SLOTS; k++) {
     const x = state.slots[k], empty = !x || !Array.isArray(x.steps) || !x.steps.some(st => st.m !== 'R');
     if (k === state.slot || !(empty || (force && x.auto))) continue;
-    state.slots[k] = { steps: generatePattern(16).steps, swing: x ? x.swing ?? 0 : 0, gateLen: x ? x.gateLen ?? .5 : .5, auto: true }; n++;
+    state.slots[k] = { steps: generatePattern(16, genDens).steps, swing: x ? x.swing ?? 0 : 0, gateLen: x ? x.gateLen ?? .5 : .5, auto: true }; n++;
   }
   return n;
 }
