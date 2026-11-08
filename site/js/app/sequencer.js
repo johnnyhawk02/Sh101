@@ -92,17 +92,36 @@ roll.addEventListener('pointerdown', e => {
     return;
   }
   const b = e.target.closest('button[data-t]'); if (!b || e.button > 0) return;
-  e.preventDefault(); applyCell(b); paintedClick = true;
+  e.preventDefault(); keepUndo(); applyCell(b); paintedClick = true;
   const st = state.steps[+b.dataset.col], t = b.dataset.t;
-  paint = { t, id: e.pointerId, on: t === 'k' ? st.m !== 'R' : t === 'o' ? true : t === 't' ? st.m === 'T' : st[t], oct: st.o };
+  paint = { t, id: e.pointerId, on: t === 'k' ? st.m !== 'R' : t === 'o' ? true : t === 't' ? st.m === 'T' : st[t], oct: st.o,
+    x: e.clientX, y: e.clientY, dirty: false, raf: 0 };
   stepChanged();
 });
+// a fast stroke: every point between the last pointer position and this one (coalesced events included) is
+// hit-tested, so no step the stroke crosses is skipped; the roll is redrawn and the engine told at most once a
+// frame, and the slot, bank and save are done once when the stroke ends (one Undo for the whole stroke)
+function paintAt(x, y) {
+  const t = document.elementFromPoint(x, y), b = t && t.closest && t.closest('#roll button[data-t]');
+  return b ? paintCell(b) : false;
+}
+function paintFrame() { if (!paint) return; paint.raf = 0; renderSeq(); post(seqMsg()); }
 addEventListener('pointermove', e => {
   if (!paint || e.pointerId !== paint.id) return;
-  const t = document.elementFromPoint(e.clientX, e.clientY), b = t && t.closest && t.closest('#roll button[data-t]'); if (!b) return;
-  if (paintCell(b)) stepChanged();
+  const pts = (e.getCoalescedEvents && e.getCoalescedEvents()) || []; if (!pts.length) pts.push(e);
+  const gap = 6 * fitK(); let ch = false;
+  for (const q of pts) {
+    const dx = q.clientX - paint.x, dy = q.clientY - paint.y, n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / gap));
+    for (let k = 1; k <= n; k++) if (paintAt(paint.x + dx * k / n, paint.y + dy * k / n)) ch = true;
+    paint.x = q.clientX; paint.y = q.clientY;
+  }
+  if (ch) { paint.dirty = true; if (!paint.raf) paint.raf = requestAnimationFrame(paintFrame); }
 });
-const endPaint = e => { if (paint && e.pointerId === paint.id) paint = null; };
+const endPaint = e => {
+  if (!paint || e.pointerId !== paint.id) return;
+  const p = paint; paint = null; if (p.raf) cancelAnimationFrame(p.raf);
+  if (p.dirty) stepChanged();
+};
 addEventListener('pointerup', endPaint); addEventListener('pointercancel', endPaint);
 roll.addEventListener('click', e => {
   const h = e.target.closest('button[data-h]');
