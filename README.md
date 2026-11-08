@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Depth moves the pattern that is there (v0.22.2)
+
+Turning **Depth** now changes the current pattern live, not only the next Randomise. Every step keeps a weight (a roll from 0 to 1) per lane, for accents, slides and octave jumps, and a lane is on where its roll is under the Randomise odds at the current Depth (the same odds: accents lean on the beat, slides only into a played step and most across an octave, octave jumps away from the riff's register and the repeat note a third as often). Turning up switches on the lowest-rolled steps first, turning down takes them off in reverse, so up and back gives the same pattern; Depth 0 clears them. A roll that no longer fits its step (after an edit, Generate, Alter or a slot change) is drawn again in the range that fits, so the pattern as it stands is kept at its Depth. Ties and notes are left alone, as are slides into rests. One drag is one Undo.
+
 ### The TB-303 app's sequencer keys (v0.22.1)
 
 The sequencer's keys are now the TB-303 app's: plain letters, Shift for the Alter versions. A S O accents, slides, octaves (I ties, Shyoy's own), L alter whole pattern, H shuffle, G generate, ⇧G refill, D double, J join chain, R / T / E open the Randomise, Tools and Gate menus; Cmd/Ctrl C V Z, ⇧⌫, ] [ , . as before. Letters also play notes, so on the Sequencer page these letters run the sequencer and don't sound; on other pages they play notes and the same keys work with Option/Alt held. Ignored while typing or with a dialog open.

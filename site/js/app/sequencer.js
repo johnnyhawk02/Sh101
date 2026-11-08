@@ -164,7 +164,7 @@ document.getElementById('p-shuf').onclick = () => {
 // Generate (the TB-303 app's AcidLab-style generator in generate.js): a new riff with no stored patterns. It keeps the pattern's length but
 // writes all 64 steps; the steps past the length go into tail, so lengthening the pattern brings in more of the riff.
 document.getElementById('p-rnd').onclick = () => {
-  keepUndo(); const g = generatePattern(SEQ_MAX), n = state.steps.length;
+  keepUndo(); const g = generatePattern(SEQ_MAX), n = state.steps.length; rw.base = null; rw.jump = 0.25;
   state.steps = g.steps.slice(0, n); tail = g.steps.slice(n); stepChanged();
 };
 // Move notes (Tools menu, ] [ ⇧] ⇧[ , . and the D-pad). A real transpose: B up a semitone becomes C one octave up, and
@@ -199,7 +199,62 @@ const sqDepthEl = document.getElementById('sqRndDepth'), sqDepthOut = document.g
 try { const d = localStorage.getItem('kestrel.sqRndDepth'); if (d != null) sqDepthEl.value = d; } catch (e) {}
 const showSqDepth = () => { sqDepthOut.textContent = sqDepthEl.value + '%'; };
 showSqDepth();
-sqDepthEl.addEventListener('input', e => { e.stopPropagation(); showSqDepth(); try { localStorage.setItem('kestrel.sqRndDepth', sqDepthEl.value); } catch (er) {} });
+// Depth works on the pattern that is there too (v0.22.2, Johnny: "use weights"). Every step keeps a weight per lane
+// (accents, slides, octave jumps): a roll from 0 to 1, and the lane is on where the roll is under the Randomise odds at
+// the current Depth. Turning Depth up switches on the steps with the lowest rolls first, turning it down switches them
+// off again in the reverse order, so a move there and back gives the same pattern. A roll that no longer fits the step
+// (it was drawn, edited, generated or altered since) is drawn again inside the range that fits, so the pattern as it
+// stands is always kept at the Depth it is at, and only what the move adds or takes away changes.
+const rw = { a: [], s: [], o: [], dir: [], base: null, jump: 0.25, sig: null };
+let depthWas = +sqDepthEl.value, depthDrag = false;
+function depthLive(from, to) {
+  const P = state.steps, n = P.length, r = Math.random, pit = (st) => st.n + 12 * st.o;
+  if (!P.some(st => st.m === 'N')) return false;
+  const before = JSON.stringify(P), cap = (p, pct) => Math.min(0.95, p * pct / 30);
+  // where a roll sits: under thr means on. A roll that disagrees with the step is drawn again on the right side of thr.
+  const fit = (lane, i, on, thr) => { let u = rw[lane][i]; if (u == null || (u < thr) !== on) u = rw[lane][i] = on ? r() * thr : thr + r() * (1 - thr); return u; };
+  // accents: struck notes, leaning on the beat
+  const accP = (i) => i % 4 === 0 ? 0.42 : i % 2 ? 0.2 : 0.26;
+  P.forEach((st, i) => { if (st.m !== 'N') return; st.a = fit('a', i, st.a, cap(accP(i), from)) < cap(accP(i), to); });
+  const sldP = (i) => { const nx = P[(i + 1) % n]; if (nx.m === 'R') return 0; const d = Math.abs(pit(nx) - pit(P[i])); return d >= 12 ? 0.5 : d === 0 ? 0.12 : 0.22; };
+  const sp0 = P.map((_, i) => sldP(i));
+  // octave jumps: away from the riff's register, the repeat note a third as often
+  const N = P.filter(st => st.m === 'N');
+  // the register is kept while only Depth moves the pattern; anything else (an edit, a slot, Undo) works it out again
+  if (rw.base == null || (rw.sig != null && rw.sig !== before)) {
+    const oc = {}; for (const st of N) oc[st.o] = (oc[st.o] || 0) + 1;
+    rw.base = +Object.keys(oc).sort((a, b) => oc[b] - oc[a])[0];
+  }
+  const kc = {}; for (const st of N) kc[st.n] = (kc[st.n] || 0) + 1;
+  const hold = +Object.keys(kc).sort((a, b) => kc[b] - kc[a])[0], base = rw.base;
+  if (!rw.dir) rw.dir = [];
+  P.forEach((st, i) => {
+    if (st.m !== 'N') return;
+    const j = rw.jump * (st.n === hold ? 1 / 3 : 1), on = st.o !== base;
+    if (on) rw.dir[i] = st.o - base; else if (!rw.dir[i]) rw.dir[i] = r() < 0.7 ? 1 : -1;
+    if (Math.abs(base + rw.dir[i]) > 2) rw.dir[i] = -Math.sign(rw.dir[i]);
+    st.o = Math.max(-2, Math.min(2, fit('o', i, on, cap(j, from)) < cap(j, to) ? base + rw.dir[i] : base));
+  });
+  for (let i = 1; i < n; i++) if (P[i].m === 'T') P[i].o = P[i - 1].o;
+  // slides: only where the next step plays, most across an octave jump (one into a rest, which does nothing, is left be). The odds before the move are worked out on the
+  // pitches as they were, the odds after on the pitches the octave move left, so a move there and back undoes itself.
+  const sp = P.map((_, i) => sldP(i));
+  P.forEach((st, i) => { if (st.m === 'R' || (!sp0[i] && !sp[i])) return; st.s = fit('s', i, st.s, cap(sp0[i], from)) < cap(sp[i], to); });
+  rw.sig = JSON.stringify(P);
+  return rw.sig !== before;
+}
+sqDepthEl.addEventListener('pointerdown', () => { depthDrag = false; });
+sqDepthEl.addEventListener('input', e => {
+  e.stopPropagation(); showSqDepth(); try { localStorage.setItem('kestrel.sqRndDepth', sqDepthEl.value); } catch (er) {}
+  const to = +sqDepthEl.value, snap = JSON.stringify({ steps: state.steps, tail });
+  if (depthLive(depthWas, to)) {
+    // one Undo per drag: the pattern from before the drag started
+    if (!depthDrag) { undoStack.push(snap); if (undoStack.length > 30) undoStack.shift(); depthDrag = true; }
+    tail = []; stepChanged();
+  }
+  depthWas = to;
+});
+sqDepthEl.addEventListener('change', () => { depthDrag = false; });
 let tieBase = null, tieOut = null;
 function rndRow(kind) {
   const d = sqDepthEl.value / 100, P = state.steps, n = P.length, hit = (p) => Math.random() < p;
@@ -210,6 +265,7 @@ function rndRow(kind) {
     const count = {}; for (const st of P) if (st.m === 'N') count[st.n] = (count[st.n] || 0) + 1;
     const hold = +Object.keys(count).sort((a, b) => count[b] - count[a])[0];
     const base = Math.max(-1, Math.min(1, rndOct())), jump = (0.15 + r() * 0.2) * f;
+    if (kind === 'o') { rw.base = base; rw.jump = jump / Math.max(f, 1e-6) || 0.25; rw.o = []; rw.dir = []; rw.sig = null; }
     P.forEach((st, i) => {
       if (st.m === 'R') return;
       if (kind === 'a') st.a = st.m === 'N' && r() < odds(i % 4 === 0 ? 0.42 : i % 2 ? 0.2 : 0.26);
