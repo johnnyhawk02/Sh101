@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Preset names from chopped-up place and dish names (v0.22.12)
+
+The 🎲 preset namer now makes two invented words. Each word is the front of one source word joined to the back of another, sometimes with a middle syllable, and every piece picks its source evenly: Welsh village names, Yorkshire village names, French dishes and cookery words, or alien syllables (Llangefno Remoupham, Kettlex Racletyx). Joints that would be hard to say are thrown away and tried again.
+
 ### Depth renamed Complexity (v0.22.5)
 
 The sequencer's randomise **Depth** slider is now labelled **Complexity** (Johnny). Nothing else changes: same behaviour, same element id (`sqRndDepth`) and `localStorage` key (`kestrel.sqRndDepth`), so saved settings carry over. Older notes below still call it Depth.
