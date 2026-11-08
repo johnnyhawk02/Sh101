@@ -409,8 +409,13 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // loop gain falls away there and the real filter stops self-oscillating. Without this roll-off, cutoff and
       // resonance at full put the oscillation above Nyquist, where it folded back as broadband 'sandpaper' noise.
       // The pole frequencies are also held below fs/2 of the output rate.
-      const k0 = sm.reso * 4.3 / (1 + (fcBase / 20000) ** 4) * (C.fbInv ? -1 : 1);
-      const att = 0.004 + sm.drive * 0.03;                               // input divider into OTA
+      const kFull = sm.reso * 4.3, kRoll = kFull / (1 + (fcBase / 20000) ** 4);
+      const k0 = kRoll * (C.fbInv ? -1 : 1);
+      // That bandwidth loss is in the OTA stages themselves, so it takes the forward gain down with the loop gain.
+      // Rolling off only the feedback lifted the passband (gain 1/(1+k)) by up to ~4 dB in the last tenth of the
+      // cutoff travel, so hold the passband where the full-loop filter has it. Not applied with the feedback inverted.
+      const passComp = C.fbInv ? 1 : (1 + kRoll) / (1 + kFull);
+      const att = (0.004 + sm.drive * 0.03) * passComp;                  // input divider into OTA
       const offN = C.otaOff / (2 * VT0);
       const c2inj = inj[5] * dto / (C.cf[1] * 2 * VT0) * 2;
       const vcfInj = inj[4] * 10e3 / (2 * VT0);

@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Cutoff no longer gets louder at the top (v0.22.14)
+
+With resonance up, the last tenth of the cutoff travel made the sound up to 4 dB louder (Johnny heard volume rise with cutoff). The model rolls the resonance loop off near 20 kHz, as the IR3109's OTAs run out of bandwidth, but it took only the feedback down, so the passband (gain 1/(1+k)) came back up. The real stages lose forward gain with it, so the input is now scaled to hold the passband where the full-loop filter has it. Measured on a saw: level is flat to 0.1 dB from cutoff 0.85 to 1 at every resonance. The remaining brightness and loudness rise lower down is the real filter letting more harmonics through. VST: port the `passComp` line in the VCF control block.
+
 ### Accent sweep capped at two octaves (v0.22.13)
 
 The **Acc** fader (accent into the filter cutoff) now tops out at +2 octaves instead of +4 (Johnny). The whole travel is rescaled, so halfway is +1 oct; saved sounds keep their fader position and push half as far as before.
