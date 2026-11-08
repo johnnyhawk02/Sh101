@@ -68,7 +68,7 @@ const RACK = [
     { f: 'vcfMod', label: 'Mod', def: 0, fmt: pct },
     { f: 'kybd', label: 'Kybd', def: .5, fmt: pct },
     { f: 'drive', label: 'Drive', def: .4, fmt: pct },
-    { f: 'accVcf', label: 'Acc', def: 0, fmt: v => v < .005 ? 'off' : '+' + (v * 4).toFixed(1) + 'oct' } ] },
+    { f: 'accVcf', label: 'Acc', def: 0, fmt: v => v < .005 ? 'off' : '+' + (v * 2).toFixed(1) + 'oct' } ] },
   { id: 'env', name: 'Envelope', sub: 'RC ADSR', items: [
     { f: 'attack', label: 'A', def: 0, fmt: v => ms(0.0015 * Math.pow(4 / 0.0015, v)) },
     { f: 'decay', label: 'D', def: .4, fmt: v => ms(0.002 * Math.pow(5000, v)) },

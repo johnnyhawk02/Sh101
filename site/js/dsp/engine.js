@@ -395,8 +395,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const fcOct = sm.cutoff * 10.966 - 6.644                          // 10 Hz .. 20 kHz re 1 kHz
         + sm.lever * sm.bendVcf * 4
         // Accent is not on a real 101 (it comes with the 303-style sequencer). Its filter push has its own
-        // depth fader (ACC, up to +4 oct), so at 0 the IC18b summer only sees cutoff, ENV, KYBD, MOD and bender.
-        + sm.vcfEnv * env * VCF_ENV_OCT + this.accCap * (P.accVcf || 0) * 4
+        // depth fader (ACC, up to +2 oct), so at 0 the IC18b summer only sees cutoff, ENV, KYBD, MOD and bender.
+        + sm.vcfEnv * env * VCF_ENV_OCT + this.accCap * (P.accVcf || 0) * 2
         + lfo * ((Math.pow(10, 2 * sm.vcfMod) - 1) / 99) * VCF_MOD_OCT   // MOD pot is audio taper (100kA)
         + (this.pitch - 60) / 12 * sm.kybd
         + clamp(inj[3] * 100e3, -8, 8);

@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Accent sweep capped at two octaves (v0.22.13)
+
+The **Acc** fader (accent into the filter cutoff) now tops out at +2 octaves instead of +4 (Johnny). The whole travel is rescaled, so halfway is +1 oct; saved sounds keep their fader position and push half as far as before.
+
 ### Preset names from chopped-up place and dish names (v0.22.12)
 
 The 🎲 preset namer now makes two invented words. Each word is the front of one source word joined to the back of another, sometimes with a middle syllable, and every piece picks its source evenly: Welsh village names, Yorkshire village names, French dishes and cookery words, or alien syllables (Llangefno Remoupham, Kettlex Racletyx). Joints that would be hard to say are thrown away and tried again.
