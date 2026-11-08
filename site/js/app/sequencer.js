@@ -7,7 +7,8 @@ const roll = document.getElementById('roll');
 const KEY_ROWS = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0], OCT_ROWS = [2, 1, -1, -2], BLACK = new Set([1, 3, 6, 8, 10]);
 const FLAG_ROWS = [['t', 'tie'], ['s', 'slide'], ['a', 'acc']];
 const SEQ_SHOW = 32, SEQ_MAX = 64;
-let selStep = -1, playStep = -1, seqCols = [], tail = [], undoBuf = null, playingSlot = -1, chainOffs = [];
+let selStep = -1, playStep = -1, seqCols = [], tail = [], playingSlot = -1, chainOffs = [];
+const undoStack = []; // up to 30 changes back (the 303 app's pattern Undo)
 const restStep = (st) => ({ n: st ? st.n : 0, o: st ? st.o : 0, m: 'R', a: false, s: false });
 function renderSeq() {
   const P = state.steps, n = P.length, cols = Math.max(SEQ_SHOW, n);
@@ -53,7 +54,7 @@ function renderSide() {
   document.getElementById('o-swing').textContent = Math.round(p.swing * 100) + '%';
   const sv = (a, v) => { const el = sideIn[a]; if (el && !el.matches(':active')) el.value = v; };
   sv('len', P.length); sv('gate', Math.round((0.1 + p.gateLen * 0.85) * 100)); sv('swing', Math.round(p.swing * 100));
-  document.getElementById('p-undo').disabled = !undoBuf;
+  document.getElementById('p-undo').disabled = !undoStack.length;
 }
 function stepChanged() { storeSlot(); renderSeq(); post(seqMsg()); save(); renderBank(); }
 function setPitch(st, v) { st.o = Math.max(-2, Math.min(2, Math.floor(v / 12))); st.n = Math.max(0, Math.min(11, v - 12 * st.o)); }
@@ -123,7 +124,7 @@ function preview(i) {
   if (running || !node) return; const st = state.steps[i]; const n = 60 + st.n + 12 * st.o;
   post({ type: 'noteOn', n }); clearTimeout(prevT); prevT = setTimeout(() => post({ type: 'noteOff', n }), 160);
 }
-const keepUndo = () => { undoBuf = JSON.stringify({ steps: state.steps, tail }); };
+const keepUndo = () => { undoStack.push(JSON.stringify({ steps: state.steps, tail })); if (undoStack.length > 30) undoStack.shift(); };
 // length (under the roll), gate and swing (up top) are plain sliders (the Shift and Transpose spring sliders gave way to the D-pad under the roll)
 const sideIn = {}; for (const el of document.querySelectorAll('.sld input')) sideIn[el.dataset.a] = el;
 document.querySelector('.sq-body').addEventListener('input', e => {
@@ -142,13 +143,25 @@ document.getElementById('p-dup').onclick = () => {
   keepUndo(); state.steps = Array.from({ length: to }, (_, i) => ({ ...P[i % n] })); tail = [];
   stepChanged();
 };
+// Shuffle (the TB-303 app's shuffleSteps, v164): whole beats when the length is a multiple of 4 and at least 8, else steps
 document.getElementById('p-shuf').onclick = () => {
-  const P = state.steps; if (P.length < 2) return; keepUndo();
-  for (let i = P.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
-  for (let i = 0; i < P.length; i++) if (P[i].m === 'T' && i === 0) P[i].m = 'N';
+  const P = state.steps, n = P.length; if (n < 2) return;
+  keepUndo();
+  const b = n >= 8 && n % 4 === 0 ? 4 : 1, before = JSON.stringify(P);
+  for (let tries = 0; tries < 8 && JSON.stringify(state.steps) === before; tries++) {
+    const blocks = []; for (let i = 0; i < n; i += b) blocks.push(P.slice(i, i + b));
+    for (let i = blocks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [blocks[i], blocks[j]] = [blocks[j], blocks[i]]; }
+    state.steps = blocks.flat().map(st => ({ ...st }));
+  }
+  const Q = state.steps;
+  Q.forEach((st, i) => {
+    if (st.s && Q[(i + 1) % n].m === 'R') st.s = false;
+    const pv = Q[i - 1];
+    if (st.m === 'T' && (!pv || pv.m === 'R' || pv.n !== st.n || pv.o !== st.o)) st.m = 'N';
+  });
   tail = []; stepChanged();
 };
-// Generate (from the TB-303 app): a new riff from the real acid basslines in patterns.js. It keeps the pattern's length but
+// Generate (the TB-303 app's AcidLab-style generator in generate.js): a new riff with no stored patterns. It keeps the pattern's length but
 // writes all 64 steps; the steps past the length go into tail, so lengthening the pattern brings in more of the riff.
 document.getElementById('p-rnd').onclick = () => {
   keepUndo(); const g = generatePattern(SEQ_MAX), n = state.steps.length;
@@ -175,7 +188,12 @@ document.querySelector('.dpad').addEventListener('click', e => {
   if (b.dataset.nudge) nudgeNotes(+b.dataset.nudge * (e.shiftKey ? 12 : 1));
   else if (b.dataset.rot) rotateSteps(+b.dataset.rot);
 });
-// Randomise one row (oct / slide / acc / tie): the notes stay, only that row is dealt again, as wild as Rnd depth.
+// Randomise accents, slides or octaves (the TB-303 app's randomise(), v164): the odds are Generate's. Accents lean on the
+// beat; slides only where the next step plays, most across octave jumps; octaves pick one register for the riff, keep its
+// most used key (the repeat note) there and jump the odd other note. Depth scales every chance (30% = the 303 app).
+// Ties (Shyoy's own) are dealt again as wild as Depth.
+const RND_OCT = [[-1, 3], [0, 5], [1, 2], [2, 0.4], [-2, 0.4]]; // octave, weight: mostly 0 and -1, some +1, a rare extreme
+const rndOct = () => { let x = Math.random() * RND_OCT.reduce((a, [, w]) => a + w, 0); for (const [o, w] of RND_OCT) if ((x -= w) < 0) return o; return 0; };
 // Ties take the pitch of the note before them, so repeated tie presses start again from the pattern before the first press.
 const sqDepthEl = document.getElementById('sqRndDepth'), sqDepthOut = document.getElementById('o-sqRndDepth');
 try { const d = localStorage.getItem('kestrel.sqRndDepth'); if (d != null) sqDepthEl.value = d; } catch (e) {}
@@ -187,21 +205,25 @@ function rndRow(kind) {
   const d = sqDepthEl.value / 100, P = state.steps, n = P.length, hit = (p) => Math.random() < p;
   if (P.every(st => st.m === 'R')) return;
   keepUndo();
-  if (kind === 'o') {
-    // octave jumps on played notes; ties follow the note they hold
-    for (let i = 0; i < n; i++) {
-      const st = P[i];
-      if (st.m === 'T') { const pv = P[(i - 1 + n) % n]; st.o = pv.o; continue; }
-      if (st.m === 'R') continue;
-      st.o = !hit(d) ? 0 : hit(0.15 + 0.35 * d) ? (hit(0.5) ? 2 : -2) : (hit(0.6) ? 1 : -1);
-    }
-  } else if (kind === 's' || kind === 'a') {
-    for (let i = 0; i < n; i++) {
-      const st = P[i];
-      // accents only sound on struck notes, and lean to the downbeats like the Random pattern
-      const ok = kind === 'a' ? st.m === 'N' : st.m !== 'R';
-      st[kind] = ok && hit(kind === 'a' ? Math.min(1, d * (i % 4 === 0 ? 1.6 : 0.8)) : d);
-    }
+  const f = sqDepthEl.value / 30, odds = (p) => Math.min(0.95, p * f), r = Math.random, pit = (st) => st.n + 12 * st.o;
+  if (kind === 'a' || kind === 's' || kind === 'o') {
+    const count = {}; for (const st of P) if (st.m === 'N') count[st.n] = (count[st.n] || 0) + 1;
+    const hold = +Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+    const base = Math.max(-1, Math.min(1, rndOct())), jump = (0.15 + r() * 0.2) * f;
+    P.forEach((st, i) => {
+      if (st.m === 'R') return;
+      if (kind === 'a') st.a = st.m === 'N' && r() < odds(i % 4 === 0 ? 0.42 : i % 2 ? 0.2 : 0.26);
+      else if (kind === 's') {
+        const nx = P[(i + 1) % n], d = Math.abs(pit(nx) - pit(st));
+        st.s = nx.m !== 'R' && r() < odds(d >= 12 ? 0.5 : d === 0 ? 0.12 : 0.22);
+      }
+      else if (st.m === 'N') {
+        let o = base; if (r() < (st.n === hold ? jump / 3 : jump)) o += r() < 0.7 ? 1 : -1;
+        st.o = Math.max(-2, Math.min(2, o));
+      }
+    });
+    // ties hold the note before them, so they follow its octave
+    for (let i = 1; i < n; i++) if (P[i].m === 'T') P[i].o = P[i - 1].o;
   } else {
     const src = tieOut && tieBase && tieBase.length === n && JSON.stringify(P) === tieOut ? tieBase : clone(P);
     tieBase = src;
@@ -215,11 +237,53 @@ function rndRow(kind) {
   }
   tail = []; stepChanged(); if (kind === 't') tieOut = JSON.stringify(state.steps);
 }
-// Alter one row: nudge the pattern instead of re-dealing it. Depth sets how many steps flip (about half the
-// Randomise share, at least one). Notes stay; a new tie takes the pitch of the note before it, as in the roll.
+// Alter accents, slides or octaves (the TB-303 app's alterLane(), v163): a variation, not a new roll. About a quarter of
+// the notes at Depth 30% (at least one) get the change, picked by weight the way Generate places things.
+function altLane(kind) { // kind 'a' | 's' | 'o'
+  const d = sqDepthEl.value / 100, P = state.steps, n = P.length, r = Math.random, pit = (st) => st.n + 12 * st.o;
+  const on = [...P.keys()].filter(i => kind === 's' ? P[i].m !== 'R' : P[i].m === 'N');
+  if (!on.length) return;
+  keepUndo();
+  const tied = (i) => P[(i + 1) % n].m !== 'R'; // a slide only does something when the very next step plays
+  const count = {}; for (const i of on) count[pit(P[i])] = (count[pit(P[i])] || 0) + 1;
+  const hold = +Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+  const weight = (i) => {
+    const st = P[i], beat = i % 4 === 0;
+    if (kind === 'a') return st.a ? (beat ? 0.4 : 1.6) : (beat ? 1.8 : i % 2 ? 0.8 : 1);
+    if (kind === 's') {
+      if (st.s) return tied(i) ? 0.6 : 3;
+      if (!tied(i)) return 0.05;
+      const jump = Math.abs(pit(P[(i + 1) % n]) - pit(st));
+      return jump >= 12 ? 2.5 : jump === 0 ? 0.6 : 1;
+    }
+    return pit(st) === hold && Object.keys(count).length > 1 ? 0.25 : 1; // octave
+  };
+  const pool = on.map(i => ({ i, w: weight(i) })), pick = [];
+  for (let k = Math.max(1, Math.round(on.length * d * 5 / 6)); k > 0 && pool.length; k--) {
+    let x = r() * pool.reduce((s, p) => s + p.w, 0), j = 0;
+    while (j < pool.length - 1 && (x -= pool[j].w) > 0) j++;
+    pick.push(pool.splice(j, 1)[0].i);
+  }
+  for (const i of pick) {
+    const st = P[i];
+    if (kind === 'o') {
+      const up = st.o < 2 && (st.o <= -2 || r() < 0.5); st.o += up ? 1 : -1;
+      // Generate slides across most octave jumps: tie the note before into this one now and then
+      if (i > 0 && P[i - 1].m !== 'R' && r() < 0.35) P[i - 1].s = true;
+    }
+    else if (kind === 'a') st.a = !st.a;
+    else st.s = !st.s;
+  }
+  // ties hold the note before them, so they follow its octave
+  for (let i = 1; i < n; i++) if (P[i].m === 'T') { P[i].n = P[i - 1].n; P[i].o = P[i - 1].o; }
+  tail = []; stepChanged();
+}
+// Alter ties (Shyoy's own): Depth sets how many steps flip (about half the Randomise share, at least one).
+// A new tie takes the pitch of the note before it, as in the roll.
 function altRow(kind) {
+  if (kind !== 't') return altLane(kind);
   const d = sqDepthEl.value / 100, P = state.steps, n = P.length;
-  const ok = i => kind === 'a' ? P[i].m === 'N' : kind === 't' ? i > 0 && P[i].m !== 'R' && P[i - 1].m !== 'R' : P[i].m !== 'R' && !(kind === 'o' && P[i].m === 'T');
+  const ok = i => i > 0 && P[i].m !== 'R' && P[i - 1].m !== 'R';
   const idx = []; for (let i = 0; i < n; i++) if (ok(i)) idx.push(i);
   if (!idx.length) return;
   keepUndo();
@@ -227,18 +291,60 @@ function altRow(kind) {
   const k = Math.max(1, Math.round(idx.length * d * 0.5)), pick = idx.slice(0, k);
   for (const i of pick) {
     const st = P[i];
-    if (kind === 'o') st.o = st.o === 0 ? (Math.random() < 0.5 ? 1 : -1) : Math.random() < 0.6 ? 0 : Math.max(-2, Math.min(2, st.o + Math.sign(st.o)));
-    else if (kind === 't') { if (st.m === 'T') st.m = 'N'; else { st.n = P[i - 1].n; st.o = P[i - 1].o; st.m = 'T'; } }
-    else st[kind] = !st[kind];
+    if (st.m === 'T') st.m = 'N'; else { st.n = P[i - 1].n; st.o = P[i - 1].o; st.m = 'T'; }
   }
-  // ties hold the note before them, so they follow its octave
-  if (kind === 'o' || kind === 't') for (let i = 1; i < n; i++) if (P[i].m === 'T') { P[i].n = P[i - 1].n; P[i].o = P[i - 1].o; }
+  // ties hold the note before them
+  for (let i = 1; i < n; i++) if (P[i].m === 'T') { P[i].n = P[i - 1].n; P[i].o = P[i - 1].o; }
   tail = []; stepChanged();
 }
+// Alter whole pattern (the TB-303 app's FUNCTIONS.alter, v161): about a quarter of the steps change. New notes walk a
+// scale step or two in the pattern's own key or snap back to its most used pitch (the repeat note), filled rests take the
+// repeat note, rests land on off-beats and fills on the beat, and now and then every beat is made to play.
+function alterAll() {
+  const d = sqDepthEl.value / 100, P = state.steps, n = P.length, r = Math.random, pit = (st) => st.n + 12 * st.o;
+  keepUndo();
+  const used = P.filter(st => st.m === 'N').map(pit), pitches = [...new Set(used)].sort((a, b) => a - b);
+  if (!pitches.length) pitches.push(0);
+  const count = {}; for (const c of used) count[c] = (count[c] || 0) + 1;
+  const hold = used.length ? +Object.keys(count).sort((a, b) => count[b] - count[a])[0] : pitches[0];
+  // the key: the repeat note as root, with whichever of Generate's scales holds most of the notes the pattern uses
+  const pcs = used.map(c => (((c - hold) % 12) + 12) % 12);
+  const scale = Object.values(GEN_SCALES).map(sc => [sc, pcs.filter(pc => sc.includes(pc)).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const inKey = []; for (let k = -24; k <= 35; k++) if (scale.includes((((k - hold) % 12) + 12) % 12)) inKey.push(k);
+  // a neighbouring note one or two scale steps up or down, so the line walks but stays in its key
+  const walk = (c) => { let i = inKey.findIndex(k => k >= c); if (i < 0) i = inKey.length - 1;
+    return inKey[Math.max(0, Math.min(inKey.length - 1, i + (r() < 0.5 ? -1 : 1) * (r() < 0.7 ? 1 : 2)))]; };
+  const idx = [...Array(n).keys()].sort(() => r() - 0.5).slice(0, Math.max(1, Math.round(n * d * 5 / 6)));
+  for (const i of idx) {
+    const st = P[i], x = r(), beat = i % 4 === 0, off = i % 2 === 1, plays = st.m !== 'R';
+    if (x < 0.4) {
+      const was = pit(st); let to = was !== hold && r() < 0.35 ? hold : walk(was);
+      if (to === was) to = walk(was);
+      setPitch(st, to); st.m = 'N';
+    }
+    else if (x < 0.52) { const up = st.o < 2 && (st.o <= -2 || r() < 0.5); st.o += up ? 1 : -1; }
+    else if (x < 0.66) st.a = !st.a;
+    else if (x < 0.8) st.s = !st.s;
+    else if (i > 0 && (plays ? !beat && (off || r() < 0.4) : !off || r() < 0.5)) {
+      if (plays) st.m = 'R'; else { setPitch(st, hold); st.m = 'N'; }
+    }
+    else st.a = !st.a;
+  }
+  // AcidLab's Mutate sometimes puts a note on every beat: here one press in eight, with the repeat note
+  if (n >= 8 && r() < 0.125) for (let i = 0; i < n; i += 4) if (P[i].m === 'R') { setPitch(P[i], hold); P[i].m = 'N'; }
+  // tidy up: accents only on struck notes, no slides on rests, ties hold the pitch of the note before them
+  P.forEach((st, i) => {
+    if (st.m !== 'N') st.a = false;
+    if (st.m === 'R') st.s = false;
+    if (st.m === 'T') { if (i === 0 || P[i - 1].m === 'R') st.m = 'N'; else { st.n = P[i - 1].n; st.o = P[i - 1].o; } }
+  });
+  tail = []; stepChanged();
+}
+document.getElementById('a-all').onclick = alterAll;
 [['a-oct', 'o'], ['a-slide', 's'], ['a-acc', 'a'], ['a-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => altRow(k); });
 [['r-oct', 'o'], ['r-slide', 's'], ['r-acc', 'a'], ['r-tie', 't']].forEach(([id, k]) => { document.getElementById(id).onclick = () => rndRow(k); });
 document.getElementById('p-clr').onclick = () => { keepUndo(); state.steps = state.steps.map(() => restStep()); tail = []; stepChanged(); };
 document.getElementById('p-undo').onclick = () => {
-  if (!undoBuf) return; const u = JSON.parse(undoBuf); undoBuf = null; state.steps = u.steps; tail = u.tail; stepChanged();
+  if (!undoStack.length) return; const u = JSON.parse(undoStack.pop()); state.steps = u.steps; tail = u.tail; stepChanged();
 };
 renderSeq();

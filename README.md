@@ -81,6 +81,16 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Sequencer randomisers from the TB-303 app (v0.22.0)
+
+Brought level with the TB-303 app (tb303-circuit-model v164). The **Depth** slider scales the 303 app's odds: at its default 30% every randomiser behaves exactly like the 303 app, lower is gentler, higher is wilder. Ties rows stay Shyoy's own.
+- **Generate** (⌥G, and Refill ⇧⌥G): no stored patterns. `generate.js` picks one of 16 styles, a scale, a root and a feel, walks a scale degree the way that style moves, keeps pulling back to a held repeat note, adds the odd octave jump and 303 slides (most across octave jumps). Zero to two moves (loop, reverse, double, Mutate, swap beats) vary the bar, and each later bar is the first with one more move, so a 64-step riff develops. `patterns.js` (commercial ABL3 / Phoscyon content) is deleted.
+- **Randomise accents, slides, octaves** (⌥A ⌥S ⌥O): Generate's odds. Accents 42% on beats, 26% other even steps, 20% off-beats, struck notes only; slides only where the next step plays (50% across an octave, 12% same pitch, 22% otherwise); octaves pick one register for the riff and jump the odd note, the repeat note a third as often.
+- **Alter accents, slides, octaves** (⇧⌥A ⇧⌥S ⇧⌥O): about a quarter of the notes at Depth 30% (Depth × 5/6, at least one), picked by weight: accents onto beats and off off-beats, slides where they tie into the next note (dead slides go first), octave jumps spare the repeat note and sometimes slide in.
+- **Alter whole pattern** (⌥L, new, end of the alter section): the 303 app's Alter. It finds the pattern's key (repeat note as root, best-fitting scale) and changes about a quarter of the steps: walk a scale step or two or snap to the repeat note, octave jump, accent or slide toggle, rest on an off-beat or fill a rest with the repeat note. One press in eight fills every empty beat.
+- **Shuffle steps** (⌥H): whole beats when the length is a multiple of 4 and at least 8, else steps; always changes something; dead slides dropped, orphaned ties become notes.
+- **Undo** (⌘Z / Ctrl+Z) goes back up to 30 changes. Loading a slot or a sound empties it.
+
 ### Sequenced controls show it (v0.21.1)
 
 A control with its step sequencer switched on has its name in an ink chip (on the strip, where the dials have no name, its readout). While the pattern runs, the fill, ring and readout stay at the control's own setting, and a marker shows the value being heard: a bar across a fader's track, a pointer across a dial's ring. The small square after the readout is gone.
@@ -132,7 +142,7 @@ After the TB-303 app's `fit.js` and its `html.fit` rules. The glass (`.unit`) is
 
 ### Sequencer extras from the TB-303 app: Generate, Refill slots, move notes, D-pad, Join chain (v0.14.0)
 
-- **Generate** (Randomise, ⌥G; was New pattern): `js/app/patterns.js` holds the TB-303 app's `patterns.json` (ABL3 and Phoscyon factory patterns) as `PATTERN_BANK`; `js/app/generate.js` turns each into Shyoy steps (`n = code % 12`, `o = floor(code / 12) - 2`, rests keep the pitch before them) and ports `generatePattern` and its four moves (loop, reverse, double, swap). It keeps the pattern's length but writes all 64 steps, the rest into `tail`, so lengthening brings in more riff. About 1 in 10 notes that repeat the pitch before them become ties.
+- **Generate** (Randomise, ⌥G; was New pattern): `js/app/generate.js` is the TB-303 app's AcidLab-style generator (see v0.22.0; the stored ABL3 / Phoscyon patterns and `patterns.js` are gone). It keeps the pattern's length but writes all 64 steps, the rest into `tail`, so lengthening brings in more riff. About 1 in 10 notes that repeat the pitch before them become ties.
 - **Auto slots**: a slot Generate filled by itself carries `auto: true` until its steps are edited. On load every empty slot except the current one gets a 16-step generated pattern. **Refill slots** (Randomise, ⇧⌥G) regenerates every auto or empty slot, never the current one or an edited one; no Undo.
 - **Move notes** (Tools): up/down a semitone (] [), an octave (⇧] ⇧[), shift a step left/right (, .). A real transpose (B up becomes C an octave up), ties and rests move along; if any note would leave octave -2 C to octave +2 B nothing moves. Shifting rotates the pattern.
 - **D-pad** under the roll at the right: ▲▼ a semitone (Shift-click an octave), ◀▶ a step. It replaces the Shift and Transpose spring sliders.

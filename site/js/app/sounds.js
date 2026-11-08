@@ -18,7 +18,7 @@ function applyPattern(x) {
   if (!x || typeof x !== 'object' || !Array.isArray(x.steps) || !x.steps.length) return;
   state.steps = cleanSteps(x.steps);
   if (Array.isArray(x.s101)) state.s101 = clone(x.s101).slice(0, 100);
-  tail = []; undoBuf = null; renderSeq();
+  tail = []; undoStack.length = 0; renderSeq();
 }
 const sndOnlyEl = document.getElementById('prj-sndonly');
 sndOnlyEl.checked = !!store.get('prjSoundOnly', false);

@@ -23,7 +23,7 @@ function loadSlotData() {
   const x = state.slots[state.slot];
   state.steps = x && x.steps && x.steps.length ? cleanSteps(x.steps) : blankSteps();
   if (x) { state.params.swing = x.swing ?? state.params.swing; state.params.gateLen = x.gateLen ?? state.params.gateLen; }
-  tail = []; undoBuf = null; selStep = -1;
+  tail = []; undoStack.length = 0; selStep = -1;
 }
 function loadSlot(n) {
   if (n === state.slot) return;

@@ -18,7 +18,7 @@
   const ACTS = [
     ['rm-btn', 'KeyR', 'alt'], ['tm-btn', 'KeyT', 'alt'],
     ['r-acc', 'KeyA', 'alt'], ['r-slide', 'KeyS', 'alt'], ['r-oct', 'KeyO', 'alt'], ['r-tie', 'KeyI', 'alt'],
-    ['a-acc', 'KeyA', 'shift alt'], ['a-slide', 'KeyS', 'shift alt'], ['a-oct', 'KeyO', 'shift alt'], ['a-tie', 'KeyI', 'shift alt'],
+    ['a-acc', 'KeyA', 'shift alt'], ['a-slide', 'KeyS', 'shift alt'], ['a-oct', 'KeyO', 'shift alt'], ['a-tie', 'KeyI', 'shift alt'], ['a-all', 'KeyL', 'alt'],
     ['p-shuf', 'KeyH', 'alt'], ['p-rnd', 'KeyG', 'alt'], ['p-refill', 'KeyG', 'shift alt'],
     ['p-copy', 'KeyC', 'cmd'], ['p-paste', 'KeyV', 'cmd'], ['p-dup', 'KeyD', 'alt'], ['p-clr', 'Backspace', 'shift'], ['p-undo', 'KeyZ', 'cmd'],
     // move notes: plain keys, since ] [ , and . aren't note keys
