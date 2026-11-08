@@ -81,14 +81,18 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### The TB-303 app's sequencer keys (v0.22.1)
+
+The sequencer's keys are now the TB-303 app's: plain letters, Shift for the Alter versions. A S O accents, slides, octaves (I ties, Shyoy's own), L alter whole pattern, H shuffle, G generate, ⇧G refill, D double, J join chain, R / T / E open the Randomise, Tools and Gate menus; Cmd/Ctrl C V Z, ⇧⌫, ] [ , . as before. Letters also play notes, so on the Sequencer page these letters run the sequencer and don't sound; on other pages they play notes and the same keys work with Option/Alt held. Ignored while typing or with a dialog open.
+
 ### Sequencer randomisers from the TB-303 app (v0.22.0)
 
 Brought level with the TB-303 app (tb303-circuit-model v164). The **Depth** slider scales the 303 app's odds: at its default 30% every randomiser behaves exactly like the 303 app, lower is gentler, higher is wilder. Ties rows stay Shyoy's own.
-- **Generate** (⌥G, and Refill ⇧⌥G): no stored patterns. `generate.js` picks one of 16 styles, a scale, a root and a feel, walks a scale degree the way that style moves, keeps pulling back to a held repeat note, adds the odd octave jump and 303 slides (most across octave jumps). Zero to two moves (loop, reverse, double, Mutate, swap beats) vary the bar, and each later bar is the first with one more move, so a 64-step riff develops. `patterns.js` (commercial ABL3 / Phoscyon content) is deleted.
-- **Randomise accents, slides, octaves** (⌥A ⌥S ⌥O): Generate's odds. Accents 42% on beats, 26% other even steps, 20% off-beats, struck notes only; slides only where the next step plays (50% across an octave, 12% same pitch, 22% otherwise); octaves pick one register for the riff and jump the odd note, the repeat note a third as often.
-- **Alter accents, slides, octaves** (⇧⌥A ⇧⌥S ⇧⌥O): about a quarter of the notes at Depth 30% (Depth × 5/6, at least one), picked by weight: accents onto beats and off off-beats, slides where they tie into the next note (dead slides go first), octave jumps spare the repeat note and sometimes slide in.
-- **Alter whole pattern** (⌥L, new, end of the alter section): the 303 app's Alter. It finds the pattern's key (repeat note as root, best-fitting scale) and changes about a quarter of the steps: walk a scale step or two or snap to the repeat note, octave jump, accent or slide toggle, rest on an off-beat or fill a rest with the repeat note. One press in eight fills every empty beat.
-- **Shuffle steps** (⌥H): whole beats when the length is a multiple of 4 and at least 8, else steps; always changes something; dead slides dropped, orphaned ties become notes.
+- **Generate** (G, and Refill ⇧G): no stored patterns. `generate.js` picks one of 16 styles, a scale, a root and a feel, walks a scale degree the way that style moves, keeps pulling back to a held repeat note, adds the odd octave jump and 303 slides (most across octave jumps). Zero to two moves (loop, reverse, double, Mutate, swap beats) vary the bar, and each later bar is the first with one more move, so a 64-step riff develops. `patterns.js` (commercial ABL3 / Phoscyon content) is deleted.
+- **Randomise accents, slides, octaves** (A S O): Generate's odds. Accents 42% on beats, 26% other even steps, 20% off-beats, struck notes only; slides only where the next step plays (50% across an octave, 12% same pitch, 22% otherwise); octaves pick one register for the riff and jump the odd note, the repeat note a third as often.
+- **Alter accents, slides, octaves** (⇧A ⇧S ⇧O): about a quarter of the notes at Depth 30% (Depth × 5/6, at least one), picked by weight: accents onto beats and off off-beats, slides where they tie into the next note (dead slides go first), octave jumps spare the repeat note and sometimes slide in.
+- **Alter whole pattern** (L, new, end of the alter section): the 303 app's Alter. It finds the pattern's key (repeat note as root, best-fitting scale) and changes about a quarter of the steps: walk a scale step or two or snap to the repeat note, octave jump, accent or slide toggle, rest on an off-beat or fill a rest with the repeat note. One press in eight fills every empty beat.
+- **Shuffle steps** (H): whole beats when the length is a multiple of 4 and at least 8, else steps; always changes something; dead slides dropped, orphaned ties become notes.
 - **Undo** (⌘Z / Ctrl+Z) goes back up to 30 changes. Loading a slot or a sound empties it.
 
 ### Sequenced controls show it (v0.21.1)
