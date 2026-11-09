@@ -81,7 +81,7 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
-### Older macOS web views (v0.22.20)
+### Older macOS web views (v0.23.1)
 
 Safari before 15.4 (an un-updated macOS 11 or 12, whose WebKit is also what the VST's window uses) has no `<dialog>`, so the Options sheet and the control sequencer card were drawn open over the screen, and `100dvh` / `aspect-ratio` were ignored (the screen sat half off the top, the logo had no width). shyoy.css now hides closed dialogs itself, has `100vh` fallbacks and a fixed logo width; fit.js marks `html.nodialog` so an open sheet is placed by the CSS; cseq.js reads the `open` attribute rather than the `.open` property. Modern browsers are unchanged.
 
