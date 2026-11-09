@@ -133,7 +133,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
           if (si >= 0 && di >= 0 && m.br[k] > 0) this.bridges.push([si, di, 1 / (10e6 * Math.pow(1e-4, m.br[k]))]);
         }
         break;
-      case 'noteOn': this.keyOn(m.n); break;
+      case 'noteOn': this.keyOn(m.n, m.acc); break; // acc: a hard key on a velocity keyboard (MIDI)
       case 'noteOff': this.keyOff(m.n); break;
       case 'seq': Object.assign(this.seq, m.seq); if (m.seq.bpm) this.fxc.setBpm(m.seq.bpm); break;
       case 'fx': this.fxc.setFx(m.name, m.on); break;
@@ -202,7 +202,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
   lfoReset() { this.ltri = -this.C.hys * this.rail; this.lsq = -1; this.clockPending = true; }
   clockedMode() { return this.arp > 0 || this.seqMode === 2; }
-  keyOn(n) {
+  keyOn(n, acc) {
     n += this.P.transpose * 12;
     if (this.running) { this.transpose = n - 60; return; }
     if (this.seqMode === 2) { this.s101Tr = n - 60; return; }
@@ -218,7 +218,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.keys = this.keys.filter(k => k !== n); this.keys.push(n);
     const gm = this.P.glideMode;
     this.setPitch(n - 12, gm === 2 || (gm === 1 && legato) ? this.P.glide : 0);
-    if (!legato || this.P.trig === 0) this.trigger(false);
+    if (!legato || this.P.trig === 0) this.trigger(!!acc);
   }
   keyOff(n) {
     n += this.P.transpose * 12;

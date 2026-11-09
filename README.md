@@ -81,6 +81,10 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Novation Bass Station II map, pitch bend, aftertouch, sustain (v0.22.17)
+
+An input whose port name says Bass Station II gets its own CC map (`BS2_MAP` in `js/app/midi.js`, from Novation's published CC list) in place of the CC 1-27 panel map: filter frequency, resonance, filter env (right of centre), filter LFO 2, overdrive, osc 1/2/sub/noise levels to Saw/Pulse/Sub/Noise, osc 1 range, fine, LFO 1 depth and the three PW knobs (each also picks the PWM source), sub octave and wave to the Sub switch, LFO 1/2 speed and wave, both envelopes' ADSR to the one envelope, glide, patch volume, bend amount, distortion to the FX drive pedal. 8-bit knobs use their LSB too. The mod wheel and aftertouch push the mod lever (the larger of the two), and a key hit at velocity 100 or more plays an accented note (`noteOn` carries `acc`, the engine's `keyOn(n, acc)`). From every input, pitch bend moves the bender lever, channel aftertouch the mod lever and CC 64 holds notes. The MIDI tab lists both maps. Not mapped (no Shyoy equivalent): osc 2 pitch/range/PW, ring mod, external in, filter type/slope/shape, osc filter mod, LFO delay, arp, VCA limit, NRPN-only settings.
+
 ### Cutoff no longer gets louder at the top (v0.22.14)
 
 With resonance up, the last tenth of the cutoff travel made the sound up to 4 dB louder (Johnny heard volume rise with cutoff). The model rolls the resonance loop off near 20 kHz, as the IR3109's OTAs run out of bandwidth, but it took only the feedback down, so the passband (gain 1/(1+k)) came back up. The real stages lose forward gain with it, so the input is now scaled to hold the passband where the full-loop filter has it. Measured on a saw: level is flat to 0.1 dB from cutoff 0.85 to 1 at every resonance. The remaining brightness and loudness rise lower down is the real filter letting more harmonics through. VST: port the `passComp` line in the VCF control block.

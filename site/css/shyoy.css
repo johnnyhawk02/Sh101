@@ -218,6 +218,8 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .ccmap li { display: grid; grid-template-columns: 3.4em 1fr; gap: var(--gap-s); padding: 2px 0; break-inside: avoid; }
 .ccmap b { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ccmap span { text-transform: lowercase; }
+.ccmap.bs2 li { grid-template-columns: 8.6em 1fr; }
+.ccmap.bs2 b { text-transform: lowercase; }
 /* About: Install and Check for update side by side, the version, then the notes */
 .opt-acts { display: flex; flex-wrap: wrap; gap: var(--gap-s) var(--gap); }
 .opt-ver { margin: calc(var(--gap) * -1 + 2px) 0 0; font-size: var(--fs-s); color: var(--muted); }

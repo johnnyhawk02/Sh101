@@ -30,7 +30,7 @@ try {
 <div class="unit" id="unit">
   <header class="top">
     <!-- v0.22.11: logo is Johnny's shyoy.psd artwork, used as a mask filled with the LCD ink and multiplied onto the glass -->
-    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.22.16</i></b><span>Circuit-modelled monosynth · bendable</span></div>
+    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.22.17</i></b><span>Circuit-modelled monosynth · bendable</span></div>
     <!-- v0.22.10: battery readout and Bend board tab taken off the page (Johnny); both stay in the HTML, hidden -->
     <span class="psu" id="psu" hidden>Battery 9.0 V · rail 100%</span>
     <div class="transport">
@@ -182,7 +182,10 @@ try {
   <div class="opt-body">
     <section class="osec" id="osec-midi" role="tabpanel" aria-label="MIDI">
       <p class="opt-status" id="midi-status"></p>
+      <p class="opt-status">Any controller</p>
       <ol class="ccmap" id="midi-map"></ol>
+      <p class="opt-status">Novation Bass Station II (picked up by its port name)</p>
+      <ol class="ccmap bs2" id="midi-map-bs2"></ol>
     </section>
     <section class="osec" id="osec-colours" role="tabpanel" aria-label="Colours" hidden>
       <div class="lcd-mode"><span class="lab">mode</span>
