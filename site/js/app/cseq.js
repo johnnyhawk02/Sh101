@@ -178,7 +178,7 @@ cseqOpen = (key) => {
   csKey = key; csPage = 0; csSel = 0; csNow = -1;
   document.getElementById('cs-name').textContent = (CSEQ_NAME[key] || key).toUpperCase();
   csDraw();
-  if (!csDlg.open) { if (csDlg.showModal) csDlg.showModal(); else csDlg.setAttribute('open', ''); }
+  if (!csDlg.hasAttribute('open')) { if (csDlg.showModal) csDlg.showModal(); else csDlg.setAttribute('open', ''); }
   csStepsEl.focus();
 };
 function csClose() {
@@ -186,7 +186,7 @@ function csClose() {
   const q = csKey && state.cseq[csKey];
   if (q && csFresh && q.vals.every(v => v === 0)) { cseqRelease(csKey); delete state.cseq[csKey]; }
   csKey = null; cseqMarks(); save();
-  if (csDlg.open) { if (csDlg.close) csDlg.close(); else csDlg.removeAttribute('open'); }
+  if (csDlg.hasAttribute('open')) { if (csDlg.close) csDlg.close(); else csDlg.removeAttribute('open'); }
 }
 csDlg.addEventListener('cancel', (e) => { e.preventDefault(); csClose(); });
 csDlg.addEventListener('click', (e) => { if (e.target === csDlg) csClose(); });
