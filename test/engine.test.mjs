@@ -104,3 +104,19 @@ for (const [drvtype, revtype] of [[0, 0], [1, 1 / 3], [2, 2 / 3], [0, 1]]) {
   assert.ok(lo < 1.6 && hi > 4, `flanger sweep ${lo.toFixed(2)}-${hi.toFixed(2)} ms`);
 }
 console.log('engine tests passed');
+// last-note priority: letting go of an older key under a newer one changes nothing
+{
+  const [p, send] = make();
+  send({ type: 'params', p: { trig: 0, attack: 0, decay: .2, sustain: .5 } });
+  send({ type: 'noteOn', n: 60 }); render(p, .3);
+  send({ type: 'noteOn', n: 65 }); render(p, .3);
+  const st = p.stage, pt = p.pitchT;
+  assert.ok(st !== 1, 'expected decay/sustain after 0.3 s');
+  send({ type: 'noteOff', n: 60 });
+  assert.equal(p.stage, st, 'releasing an older key retriggered the envelope');
+  assert.equal(p.pitchT, pt, 'releasing an older key moved the pitch');
+  send({ type: 'noteOn', n: 60 }); render(p, .3);
+  send({ type: 'noteOff', n: 60 });
+  assert.equal(p.pitchT, pt, 'releasing the newest key should fall back to the held one');
+}
+console.log('key priority ok');

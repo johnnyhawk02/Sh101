@@ -228,8 +228,12 @@ class KestrelProcessor extends AudioWorkletProcessor {
       if (!this.hold) { this.arpNotes = this.arpNotes.filter(k => k !== n); if (!this.arpNotes.length) { this.gateOff(); this.arpIdx = -1; } }
       return;
     }
+    // Last-note priority: letting go of an older key while a newer one is held
+    // changes nothing (no pitch move, no retrigger). Only releasing the sounding
+    // key falls back to the newest key still held.
+    const top = this.keys.length && this.keys[this.keys.length - 1] === n;
     this.keys = this.keys.filter(k => k !== n);
-    if (this.keys.length) { this.setPitch(this.keys[this.keys.length - 1] - 12, this.P.glideMode ? this.P.glide : 0); if (this.P.trig === 0) this.trigger(false); }
+    if (this.keys.length) { if (!top) return; this.setPitch(this.keys[this.keys.length - 1] - 12, this.P.glideMode ? this.P.glide : 0); if (this.P.trig === 0) this.trigger(false); }
     else if (!this.hold) this.gateOff();
   }
 
