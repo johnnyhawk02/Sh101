@@ -85,6 +85,10 @@ npx wrangler pages deploy site --project-name shyoy --branch main
 
 The "Circuit-modelled monosynth · bendable" line beside the logo is gone (Johnny); the header shows just the logo and version.
 
+### Bass Station II Rhythm knob picks the pattern (v0.22.19)
+
+On a Bass Station II, the arp Rhythm knob (CC 119) picks the pattern slot: its 32 rhythms are spread over the 8 slots, four per slot (if it ever sends a value above 31, the whole 0-127 range is spread instead). It loads the slot as a tap on the slot button does.
+
 ### Novation Bass Station II map, pitch bend, aftertouch, sustain (v0.22.17)
 
 An input whose port name says Bass Station II gets its own CC map (`BS2_MAP` in `js/app/midi.js`, from Novation's published CC list) in place of the CC 1-27 panel map: filter frequency, resonance, filter env (right of centre), filter LFO 2, overdrive, osc 1/2/sub/noise levels to Saw/Pulse/Sub/Noise, osc 1 range, fine, LFO 1 depth and the three PW knobs (each also picks the PWM source), sub octave and wave to the Sub switch, LFO 1/2 speed and wave, both envelopes' ADSR to the one envelope, glide, patch volume, bend amount, distortion to the FX drive pedal. 8-bit knobs use their LSB too. The mod wheel and aftertouch push the mod lever (the larger of the two), and a key hit at velocity 100 or more plays an accented note (`noteOn` carries `acc`, the engine's `keyOn(n, acc)`). From every input, pitch bend moves the bender lever, channel aftertouch the mod lever and CC 64 holds notes. The MIDI tab lists both maps. Not mapped (no Shyoy equivalent): osc 2 pitch/range/PW, ring mod, external in, filter type/slope/shape, osc filter mod, LFO delay, arp, VCA limit, NRPN-only settings.
