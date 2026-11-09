@@ -5,7 +5,7 @@
 // From every input: pitch bend moves the bender lever, channel aftertouch pushes the mod lever, CC 64 (sustain) holds notes.
 // A Novation Bass Station II (found by its port name) gets its own map instead: each of its knobs and sliders moves the
 // nearest Shyoy control (BS2_MAP below, from Novation's published CC list), its mod wheel pushes the mod lever and a
-// hard key (velocity 100 or more) plays an accented note.
+// hard key (velocity 100 or more) plays an accented note, and the arp Rhythm knob picks the pattern slot.
 const MIDI_MAP = (() => {
   const all = [...RACK.flatMap(m => m.items.map(it => it.label)), ...BENDER.map(b => b.label)];
   const twice = (l) => all.filter(x => x === l).length > 1;
@@ -64,7 +64,7 @@ const BS2_SHOW = [['Filter freq', 'Cutoff'], ['Resonance', 'Reso'], ['Filter env
   ['Distortion', 'FX drive'], ['Osc 1 level', 'Saw'], ['Osc 2 level', 'Pulse'], ['Sub level', 'Sub'], ['Noise level', 'Noise'], ['Osc 1 range', 'Range'],
   ['Osc 1 fine', 'Tune'], ['Osc 1 LFO 1', 'VCO Mod'], ['Osc 1 PW', 'PW + PWM'], ['Sub oct, wave', 'Sub switch'], ['LFO 1/2 speed', 'LFO Rate'],
   ['LFO 1/2 wave', 'LFO Wave'], ['Amp/mod env', 'Env ADSR'], ['Glide time', 'Porta'], ['Volume', 'VCA Level'], ['Bend amount', 'Bender VCO'],
-  ['Pitch wheel', 'Bender'], ['Mod wheel', 'Mod lever'], ['Aftertouch', 'Mod lever'], ['Velocity 100+', 'Accent'], ['Sustain', 'Hold']];
+  ['Arp rhythm', 'Pattern 1-8'], ['Pitch wheel', 'Bender'], ['Mod wheel', 'Mod lever'], ['Aftertouch', 'Mod lever'], ['Velocity 100+', 'Accent'], ['Sustain', 'Hold']];
 document.getElementById('midi-map-bs2').innerHTML = BS2_SHOW.map(r => `<li><b>${r[0]}</b><span>${r[1]}</span></li>`).join('');
 const isBS2 = (inp) => /bass\s*station\s*(ii|2)\b/i.test(inp.name || '');
 
@@ -75,9 +75,11 @@ const midiLater = (key, fn) => { midiPending.set(key, fn); if (!midiFrame) midiF
 const midiHeld = new Set(), midiDown = new Set(); let midiSus = false;
 const modIn = { wheel: 0, press: 0 };
 const setMod = () => { const v = Math.max(modIn.wheel, modIn.press); modPush.classList.toggle('held', v > .02); post({ type: 'param', id: 'modPush', v }); };
-const bs2Msb = {};
+const bs2Msb = {}; let bs2RhyWide = false;
 function bs2CC(cc, val) {
   if (cc === 1 || cc === 0) { modIn.wheel = val / 127; midiLater('mod', setMod); return; }
+  // the arp Rhythm knob picks the pattern slot: its 32 rhythms (0..31) spread over the slots, or 0..127 if that is what it sends
+  if (cc === 119) { if (val > 31) bs2RhyWide = true; const k = Math.min(SLOTS - 1, Math.floor(val * SLOTS / (bs2RhyWide ? 128 : 32))); midiLater('rhythm', () => loadSlot(k)); return; }
   let base = cc, lsb = 0;
   if (cc >= 48 && cc < 64 && BS2_14.has(cc - 32)) { base = cc - 32; lsb = val; if (bs2Msb[base] == null) return; }
   const row = BS2_BY_CC.get(base); if (!row) return;
