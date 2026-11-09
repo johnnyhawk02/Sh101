@@ -71,7 +71,7 @@ button, table, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
 
 /* ---------- the glass ---------- */
-.unit { display: flex; flex-direction: column; height: calc(100dvh - 24px); min-height: 560px; max-width: 1480px; margin: 0 auto; overflow: hidden;
+.unit { display: flex; flex-direction: column; height: calc(100vh - 24px); height: calc(100dvh - 24px); min-height: 560px; max-width: 1480px; margin: 0 auto; overflow: hidden;
   color: var(--ink); text-shadow: var(--shadow); border: 6px solid var(--bezel); border-radius: 12px;
   background-color: var(--glass);
   background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
@@ -170,7 +170,7 @@ select.btn option { color: #000; }
 /* v0.22.11: logo from Johnny's PSD (icons/logo.png, black art on transparent) used as a mask, so it is drawn in the current
    ink colour and multiplied onto the glass like the rest of the LCD; the version sits top right in muted ink */
 .brand b:has(.logo) { align-items: center; gap: 8px; padding: 0; background: none; color: var(--ink); }
-.brand .logo { display: block; height: 46px; aspect-ratio: 547 / 200; max-width: none; background: var(--ink); mix-blend-mode: multiply;
+.brand .logo { display: block; height: 46px; width: 125.8px; aspect-ratio: 547 / 200; max-width: none; background: var(--ink); mix-blend-mode: multiply;
   -webkit-mask: url(../icons/logo.png) center / contain no-repeat; mask: url(../icons/logo.png) center / contain no-repeat; }
 .brand b:has(.logo) .ver { align-self: flex-end; margin-bottom: 4px; color: var(--muted); }   /* v0.23.0: on the logo's baseline */
 .brand > span { font-size: var(--fs-s); color: var(--muted); line-height: 1.05; max-width: 22ch; }
@@ -186,7 +186,7 @@ select.btn option { color: #000; }
 
 /* ---------- Options sheet (the gear): a modal piece of the same glass, from the TB-303 app's dialog#options ---------- */
 html:has(dialog#options[open]) { overflow: hidden; }
-dialog#options { width: min(940px, calc(100vw - 32px)); height: min(600px, calc(100dvh - 32px)); max-width: none; max-height: none; margin: auto; padding: 0;
+dialog#options { width: min(940px, calc(100vw - 32px)); height: min(600px, calc(100vh - 32px)); height: min(600px, calc(100dvh - 32px)); max-width: none; max-height: none; margin: auto; padding: 0;
   flex-direction: column; overflow: hidden; color: var(--ink); text-shadow: var(--shadow); border: 6px solid var(--bezel); border-radius: 12px;
   background-color: var(--glass);
   background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
@@ -197,6 +197,12 @@ dialog#options { width: min(940px, calc(100vw - 32px)); height: min(600px, calc(
     radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / calc(.28 * var(--dirt))) 100%);
   box-shadow: inset 0 6px 14px rgba(0,0,0,.35), inset -4px 0 10px rgba(0,0,0,.15), 0 18px 40px rgba(0,0,0,.5); }
 dialog#options[open] { display: flex; }
+/* v0.22.19: older WebKit (Safari before 15.4, e.g. an un-updated macOS 11 / 12, which is what a plugin's web view uses) has no
+   <dialog>: it drew both sheets open over the screen. Closed ones are hidden here (what the browser does anyway), and with
+   no <dialog> (fit.js sets html.nodialog) an open one is placed as the browser would. */
+dialog:not([open]) { display: none; }
+html.nodialog dialog { position: fixed; z-index: 100; }
+html.nodialog dialog#cseq[open] { display: block; }
 dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .opt-head { flex: none; display: flex; align-items: flex-end; gap: var(--gap) calc(var(--gap) + 12px); padding: calc(var(--pad) - 4px) var(--pad) 0; border-bottom: 2px solid var(--ink); }
 .opt-head h2 { margin: 0; padding-bottom: var(--gap-s); font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; text-transform: lowercase; }
@@ -545,7 +551,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 /* ---------- one fixed screen, scaled to fit the window (js/app/fit.js sets --k; after the TB-303 app's html.fit) ----------
    The glass is always 1400 x 906 (1.545:1, Johnny's MacBook Pro display) and scaled as a whole, with the dark case round it.
    Pop-ups inside the glass scale with it; the Options sheet sits in the top layer, so it gets its own fixed size and the same scale. */
-html.fit, html.fit body { height: 100dvh; overflow: hidden; }
+html.fit, html.fit body { height: 100vh; height: 100dvh; overflow: hidden; }
 html.fit body { padding: 0; position: relative; }
 /* v0.17.3: the page round the screen is flat near-black, so the screen's edge reads as the shape of the plugin window. */
 html.fit, html.fit body { background: #111; background-image: none; }
