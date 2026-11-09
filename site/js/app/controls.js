@@ -149,6 +149,9 @@ const rack = document.getElementById('rack');
 for (const m of RACK) {
   const sec = document.createElement('section'); sec.className = 'mod'; sec.setAttribute('aria-label', m.name);
   sec.innerHTML = `<h2>${m.name}<small>${m.sub}</small></h2><div class="ctrls"></div>`;
+  // v0.23.0: spare width goes to each module by what it holds (a switch column is about 1.6 faders wide), so the
+  // faders sit at an even pitch across a row instead of one sparse module (the VCA) taking an equal share
+  sec.style.flexGrow = m.items.reduce((n, it) => n + (it.f ? 1 : 1.6), 0).toFixed(1);
   const c = sec.querySelector('.ctrls');
   for (const it of m.items) it.f ? fader(it, c) : switcher(it, c);
   rack.appendChild(sec);

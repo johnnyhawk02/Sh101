@@ -60,7 +60,7 @@ const setTranspose = d => { allOff(); const v = Math.max(0, Math.min(2, (state.p
 
 // bender lever (springs back) and mod push
 const lever = document.getElementById('lever'), knob = lever.querySelector('i'), modPush = document.getElementById('modPush');
-const setLever = v => { v = Math.max(-1, Math.min(1, v)); knob.style.left = `calc(${50 + v * 40}% - 9px)`; lever.setAttribute('aria-valuenow', Math.round(v * 100)); post({ type: 'param', id: 'lever', v }); };
+const setLever = v => { v = Math.max(-1, Math.min(1, v)); knob.style.left = `calc(${50 + v * 40}% - 11px)`; lever.setAttribute('aria-valuenow', Math.round(v * 100)); post({ type: 'param', id: 'lever', v }); };
 let levDrag = false;
 const levFromX = e => { const r = lever.getBoundingClientRect(); return ((e.clientX - r.left) / r.width - 0.5) / 0.4; };
 lever.addEventListener('pointerdown', e => { boot(); lever.setPointerCapture(e.pointerId); levDrag = true; setLever(levFromX(e)); });

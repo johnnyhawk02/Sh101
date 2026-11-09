@@ -30,7 +30,7 @@ try {
 <div class="unit" id="unit">
   <header class="top">
     <!-- v0.22.11: logo is Johnny's shyoy.psd artwork, used as a mask filled with the LCD ink and multiplied onto the glass -->
-    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.22.19</i></b></div>
+    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.23.0</i></b></div>
     <!-- v0.22.10: battery readout and Bend board tab taken off the page (Johnny); both stay in the HTML, hidden -->
     <span class="psu" id="psu" hidden>Battery 9.0 V · rail 100%</span>
     <div class="transport">
@@ -163,11 +163,17 @@ try {
       <div class="scroll"><table class="mx" id="mx"></table></div>
     </section>
 
+    <!-- v0.23.0: three modules across the page like the Synth rack: the bender's depths, the lever with mod push, transpose -->
     <section class="perf101" id="perf101" aria-label="Performance controls">
-      <div class="grp"><h3>Bender</h3>
+      <div class="grp g-bend"><h3>bender<small>depth</small></h3>
         <div class="row" id="benderSlot"></div>
+      </div>
+      <div class="grp g-lever"><h3>lever<small>spring return</small></h3>
         <div class="row"><div class="lever" id="lever" role="slider" tabindex="0" aria-label="Bend lever" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><i></i></div>
-          <button class="btn light" id="modPush">Mod push</button><div id="trSw"></div></div>
+          <button class="btn light" id="modPush">Mod push</button></div>
+      </div>
+      <div class="grp g-tr"><h3>transpose<small>octave</small></h3>
+        <div class="row"><div id="trSw"></div></div>
       </div>
     </section>
   </div>
@@ -182,9 +188,9 @@ try {
   <div class="opt-body">
     <section class="osec" id="osec-midi" role="tabpanel" aria-label="MIDI">
       <p class="opt-status" id="midi-status"></p>
-      <p class="opt-status">Any controller</p>
+      <h3 class="opt-h">Any controller</h3>
       <ol class="ccmap" id="midi-map"></ol>
-      <p class="opt-status">Novation Bass Station II (picked up by its port name)</p>
+      <h3 class="opt-h">Novation Bass Station II <small>picked up by its port name</small></h3>
       <ol class="ccmap bs2" id="midi-map-bs2"></ol>
     </section>
     <section class="osec" id="osec-colours" role="tabpanel" aria-label="Colours" hidden>
@@ -207,7 +213,7 @@ try {
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.22.9</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.23.0</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>

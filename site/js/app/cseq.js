@@ -176,7 +176,7 @@ cseqOpen = (key) => {
   csFresh = !state.cseq[key];
   if (csFresh) state.cseq[key] = cseqNew();
   csKey = key; csPage = 0; csSel = 0; csNow = -1;
-  document.getElementById('cs-name').textContent = (CSEQ_NAME[key] || key).toUpperCase();
+  document.getElementById('cs-name').textContent = (CSEQ_NAME[key] || key).toLowerCase();
   csDraw();
   if (!csDlg.open) { if (csDlg.showModal) csDlg.showModal(); else csDlg.setAttribute('open', ''); }
   csStepsEl.focus();

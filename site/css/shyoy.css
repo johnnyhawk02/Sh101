@@ -172,7 +172,7 @@ select.btn option { color: #000; }
 .brand b:has(.logo) { align-items: center; gap: 8px; padding: 0; background: none; color: var(--ink); }
 .brand .logo { display: block; height: 46px; aspect-ratio: 547 / 200; max-width: none; background: var(--ink); mix-blend-mode: multiply;
   -webkit-mask: url(../icons/logo.png) center / contain no-repeat; mask: url(../icons/logo.png) center / contain no-repeat; }
-.brand b:has(.logo) .ver { align-self: flex-start; margin-top: 2px; color: var(--muted); }
+.brand b:has(.logo) .ver { align-self: flex-end; margin-bottom: 4px; color: var(--muted); }   /* v0.23.0: on the logo's baseline */
 .brand > span { font-size: var(--fs-s); color: var(--muted); line-height: 1.05; max-width: 22ch; }
 .psu[hidden] { display: none; } .brand:has(+ .psu[hidden]) { margin-right: auto; }
 .psu { display: inline-flex; align-items: center; gap: 8px; height: var(--h); padding: 0 10px; margin-right: auto; border: var(--bw) solid var(--ink); border-radius: var(--r);
@@ -204,7 +204,7 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .otabs button { appearance: none; background: none; color: var(--ink); border: 2px solid var(--ink); border-bottom: 0; border-radius: var(--r) var(--r) 0 0;
   height: var(--h); padding: 0 calc(var(--gap-s) + 8px); font: inherit; font-size: var(--fs); line-height: 1; text-transform: lowercase; text-shadow: var(--shadow); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .otabs button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
-[data-lcdmode=colour] .otabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); }
+/* v0.23.0: no spot colour on the selected tab, as on the main tabs (Johnny, v0.20.1) */
 .otabs button:focus-visible { outline-offset: -5px; outline-color: currentColor; }
 .xbtn { align-self: center; flex: none; appearance: none; background: none; border: 0; color: var(--ink); width: var(--h); height: var(--h); padding: 3px; margin-bottom: var(--gap-s); cursor: pointer; }
 .xbtn svg { width: 100%; height: 100%; display: block; filter: drop-shadow(var(--shadow)); }
@@ -214,10 +214,14 @@ dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .osec[hidden] { display: none; }
 /* MIDI: one status line, then the CC map flowing into columns */
 .opt-status { margin: 0; font-size: var(--fs-s); color: var(--muted); }
+.opt-h { margin: 0; padding-bottom: 4px; border-bottom: var(--rule); font-size: var(--fs); font-weight: 400; text-transform: lowercase; color: var(--ink); }
+.opt-h small { font-size: var(--fs-s); color: var(--muted); margin-left: 8px; }
+.ccmap + .opt-h { margin-top: var(--gap); }
 .ccmap { margin: 0; padding: 0; list-style: none; columns: 4 170px; column-gap: calc(var(--gap) + 16px); }
 .ccmap li { display: grid; grid-template-columns: 3.4em 1fr; gap: var(--gap-s); padding: 2px 0; break-inside: avoid; }
 .ccmap b { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
-.ccmap span { text-transform: lowercase; }
+.ccmap span { text-transform: lowercase; white-space: nowrap; }
+.ccmap.bs2 { column-gap: calc(var(--gap) + 6px); }
 .ccmap.bs2 li { grid-template-columns: 8.6em 1fr; }
 .ccmap.bs2 b { text-transform: lowercase; }
 /* About: Install and Check for update side by side, the version, then the notes */
@@ -375,7 +379,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
    rule on their left; the reverb row and the routing strip have a rule across the top. Each unit is a one-row header on
    the glass (On / Off, its name, its own menus or switch) over one row of dials. The 303's sizes are drawn 1.4x here,
    since its screen is 1000 px wide and this one 1400, so the two pages look the same. */
-#pan-fx { gap: 0; --knob: 60px; --kn-w: 82px; --fx-sp: 45px; }   /* --fx-sp: the space each side of a band rule (v0.20.0) */
+#pan-fx { gap: 0; --knob: 60px; --kn-w: 82px; --fx-sp: 38px; }   /* --fx-sp: the space each side of a band rule (v0.20.0; 38 since v0.23.0 made the routing diagram 1.2x) */
 .fxrow { flex: none; display: flex; flex-direction: column; gap: 0; margin-bottom: var(--fx-sp); }
 .fxr { flex: none; display: flex; align-items: stretch; }
 .fxr1 { margin-top: var(--fx-sp); padding-top: var(--fx-sp); border-top: 1px solid var(--line); }
@@ -409,7 +413,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .tmenu .fn-menu button[aria-checked=true]::before { content: "✓"; position: absolute; left: 8px; }
 /* routing (the 303 app's strip): the block diagram on the left, the two switches stacked on the right */
 .fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: var(--fx-sp); border-top: 1px solid var(--line); }
-.route-dia { width: 586px; height: 64px; flex: 0 1 auto; min-width: 0; overflow: visible; font-family: var(--f-lcd); }
+.route-dia { width: 703px; height: 77px; flex: 0 1 auto; min-width: 0; overflow: visible; font-family: var(--f-lcd); }
 .route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
 .route-dia .rsum { fill: none; stroke: var(--ink); stroke-width: 1.5; }
@@ -444,7 +448,10 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 /* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
 .rmenu { position: relative; }
 .sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu, .sq-bank > .sq-side + .rmenu { margin-left: 0; }
-.sq-bank > .sq-side { margin-left: auto; margin-right: var(--gap); }   /* v0.20.0: randomise depth moved into the pattern row */
+.sq-bank > .sq-side { margin-left: auto; margin-right: calc(var(--gap) * 2); }
+.sq-side .sld { grid-template-columns: auto 120px 2.4em; }
+.sq-side .sld output { text-align: left; }   /* v0.23.0: the value right by its bar, not a gap away */
+.sq-bank > .rmenu + .rmenu { margin-left: 0; }   /* v0.20.0: randomise depth moved into the pattern row */
 .rm-btn { text-transform: none; }   /* Johnny: the menu buttons read "Randomise ▾" and "Tools ▾" */
 .rm-btn::after { content: " ▾"; }
 .fn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 70; min-width: 230px; display: flex; flex-direction: column; padding: 4px 0 6px;
@@ -501,17 +508,25 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .roll .end { border-right: 3px solid var(--ink); }
 
 /* ---------- perform: the bender and transpose (arpeggio and the 101 sequencer were taken off in v0.13.2) ---------- */
-.perf101 { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
-.perf101 .grp { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--gap); padding: var(--pad); border-right: var(--rule); }
-.perf101 .grp:last-of-type { border-right: 0; }
-.perf101 .row { display: flex; gap: calc(var(--gap) + 6px); align-items: flex-start; flex-wrap: wrap; }
-#benderSlot .fdr { width: 5em; }   /* v0.20.0: equal columns so the three faders are evenly spaced */
-#benderSlot { flex: 1 1 auto; min-height: 0; align-items: stretch; flex-wrap: nowrap; gap: calc(var(--gap) * 4); justify-content: center; }
-.perf101 .row:has(.lever) { align-items: center; justify-content: center; gap: calc(var(--gap) * 3); }
-.lever { width: 180px; height: calc(var(--h) + 6px); border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; touch-action: none; cursor: ew-resize;
+/* v0.23.0: laid out like the Synth rack: three modules across the glass, rules between them, the same 16 px gutter.
+   The bender's three depth faders run full height; the lever and transpose sit centred in their own modules. */
+.perf101 { display: flex; align-items: stretch; margin: 6px 4px; overflow: hidden; }
+.perf101 .grp { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px);
+  padding: calc(var(--pad) - 6px) calc(var(--pad) - 4px); border-right: var(--rule); margin-right: -1px; }
+.perf101 .g-bend { flex-grow: 5; } .perf101 .g-lever { flex-grow: 4; } .perf101 .g-tr { flex-grow: 2; }
+.perf101 h3 small { color: var(--lit); font-size: var(--fs-xs); letter-spacing: 0; }
+.perf101 .row { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--gap); }
+#benderSlot { align-items: stretch; flex-wrap: nowrap; justify-content: space-evenly; }
+#benderSlot .fdr { width: 5em; }
+.perf101 .row:has(.lever) { flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--gap) * 2.5); }
+.perf101 .g-tr .row { align-items: center; justify-content: center; }
+.g-tr .sw button { font-size: var(--fs-l); padding: 4px 8px 4px 6px; gap: 10px; }
+.g-tr .sw .lab { display: none; }   /* the strip above names it */
+#modPush { min-width: 9em; height: var(--h-top); font-size: var(--fs-l); }
+.lever { width: 100%; max-width: 380px; height: 64px; border: var(--bw) solid var(--ink); border-radius: var(--r); position: relative; touch-action: none; cursor: ew-resize;
   background: repeating-linear-gradient(90deg, var(--ghost) 0 4px, transparent 4px 7px); }
-.lever::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2px; background: var(--muted); }
-.lever i { position: absolute; top: 2px; bottom: 2px; width: 18px; background: var(--ink); left: calc(50% - 9px); box-shadow: var(--shadow); }
+.lever::after { content: ""; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 2px; background: var(--muted); }
+.lever i { position: absolute; top: 4px; bottom: 4px; width: 22px; background: var(--ink); left: calc(50% - 11px); box-shadow: var(--shadow); }
 .readout { align-self: flex-start; font-size: calc(var(--fs-l) + 6px); padding: 2px 14px; min-width: 7em; background: var(--ink); color: var(--glass); text-shadow: none; border-radius: var(--r);
   font-variant-numeric: tabular-nums; }
 .status { font-size: var(--fs-s); color: var(--muted); }
