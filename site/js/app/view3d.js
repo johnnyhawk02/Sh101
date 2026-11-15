@@ -62,13 +62,21 @@ const TITLE = { x: M + 13 * C, y: M, w: 5 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
+// the sequencer page's own knobs, each through the 2D control it stands for
+const SQK = {
+  len: { el: () => document.querySelector('input[data-a=len]'), lo: 1, hi: 64, text: (n) => n + (n === 1 ? ' STEP' : ' STEPS'), get: () => state.steps.length },
+  dens: { el: () => document.getElementById('sqDens'), lo: 10, hi: 100, text: (n) => n + '%', get: () => Math.round(genDens * 100) },
+  cplx: { el: () => document.getElementById('sqRndDepth'), lo: 0, hi: 100, text: (n) => n + '%', get: () => +document.getElementById('sqRndDepth').value },
+};
 function setKnob(id, v) {
+  if (SQK[id]) { const q = SQK[id], n = Math.round(q.lo + (q.hi - q.lo) * Math.max(0, Math.min(1, v))); if (n !== q.get()) { const el = q.el(); el.value = n; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } return; }
   if (id === 'bpm') { const b = Math.round(40 + 200 * Math.max(0, Math.min(1, v))); if (b !== state.bpm) { bpmEl.value = b; bpmEl.onchange(); } return; }
   const r = regOf(id); if (r) r.set(Math.max(0, Math.min(1, v)));
 }
-const knobVal = (id) => id === 'bpm' ? (state.bpm - 40) / 200 : (cseqLive[id] ? cseqHeard(id) : state.params[id]);
-const knobBase = (id) => id === 'bpm' ? (state.bpm - 40) / 200 : state.params[id];
-const knobText = (id, v) => id === 'bpm' ? state.bpm + ' BPM' : String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
+const sqU = (id) => { const q = SQK[id]; return (q.get() - q.lo) / (q.hi - q.lo); };
+const knobVal = (id) => SQK[id] ? sqU(id) : id === 'bpm' ? (state.bpm - 40) / 200 : (cseqLive[id] ? cseqHeard(id) : state.params[id]);
+const knobBase = (id) => SQK[id] ? sqU(id) : id === 'bpm' ? (state.bpm - 40) / 200 : state.params[id];
+const knobText = (id, v) => SQK[id] ? SQK[id].text(SQK[id].get()) : id === 'bpm' ? state.bpm + ' BPM' : String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
   boot();
@@ -114,6 +122,10 @@ const panelMat = new THREE.MeshStandardMaterial({ color: 0xe4e2da, roughness: 0.
 const edgeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
 const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H, DEPTH), [edgeMat, edgeMat, edgeMat, edgeMat, panelMat, edgeMat]);
 slab.position.z = -DEPTH / 2; slab.receiveShadow = true; scene.add(slab);
+// two pages on the one panel (v0.25.0): the synth, and the sequencer; the logo and the page keys are on both
+const pages = { synth: new THREE.Group(), seq: new THREE.Group() }; scene.add(pages.synth, pages.seq);
+let page = 'synth'; try { if (localStorage.getItem('shyoy.page3d') === 'seq') page = 'seq'; } catch (e) {}
+let grp = pages.synth, buildPage = 'synth';
 // brushed streaks for the metal finish
 const brushed = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d');
@@ -166,21 +178,21 @@ function makeKnob(cx, cy, o) {
   const rim = new THREE.Mesh(rimGeo, mat.rim);
   const top = new THREE.Mesh(new THREE.CircleGeometry(KR - 3.2, 40), mat.knobTop); top.position.z = 15.95;
   const ptr = new THREE.Mesh(pointerGeo, mat.white);
-  const spin = new THREE.Group(); spin.add(body, rim, top, ptr); g.add(spin); scene.add(g);
+  const spin = new THREE.Group(); spin.add(body, rim, top, ptr); g.add(spin); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
     const v = knobVal(id); if (v === k.shown) return false;
     k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; return true;
   };
-  ctls.push(k); knobs.push(k); return k;
+  addCtl(k); knobs.push(k); return k;
 }
 function makeKey(cx, cy, w, h, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
   const m = new THREE.Mesh(keyGeo(w, h, 6), [mat.keyTop, mat.keySide]); m.castShadow = true; m.receiveShadow = true;
   const led = new THREE.Mesh(ledGeo, mat.ledOff); led.position.set(o.ledX || 0, o.ledY || 0, 6.5); if (h < 12) led.scale.setScalar(0.8);
   const glow = new THREE.Sprite(mat.glow); glow.scale.set(16, 16, 1); glow.position.set(led.position.x, led.position.y, 10); glow.visible = false;
-  g.add(m, led, glow); scene.add(g);
+  g.add(m, led, glow); grp.add(g);
   const k = { kind: 'key', g, led, glow, lit: null, down: false, z: 0, rect: [cx - w / 2 - (o.pad ?? 6), cy - h / 2 - (o.pad ?? 6), w + 2 * (o.pad ?? 6), h + 2 * (o.pad ?? 6)], ...o };
   k.sync = () => {
     let ch = false; const on = !!k.on();
@@ -188,22 +200,22 @@ function makeKey(cx, cy, w, h, o) {
     const z = k.down ? -2.2 : 0; if (z !== k.z) { k.z = z; g.position.z = z; shadowDirty = true; ch = true; }
     return ch;
   };
-  ctls.push(k); return k;
+  addCtl(k); return k;
 }
 // an LED on a printed tag (an effect's ON): no key of its own, the tag is what you press
 function makeLed(cx, cy, o) {
   const led = new THREE.Mesh(ledGeo, mat.ledOff); led.position.copy(P(cx, cy, 0.8));
-  const glow = new THREE.Sprite(mat.glow); glow.scale.set(16, 16, 1); glow.position.copy(P(cx, cy, 2.5)); glow.visible = false; scene.add(led, glow);
+  const glow = new THREE.Sprite(mat.glow); glow.scale.set(16, 16, 1); glow.position.copy(P(cx, cy, 2.5)); glow.visible = false; grp.add(led, glow);
   const k = { kind: 'key', lit: null, down: false, ...o };
   k.sync = () => { const on = !!k.on(); if (on === k.lit) return false; k.lit = on; led.material = on ? mat.ledOn : mat.ledOff; glow.visible = on; return true; };
-  ctls.push(k); return k;
+  addCtl(k); return k;
 }
 // a black window with white text (preset name, reverb program)
 function makeDisplay(x, y, w, h, text, o = {}) {
   const c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3; const x2 = c.getContext('2d');
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
-  m.position.copy(P(x + w / 2, y + h / 2, 0.4)); scene.add(m);
+  m.position.copy(P(x + w / 2, y + h / 2, 0.4)); grp.add(m);
   const d = { kind: 'display', rect: [x, y, w, h], shown: null, ...o };
   d.sync = () => {
     const t = text(); if (t === d.shown) return false; d.shown = t;
@@ -213,10 +225,12 @@ function makeDisplay(x, y, w, h, text, o = {}) {
     let s = t.toUpperCase(); while (x2.measureText(s).width > w - 14 && s.length > 3) s = s.slice(0, -2) + '…';
     x2.fillText(s, 7, h / 2 + 0.5); tex.needsUpdate = true; return true;
   };
-  ctls.push(d); return d;
+  addCtl(d); return d;
 }
 // the print: what's drawn on the face, refreshed whenever a label or the ink colour changes
-const prints = [];   // functions (ctx, ink, paper) drawing one part
+const printsBy = { synth: [], seq: [], all: [] };   // functions (ctx, ink, paper) drawing one part, per page
+let prints = printsBy.synth;
+const addCtl = (c) => { c.page = c.page || buildPage; ctls.push(c); return c; };
 const text = (x, s, tx, ty, size = 11, align = 'center', font = MONO, wgt = 600) => { x.font = `${wgt} ${size}px ${font}`; x.textAlign = align; x.textBaseline = 'middle'; if ('letterSpacing' in x) x.letterSpacing = '.6px'; x.fillText(s, tx, ty); };
 
 const colX = (b, col, w = 1) => M + (b.c + col) * C + (w * C) / 2;
@@ -269,14 +283,14 @@ for (const b of BOXES) {
     } else if (it.t === 'key') {
       const k = makeKey(cx, it.k === 'mod' ? cy : y0 + KEYY, 24, 14, {
         on: it.k === 'run' ? () => running : it.k === 'mod' ? () => modHeld : () => false,
-        press: it.k === 'run' ? () => setRun(!running) : it.k === 'gen' ? () => document.getElementById('sq-rnd').click() : it.k === 'edit' ? () => window.shyoyView('2d', 'tab-seq') : null,
+        press: it.k === 'run' ? () => setRun(!running) : it.k === 'gen' ? () => document.getElementById('sq-rnd').click() : it.k === 'edit' ? () => setPage('seq') : null,
         hold: it.k === 'mod' ? (on) => { modHeld = on; push(on); } : null, pad: 10, tag: it.k });
       labelAt(() => it.label, cx, ly);
     } else if (it.t === 'lever') {
       const sw = w * C - 26, sx = cx - sw / 2;
       prints.push((x, ink) => { x.fillStyle = ink; x.beginPath(); x.roundRect ? x.roundRect(sx, cy - 4, sw, 8, 4) : x.rect(sx, cy - 4, sw, 8); x.fill();
         x.fillRect(cx - 0.75, cy - 15, 1.5, 7); x.fillRect(cx - 0.75, cy + 8, 1.5, 7); });
-      const g = new THREE.Group(); scene.add(g);
+      const g = new THREE.Group(); grp.add(g);
       const h = new THREE.Mesh(keyGeo(16, 30, 14), [mat.keyTop, mat.keySide]); h.castShadow = true; g.add(h);
       const line = new THREE.Mesh(new THREE.BoxGeometry(2, 20, 0.6), mat.white); line.position.z = 14.2; g.add(line);
       const half = sw / 2 - 10;
@@ -285,7 +299,7 @@ for (const b of BOXES) {
         if (!lev.held) lev.v += (0 - lev.v) * 0.35; if (Math.abs(lev.v) < 0.002) lev.v = 0;
         if (lev.v === lev.shown) return false; lev.shown = lev.v; g.position.copy(P(cx + lev.v * half, cy, 0)); shadowDirty = true; return true;
       };
-      ctls.push(lev);
+      addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'prog') {
       const dw = w * C - 16, dx = cx - dw / 2, k0 = colX(b, col), k1 = colX(b, col + 1);
@@ -296,11 +310,11 @@ for (const b of BOXES) {
     } else if (it.t === 'pattern') {
       const span = w * C - 16, x0 = cx - span / 2, sp = span / 16, kp = span / 8;
       for (let i = 0; i < 16; i++) {   // the playhead: one LED per step of the 16 being played
-        const lx = x0 + kp * ((i >> 1) + 0.5) + (i & 1 ? 6 : -6), ly2 = y0 + 32, led = new THREE.Mesh(ledGeo, mat.ledOff); led.position.copy(P(lx, ly2, 0.8)); scene.add(led);
-        const glow = new THREE.Sprite(mat.glow); glow.scale.set(14, 14, 1); glow.position.copy(P(lx, ly2, 2.5)); glow.visible = false; scene.add(glow);
+        const lx = x0 + kp * ((i >> 1) + 0.5) + (i & 1 ? 6 : -6), ly2 = y0 + 32, led = new THREE.Mesh(ledGeo, mat.ledOff); led.position.copy(P(lx, ly2, 0.8)); grp.add(led);
+        const glow = new THREE.Sprite(mat.glow); glow.scale.set(14, 14, 1); glow.position.copy(P(lx, ly2, 2.5)); glow.visible = false; grp.add(glow);
         const o = { kind: 'led', lit: false, rect: null };
         o.sync = () => { const on = running && playStep >= 0 && playStep % 16 === i; if (on === o.lit) return false; o.lit = on; led.material = on ? mat.ledOn : mat.ledOff; glow.visible = on; return true; };
-        ctls.push(o);
+        addCtl(o);
       }
       for (let n = 0; n < 8; n++) {
         const kx = x0 + kp * (n + 0.5);
@@ -321,18 +335,177 @@ for (const b of BOXES) {
 }
 let modHeld = false;
 function stepProg(d) { const pit = progOf(), n = pit.opts.length, cur = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0)); boot(); setRev(pit.s, (cur + d + n) % n); }
-// the title: Johnny's logo, printed; tapping it opens OPTIONS
+// the title: Johnny's logo, printed; tapping it opens OPTIONS. Under it, the page keys (on both pages)
+buildPage = 'all'; grp = scene; prints = printsBy.all;
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
-    const lw = 240, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = TITLE.x + (TITLE.w - lw) / 2, ly = TITLE.y + 12 + (R - 12 - lh - 16) / 2;
+    const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = TITLE.x + (TITLE.w - lw) / 2, ly = TITLE.y + 10;
     const t = document.createElement('canvas'); t.width = lw * S2; t.height = lh * S2; const tx = t.getContext('2d');
     tx.drawImage(logo, 0, 0, t.width, t.height); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = ink; tx.fillRect(0, 0, t.width, t.height);
     x.drawImage(t, lx, ly, lw, lh);
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
-  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w / 2, TITLE.y + R - 10, 10, 'center');
+  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 98, 10, 'right');
 });
 const VER3D = ((document.getElementById('ver') || {}).textContent || '').replace(/^v/, '');
-ctls.push({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 6, TITLE.w - 20, R - 10], press: () => openOptions3d(), sync: () => false });
+addCtl({ kind: 'title', rect: [TITLE.x + 60, TITLE.y + 4, TITLE.w - 120, 78], press: () => openOptions3d(), sync: () => false });
+[['synth', 'SYNTH'], ['seq', 'SEQUENCER']].forEach(([k, t], i) => {
+  const kx = TITLE.x + 22 + i * 96, ky = TITLE.y + 98;
+  makeKey(kx, ky, 15, 10, { on: () => page === k, press: () => setPage(k), pad: 4, tag: 'page:' + k });
+  ctls[ctls.length - 1].rect = [kx - 12, ky - 10, 90, 20];
+  prints.push((x, ink) => { x.fillStyle = ink; text(x, t, kx + 12, ky + 0.5, 10.5, 'left'); });
+});
+function setPage(k) {
+  page = k; try { localStorage.setItem('shyoy.page3d', k); } catch (e) {}
+  pages.synth.visible = k === 'synth'; pages.seq.visible = k === 'seq'; ro.hide();
+  printDirty = shadowDirty = dirty = true;
+}
+
+// ================================================================ the sequencer page (v0.25.0)
+// The same panel, a second page: transport and pattern keys, length, gate, the generator, the piano roll as one printed
+// grid you draw on, and the Randomise and Tools menus as rows of keys. Every press goes through the 2D sequencer's own
+// functions (applyCell, paintCell, extendTo, keepUndo, stepChanged) and its menu buttons, so the pattern and what the
+// engine is sent are the same as from the 2D roll.
+buildPage = 'seq'; grp = pages.seq; prints = printsBy.seq;
+const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, bw = s * C - 12, bh = h * R - 12;
+  px.font = `400 13px ${DISPLAY}`; if ('letterSpacing' in px) px.letterSpacing = '.6px'; const tagW = px.measureText(n).width + 16;
+  prints.push((x, ink, paper) => { x.strokeStyle = ink; x.lineWidth = 1.6; x.strokeRect(bx, by, bw, bh);
+    x.font = `400 13px ${DISPLAY}`; if ('letterSpacing' in x) x.letterSpacing = '.6px'; x.fillStyle = ink; x.fillRect(bx + 10, by - 9, tagW, 18);
+    x.fillStyle = paper; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText(n, bx + 18, by + 0.5); });
+  return { bx, by, bw, bh, cx: (k, w = 1) => M + (c + k) * C + w * C / 2, y0: M + r * R };
+};
+{ // row 0: transport, patterns, length and gate, the generator
+  const t = box(0, 0, 2, 1, 'TRANSPORT');
+  makeKey(t.cx(0), t.y0 + KEYY, 24, 14, { on: () => running, press: () => setRun(!running), pad: 10, tag: 'run2' }); labelAt(() => 'RUN', t.cx(0), t.y0 + LY);
+  makeKnob(t.cx(1), t.y0 + KY, { cur: () => 'bpm' }); labelAt(() => 'TEMPO', t.cx(1), t.y0 + LY);
+  const pt = box(2, 0, 5, 1, 'PATTERN'), span = 5 * C - 24, x0 = pt.cx(0, 5) - span / 2, kp = span / 8;
+  for (let n = 0; n < 8; n++) {
+    const kx = x0 + kp * (n + 0.5);
+    makeKey(kx, pt.y0 + KEYY, kp - 16, 14, { on: () => state.slot === n, press: () => slotsEl.querySelector(`[data-n="${n}"]`).click(), pad: 4, tag: 'pat2:' + n });
+    prints.push((x, ink) => { x.fillStyle = ink; text(x, String(n + 1), kx, pt.y0 + KEYY + 18, 10); });
+    // a used slot: a small mark over its key
+    prints.push((x, ink) => { const u = state.slots[n] && state.slots[n].steps && state.slots[n].steps.some((st) => st.m !== 'R'); if (u) { x.fillStyle = ink; x.fillRect(kx - 6, pt.y0 + 44, 12, 2); } });
+  }
+  labelAt(() => 'PATTERN', pt.cx(0, 5), pt.y0 + LY);
+  const lg = box(7, 0, 2, 1, 'STEPS');
+  makeKnob(lg.cx(0), lg.y0 + KY, { cur: () => 'len' }); labelAt(() => 'LENGTH', lg.cx(0), lg.y0 + LY);
+  const GATES = [10, 25, 50, 75, 95], gNow = () => Math.round((0.1 + state.params.gateLen * 0.85) * 100);
+  GATES.forEach((g, i) => { const kx = lg.cx(1) - 18, ky = lg.y0 + KY - 2 * 14 + i * 14;
+    makeKey(kx, ky, 15, 10, { on: () => GATES.reduce((m, q) => Math.abs(q - gNow()) < Math.abs(m - gNow()) ? q : m) === g, press: () => document.querySelector(`#gm-menu [data-gate="${g}"]`).click(), pad: 2, tag: 'gate:' + g });
+    ctls[ctls.length - 1].rect = [kx - 12, ky - 7, 60, 14];
+    prints.push((x, ink) => { x.fillStyle = ink; text(x, g + '%', kx + 12, ky + 0.5, 10.5, 'left'); }); });
+  labelAt(() => 'GATE', lg.cx(1), lg.y0 + LY);
+  const gn = box(9, 0, 4, 1, 'GENERATE');
+  makeKnob(gn.cx(0), gn.y0 + KY, { cur: () => 'dens' }); labelAt(() => 'DENSITY', gn.cx(0), gn.y0 + LY);
+  makeKnob(gn.cx(1), gn.y0 + KY, { cur: () => 'cplx' }); labelAt(() => 'COMPLEX', gn.cx(1), gn.y0 + LY);
+  makeKey(gn.cx(2), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('sq-rnd').click(), pad: 10, tag: 'rnd' }); labelAt(() => 'NEW', gn.cx(2), gn.y0 + LY);
+  makeKey(gn.cx(3), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('p-undo').click(), pad: 10, tag: 'undo' });
+  labelAt(() => 'UNDO', gn.cx(3), gn.y0 + LY, { dim: () => document.getElementById('p-undo').disabled });
+}
+// the menus as rows of keys: [heading, [label, id]...] per column
+const keyList = (b, colsDef) => colsDef.forEach((list, ci) => {
+  let y = b.by + 26; const kx = b.bx + 18 + ci * (b.bw / 2);
+  for (const row of list) {
+    if (typeof row === 'string') { const yy = y; prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, row, kx - 7, yy + 4, 9.5, 'left'); x.globalAlpha = 1; }); y += 17; continue; }
+    const [t, id] = row, ky = y + 4, el = () => document.getElementById(id);
+    const k = makeKey(kx, ky, 15, 10, { on: () => k.down, press: () => { const b = el(); if (b && !b.disabled) b.click(); }, pad: 2, tag: 'm:' + id });
+    k.rect = [kx - 12, ky - 8, b.bw / 2 - 12, 16];
+    prints.push((x, ink) => { x.globalAlpha = el() && el().disabled ? 0.35 : 1; x.fillStyle = ink; text(x, t, kx + 12, ky + 0.5, 10.5, 'left'); x.globalAlpha = 1; });
+    y += 18;
+  }
+});
+keyList(box(14, 1, 4, 2, 'RANDOMISE'), [
+  ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie'], 'PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']],
+  ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']]]);
+keyList(box(14, 3, 4, 2, 'TOOLS'), [
+  ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN CHAIN', 'p-join']],
+  ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DOWN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DOWN', 'nu-odn'], ['SHIFT LEFT', 'rot-l'], ['SHIFT RIGHT', 'rot-r']]]);
+// ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
+const RB = box(0, 1, 14, 4, 'PATTERN EDIT');
+const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
+const ROWS_DEF = [['h'], ...[2, 1, -1, -2].map((o) => ['o', o, (o > 0 ? '+' : '-') + Math.abs(o)]), ['gap'],
+  ...[11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((k) => ['k', k, NOTE[k]]), ['gap'], ['t', 0, 'TIE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
+const RH = { h: 16, gap: 8 }, rowH = (RB.by + RB.bh - 12 - RL.y - RH.h - 2 * RH.gap) / 19;
+let ry = RL.y; const rowsY = ROWS_DEF.map((r) => { const y = ry; ry += RH[r[0]] || rowH; return y; });
+RL.h = ry - RL.y;
+let rollPage = 0;   // 0: steps 1-32, 1: steps 33-64
+const SHOW = 32, colW = RL.w / SHOW;
+const rc = document.createElement('canvas'); rc.width = Math.ceil(RL.w * 3); rc.height = Math.ceil(RL.h * 3); const rx = rc.getContext('2d');
+const rollTex = new THREE.CanvasTexture(rc); rollTex.colorSpace = THREE.SRGBColorSpace; rollTex.anisotropy = 4;
+const rollMesh = new THREE.Mesh(new THREE.PlaneGeometry(RL.w, RL.h), new THREE.MeshBasicMaterial({ map: rollTex, transparent: true, depthWrite: false }));
+rollMesh.position.copy(P(RL.x + RL.w / 2, RL.y + RL.h / 2, 0.08)); rollMesh.renderOrder = 1; grp.add(rollMesh);
+// row names, printed beside the grid
+ROWS_DEF.forEach((r, i) => { if (r[2] == null) return; const yy = rowsY[i] + rowH / 2;
+  prints.push((x, ink) => { x.fillStyle = ink; text(x, String(r[2]).toUpperCase(), RL.x - 8, yy + 0.5, 9.5, 'right'); }); });
+prints.push((x, ink) => { x.fillStyle = ink; text(x, 'STEP', RL.x - 8, RL.y + RH.h / 2, 9.5, 'right'); });
+// steps 1-32 / 33-64, top right inside the box
+[['1-32', 0], ['33-64', 1]].forEach(([t, k], i) => { const kx = RB.bx + RB.bw - 130 + i * 64, ky = RB.by + 12;
+  makeKey(kx, ky, 15, 10, { on: () => rollPage === k, press: () => { rollPage = k; }, pad: 4, tag: 'rpage:' + k });
+  ctls[ctls.length - 1].rect = [kx - 12, ky - 9, 60, 18];
+  prints.push((x, ink) => { x.fillStyle = ink; text(x, t, kx + 12, ky + 0.5, 10, 'left'); }); });
+let rollSig = '';
+function drawRoll() {
+  const P2 = state.steps, n = P2.length, off = rollPage * SHOW, ink = curInk, light = ink === '#000000';
+  const sig = JSON.stringify(P2) + '|' + n + off + ink + (running ? playStep : -1) + '|' + selStep;
+  if (sig === rollSig) return false; rollSig = sig;
+  rx.setTransform(3, 0, 0, 3, 0, 0); rx.clearRect(0, 0, RL.w, RL.h);
+  const tone = (a) => light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`;
+  ROWS_DEF.forEach((r, ri) => { if (r[0] === 'k' && BLACK.has(r[1])) { rx.fillStyle = tone(0.07); rx.fillRect(0, rowsY[ri] - RL.y, RL.w, rowH); } });
+  for (let c = 0; c < SHOW; c++) {
+    const i = off + c, x = c * colW, ghost = i >= n;
+    if (running && playStep === i) { rx.fillStyle = tone(0.16); rx.fillRect(x, 0, colW, RL.h); }
+    if (i === selStep) { rx.fillStyle = ink; rx.fillRect(x + 1, 0, colW - 2, RH.h); }
+    rx.globalAlpha = ghost ? 0.3 : 1;
+    if (i % 4 === 0) { rx.fillStyle = i === selStep ? inkOf(ink) : ink; text(rx, String(i + 1), x + colW / 2, RH.h / 2 + 1, 9.5); }
+    const st = P2[i];
+    ROWS_DEF.forEach((r, ri) => {
+      const [t, v] = r; if (t === 'h' || t === 'gap') return; const y = rowsY[ri] - RL.y;
+      rx.strokeStyle = tone(0.28); rx.lineWidth = 1; rx.strokeRect(x + 1.5, y + 1.5, colW - 3, rowH - 3);
+      if (!st) return;
+      let on = false, mem = false;
+      if (t === 'o') { on = st.o === v && st.m !== 'R'; mem = st.o === v && st.m === 'R'; }
+      else if (t === 'k') { on = st.n === v && st.m !== 'R'; mem = st.n === v && st.m === 'R'; }
+      else if (t === 't') on = st.m === 'T'; else on = !!st[t];
+      if (on) { rx.fillStyle = ink; rx.fillRect(x + 3, y + 3, colW - 6, rowH - 6);
+        if (t === 'k' && st.m === 'T') { rx.fillStyle = inkOf(ink); rx.fillRect(x + 3, y + rowH / 2 - 1, 5, 2); } }
+      else if (mem) { rx.strokeStyle = ink; rx.lineWidth = 1.5; rx.strokeRect(x + 4, y + 4, colW - 8, rowH - 8); }
+    });
+    rx.globalAlpha = 1;
+    if (i % 4 === 3 && c < SHOW - 1) { rx.fillStyle = tone(0.55); rx.fillRect(x + colW - 0.75, RH.h, 1.5, RL.h - RH.h); }
+    if (i === n - 1) { rx.fillStyle = ink; rx.fillRect(x + colW - 1.25, 0, 2.5, RL.h); }
+  }
+  rollTex.needsUpdate = true; return true;
+}
+// a point on the panel -> { col, row } in the roll (row = index in ROWS_DEF), or null
+function rollAt(p) {
+  if (!p || p[0] < RL.x || p[0] > RL.x + RL.w || p[1] < RL.y || p[1] > RL.y + RL.h) return null;
+  const c = Math.min(SHOW - 1, Math.floor((p[0] - RL.x) / colW)); let ri = -1;
+  for (let i = 0; i < ROWS_DEF.length; i++) if (p[1] >= rowsY[i] && p[1] < rowsY[i] + (RH[ROWS_DEF[i][0]] || rowH)) ri = i;
+  return ri < 0 ? null : { i: rollPage * SHOW + c, r: ROWS_DEF[ri] };
+}
+const cellOf = (i, r) => ({ dataset: { col: String(i), t: r[0], v: String(r[1]) } });   // what the 2D roll's buttons carry
+addCtl({ kind: 'roll', rect: [RL.x, RL.y, RL.w, RL.h], sync: () => page === 'seq' && drawRoll() });
+const rollGrab = {
+  down(p) {
+    const h = rollAt(p); if (!h) return false; const { i, r } = h;
+    if (r[0] === 'h') { if (i < state.steps.length) { selStep = selStep === i ? -1 : i; renderSeq(); } return true; }
+    if (r[0] === 'gap') return true;
+    if (i >= state.steps.length) { extendTo(i + 1); renderSeq(); }
+    if (i >= state.steps.length) return true;
+    keepUndo(); const b = cellOf(i, r); applyCell(b);
+    const st = state.steps[i], t = r[0];
+    paint = { t, id: -1, on: t === 'k' ? st.m !== 'R' : t === 'o' ? true : t === 't' ? st.m === 'T' : st[t], oct: st.o, x: 0, y: 0, dirty: false, raf: 0 };
+    rollGrab.last = p; stepChanged(); return true;
+  },
+  move(p) {
+    if (!paint || paint.id !== -1 || !rollGrab.last) return;
+    const [x0, y0] = rollGrab.last, dx = p[0] - x0, dy = p[1] - y0, n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 4)); let ch = false;
+    for (let k = 1; k <= n; k++) { const h = rollAt([x0 + dx * k / n, y0 + dy * k / n]); if (h && h.i < state.steps.length && h.r[0] !== 'h' && h.r[0] !== 'gap' && paintCell(cellOf(h.i, h.r))) ch = true; }
+    rollGrab.last = p;
+    if (ch) { paint.dirty = true; if (!paint.raf) paint.raf = requestAnimationFrame(paintFrame); }
+  },
+  up() { if (!paint || paint.id !== -1) return; const q = paint; paint = null; rollGrab.last = null; if (q.raf) cancelAnimationFrame(q.raf); if (q.dirty) stepChanged(); },
+};
+buildPage = 'synth'; grp = pages.synth; prints = printsBy.synth;
 // the readout while a knob turns: the value on a black slab where its label is
 const ro = (() => {
   const w = 84, h = 17, c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3; const x = c.getContext('2d');
@@ -365,12 +538,13 @@ function applyLook() {
 function repaintPrint() {
   const ink = curInk, paper = inkOf(ink);
   px.clearRect(0, 0, W, H);
-  for (const f of prints) f(px, ink, paper);
+  for (const f of [...printsBy.all, ...printsBy[page]]) f(px, ink, paper);
   printTex.needsUpdate = true;
 }
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
-  + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join();
+  + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
@@ -395,7 +569,7 @@ function toPanel(e) {
 function pick(e) {
   const p = toPanel(e); if (!p) return null; let best = null, bd = Infinity;
   for (const c of ctls) {
-    if (!c.rect || (c.kind === 'knob' && !c.cur())) continue;
+    if (!c.rect || (c.page !== page && c.page !== 'all') || (c.kind === 'knob' && !c.cur())) continue;
     const [x, y, w, h] = c.rect; if (p[0] < x || p[0] > x + w || p[1] < y || p[1] > y + h) continue;
     const d = Math.hypot(p[0] - (x + w / 2), p[1] - (y + h / 2)); if (d < bd) { bd = d; best = c; }
   }
@@ -409,9 +583,10 @@ cv.addEventListener('pointerdown', (e) => {
   e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   boot();
   const g = { c, x: e.clientX, y: e.clientY, moved: false };
-  if (c.kind === 'knob') {
+  if (c.kind === 'roll') { rollGrab.down(toPanel(e)); }
+  else if (c.kind === 'knob') {
     g.id = c.cur(); g.v0 = knobBase(g.id); ro.show(c, knobText(g.id, g.v0));
-    if (g.id !== 'bpm') g.hold = setTimeout(() => { if (!g.moved && grabs.get(e.pointerId) === g) { grabs.delete(e.pointerId); ro.hide(); setKnob(g.id, g.v0); cseqOpen(g.id); } }, 550);
+    if (g.id !== 'bpm' && !SQK[g.id]) g.hold = setTimeout(() => { if (!g.moved && grabs.get(e.pointerId) === g) { grabs.delete(e.pointerId); ro.hide(); setKnob(g.id, g.v0); sheetVars(); cseqOpen(g.id); } }, 550);
   } else if (c.kind === 'key') { c.down = true; if (c.hold) c.hold(true); else if (c.press) c.press(); }
   else if (c.kind === 'lever') { c.held = true; g.v0 = c.v; }
   grabs.set(e.pointerId, g); dirty = true;
@@ -420,7 +595,8 @@ cv.addEventListener('pointermove', (e) => {
   const g = grabs.get(e.pointerId); if (!g) return;
   if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.moved = true;
   const c = g.c;
-  if (c.kind === 'knob') {
+  if (c.kind === 'roll') rollGrab.move(toPanel(e));
+  else if (c.kind === 'knob') {
     const v = Math.max(0, Math.min(1, g.v0 + (g.y - e.clientY) / dragRange() * (e.shiftKey ? 0.2 : 1)));
     setKnob(g.id, v); ro.show(c, knobText(g.id, knobBase(g.id)));
   } else if (c.kind === 'lever') {
@@ -433,13 +609,14 @@ function release(e) {
   const g = grabs.get(e.pointerId); if (!g) return; grabs.delete(e.pointerId); clearTimeout(g.hold);
   const c = g.c;
   if (c.kind === 'knob') ro.hide();
+  else if (c.kind === 'roll') rollGrab.up();
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
-cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const c = pick(e); if (c && c.kind === 'knob' && c.cur() !== 'bpm') cseqOpen(c.cur()); });
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const c = pick(e); if (c && c.kind === 'knob' && c.cur() !== 'bpm' && !SQK[c.cur()]) { sheetVars(); cseqOpen(c.cur()); } });
 cv.addEventListener('wheel', (e) => {
   const c = pick(e); if (!c || c.kind !== 'knob') return; e.preventDefault(); boot();
   const id = c.cur(); setKnob(id, knobBase(id) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02));
@@ -472,11 +649,27 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet .list button { width: 100%; justify-content: flex-start; margin: 0 0 4px; }
 .v3d-sheet .list button.lit { box-shadow: inset 3px 0 0 #ff2a14; }
 .v3d-sheet input[type=text] { flex: 1; font: 600 12px ${MONO}; padding: 6px 8px; border: 1.5px solid var(--v3d-ink); background: transparent; color: inherit; border-radius: 3px; min-width: 0; }
+/* v0.25.0: the 2D app's Options (MIDI, sequencer, about) and the per-control step sequencer, drawn as cards of the panel */
+html[data-view="3d"] dialog#options, html[data-view="3d"] dialog#cseq {
+  --glass-rgb: var(--v3d-panel-rgb); --ink-rgb: var(--v3d-ink-rgb); --dirt: 0; --grain: 0; --glow: 0;
+  --glass: rgb(var(--glass-rgb)); --ink: rgb(var(--ink-rgb)); --muted: rgb(var(--ink-rgb) / .62); --ghost: rgb(var(--ink-rgb) / .13);
+  --tint: rgb(var(--ink-rgb) / .07); --lit: rgb(var(--glass-rgb) / .8); --line: rgb(var(--ink-rgb) / .42); --rule: 1px solid var(--line);
+  --shadow: none; --acc: #ff2a14; --f-lcd: ${MONO}; --fs-xs: 12px; --fs-s: 13px; --fs: 14px; --fs-l: 16px; --fs-xl: 26px; --bezel: rgb(var(--ink-rgb));
+  font-family: ${MONO}; letter-spacing: .03em; background-image: none; border: 0; border-radius: 0;
+  box-shadow: inset 0 0 0 2px var(--ink), 0 20px 60px rgba(0,0,0,.55); }
+html[data-view="3d"] dialog#options { width: min(860px, calc(100vw - 24px)); height: auto; max-height: min(600px, calc(100dvh - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
+html[data-view="3d"] dialog#cseq { width: min(620px, calc(100vw - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
+html[data-view="3d"] dialog#options::backdrop, html[data-view="3d"] dialog#cseq::backdrop { background: rgb(0 0 0 / .55); }
+html[data-view="3d"] #otabs [data-sec=colours] { display: none; }
+html[data-view="3d"] dialog#options :is(h2, h3, .otabs button), html[data-view="3d"] dialog#cseq h2 { text-transform: uppercase; }
+html[data-view="3d"] dialog#options .btn, html[data-view="3d"] dialog#cseq .btn { font-family: ${MONO}; text-transform: uppercase; }
 #v3d-splash { position: fixed; inset: 0; z-index: 100; background: #0b0b0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity .35s; }
 `;
 document.head.appendChild(css);
 function sheetVars() {
   const s = root.style; s.setProperty('--v3d-panel', look.colour); s.setProperty('--v3d-ink', curInk); s.setProperty('--v3d-paper', inkOf(curInk));
+  const trip = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(' ');
+  s.setProperty('--v3d-panel-rgb', trip(look.colour)); s.setProperty('--v3d-ink-rgb', trip(curInk));
 }
 function sheet(title) {
   const el = document.createElement('div'); el.className = 'v3d-sheet';
@@ -495,7 +688,7 @@ opt.body.innerHTML = `
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
-  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI · ABOUT</button><button id="o3-2d">2D VIEW</button><button id="o3-reset">RESET LOOK</button></div></div>`;
+  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-2d">2D VIEW</button><button id="o3-reset">RESET LOOK</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
 function drawOpt() {
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
@@ -512,7 +705,7 @@ opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => setLook('
 opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
-$o('#o3-midi').onclick = () => { opt.close(); openOptions(); };
+for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-2d').onclick = () => { opt.close(); window.shyoyView('2d'); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
@@ -554,7 +747,7 @@ function frame() {
 }
 // the 2D view's own knob markers: a 3D knob is a registered copy of its control, so the step sequencer's
 // heard value reaches it (the frame loop reads it anyway; this keeps cseqOpen's checks happy for every control)
-applyLook();
+applyLook(); setPage(page);
 requestAnimationFrame(frame);
 
 window.shyoy3d = {
@@ -565,6 +758,7 @@ window.shyoy3d = {
   where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy, 16).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
   title() { return this.at(TITLE.x + TITLE.w / 2, TITLE.y + 50); },
+  rollCell(i, key) { const ri = ROWS_DEF.findIndex((r) => r[0] + r[1] === key); return this.at(RL.x + (i - rollPage * SHOW + 0.5) * colW, rowsY[ri] + rowH / 2); },
   at(pxX, pxY) { const v = P(pxX, pxY, 8).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   ctls, W, H, look,
 };

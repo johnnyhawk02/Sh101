@@ -83,6 +83,15 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### 3D sequencer page and sheets (v0.25.0)
+
+The 3D panel has two pages, picked with the SYNTH / SEQUENCER keys under the logo (EDIT also goes to the sequencer):
+transport and tempo, the 8 pattern keys, length and gate, the generator (density, complexity, new, undo), the piano roll
+printed on the panel (tap or drag to draw, tap a step number to write from the keyboard, steps 1-32 / 33-64), and the
+Randomise and Tools menus as rows of keys. All of it goes through the 2D sequencer's own functions and menu buttons,
+so the engine gets the same messages. The MIDI, sequencer and About options and the per-control step sequencer open as
+cards in the panel's colour and lettering.
+
 ### 3D panel tidy-up (v0.24.1)
 
 Effect ON keys moved inside their boxes (top right), all keys made smaller, switch stacks kept inside their boxes and
@@ -94,8 +103,7 @@ tick marks), the preset and reverb-program keys on one key line with PREV / BROW
 The default view is now one flat 3D panel (three.js, in the style of FILTH): every control on one plane in an 18-column
 grid, boxed sections with their names printed on the panel, black drag-only knobs (vertical drag, Shift for fine; hold or
 right-click for the control's step sequencer), black keys with red LEDs. Tap the shyoy logo for OPTIONS: panel colour,
-lighting, finish, lens, MIDI/About and the 2D view (the 2D screen has a "3d" key to come back). The sequencer's piano roll
-opens in 2D from EDIT. The 3D layer never talks to the engine: it works the 2D app's own setters and buttons, which stay
+lighting, finish, lens, MIDI/About and the 2D view (the 2D screen has a "3d" key to come back). The 3D layer never talks to the engine: it works the 2D app's own setters and buttons, which stay
 loaded underneath, so the messages the engine gets (and the sound) are the same as from the 2D screen.
 
 ### Header tagline removed (v0.22.18)
