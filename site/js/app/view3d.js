@@ -715,7 +715,11 @@ function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
 const pb = sheet('PRESETS');
-pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-save">SAVE</button></div></div><div class="list" id="pb-list"></div>`;
+pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-roll" aria-label="Suggest another name">🎲</button><button id="pb-save">SAVE</button></div></div><div class="list" id="pb-list"></div>`;
+pb.body.querySelector('#pb-roll').onclick = () => {
+  prjBar.suggest(true);
+  pb.body.querySelector('#pb-name').value = document.getElementById('prj-name').value || '';
+};
 const prjSel = document.getElementById('prj-preset');
 function drawBrowser() {
   let h = '';
