@@ -734,7 +734,15 @@ pb.body.querySelector('#pb-save').onclick = () => {
   const n = pb.body.querySelector('#pb-name').value.trim(); const ne = document.getElementById('prj-name');
   if (n) ne.value = n; document.getElementById('prj-save').click(); pb.body.querySelector('#pb-name').value = ''; drawBrowser(); dirty = true;
 };
-function openBrowser() { drawBrowser(); pb.body.querySelector('#pb-name').placeholder = 'SAVE AS… ' + (document.getElementById('prj-name').value || ''); pb.open(); }
+// the auto-namer (prjBar, from sounds.js) suggests a name in the save box, as the 2D preset bar does
+function openBrowser() {
+  drawBrowser();
+  const pn = pb.body.querySelector('#pb-name');
+  if (typeof prjBar !== 'undefined') prjBar.suggest(false);
+  pn.value = document.getElementById('prj-name').value || '';
+  pn.placeholder = 'SAVE AS…';
+  pb.open();
+}
 
 // ---------------------------------------------------------------- frame loop: draw only when something changed
 let live = true, drawn = 0;
