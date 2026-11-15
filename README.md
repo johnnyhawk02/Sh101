@@ -83,6 +83,12 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### 3D panel tidy-up (v0.24.1)
+
+Effect ON keys moved inside their boxes (top right), all keys made smaller, switch stacks kept inside their boxes and
+placed the same way in every column, even 12 px gutters between boxes, the step LEDs paired over the pattern keys (no
+tick marks), the preset and reverb-program keys on one key line with PREV / BROWSE / NEXT labels, the logo centred.
+
 ### 3D panel (v0.24.0)
 
 The default view is now one flat 3D panel (three.js, in the style of FILTH): every control on one plane in an 18-column
