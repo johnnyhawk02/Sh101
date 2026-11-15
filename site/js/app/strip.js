@@ -21,7 +21,8 @@ const STRIP_NAME = { lfoRate: 'lfo rate', tune: 'tune', vcoMod: 'vco lfo', pw: '
   const rackUi = {}; for (const a of ALL) rackUi[a.f] = ui[a.f];   // the Synth page's own setters
   const slots = [];
   // one value, two dials: refresh the Synth page copy and every strip dial on that control (without re-sending)
-  const show = (id) => { const v = state.params[id]; rackUi[id](v); for (const s of slots) if (s.id === id) s.set(v); };
+  const show = (id) => { const v = state.params[id]; if (rackUi[id]) rackUi[id](v);   // v0.24.0: FX dials call onMove too (they threw here)
+   for (const s of slots) if (s.id === id) s.set(v); };
   for (const a of ALL) ui[a.f] = (v) => { rackUi[a.f](v); for (const s of slots) if (s.id === a.f) s.set(v); };
   onMove.push(show);
   const items = (() => { let h = '', last = '';

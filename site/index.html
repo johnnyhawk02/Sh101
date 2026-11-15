@@ -12,25 +12,42 @@ try {
   const t = rd('lcdTheme'), m = rd('lcdMode'), el = document.documentElement;
   el.dataset.lcd = ['green', 'orange', 'amber', 'blue', 'red', 'grey'].includes(t) ? t : 'green';
   el.dataset.lcdmode = m === 'mono' ? 'mono' : 'colour';
+  // v0.24.0: the 3D panel is the default view; the 2D screen stays one tap away (Options › 2D view, and its 3D key back)
+  el.dataset.view = localStorage.getItem('shyoy.view') === '2d' ? '2d' : '3d';
   const v = rd('lcdVars'); if (v && typeof v === 'object') for (const k in v) if (k !== '--glow') el.style.setProperty(k, v[k]);   // the look sliders
 } catch (e) {}
 </script>
 <script src="js/app/fit.js"></script>
+<style>html, body { background: #0b0b0b; } html[data-view="3d"] .unit { visibility: hidden; }
+  #v3d-splash { position: fixed; inset: 0; z-index: 100; background: #0b0b0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; transition: opacity .35s; }
+  #v3d-splash.out { opacity: 0; pointer-events: none; }
+  #v3d-splash b { width: min(300px, 56vw); aspect-ratio: 547 / 200; background: #fff; -webkit-mask: url(icons/logo.png) center / contain no-repeat; mask: url(icons/logo.png) center / contain no-repeat; }
+  #v3d-splash i { position: relative; display: block; width: min(220px, 50vw); height: 2px; background: rgba(255,255,255,.15); overflow: hidden; }
+  #v3d-splash i::after { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; background: #fff; animation: v3d-run 1.1s ease-in-out infinite; }
+  #v3d-splash span { font: 500 11px ui-monospace, Menlo, monospace; letter-spacing: .3em; color: rgba(255,255,255,.55); }
+  @keyframes v3d-run { from { left: -35%; } to { left: 100%; } }</style>
+<script type="importmap">{ "imports": { "three": "./js/vendor/three.module.min.js" } }</script>
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 </head>
 <body>
+<!-- loading splash (v0.24.0): dark from the first paint until the 3D panel has drawn, so there is no white flash -->
+<div id="v3d-splash" role="status" aria-label="Loading"><b role="img" aria-label="Shyoy"></b><i></i><span>LOADING</span></div>
+<script>
+window.shyoySplash = { done() { const e = document.getElementById('v3d-splash'); if (!e || e.classList.contains('out')) return; e.classList.add('out'); setTimeout(() => e.remove(), 400); } };
+setTimeout(() => window.shyoySplash.done(), 20000);
+</script>
 <title>Shyoy</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Archivo+Black&family=Geist+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="css/shyoy.css">
 
 <div class="rotate" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg><p>Turn sideways for a bigger view</p></div>
 <div class="unit" id="unit">
   <header class="top">
     <!-- v0.22.11: logo is Johnny's shyoy.psd artwork, used as a mask filled with the LCD ink and multiplied onto the glass -->
-    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.23.0</i></b></div>
+    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.24.0</i></b></div>
     <!-- v0.22.10: battery readout and Bend board tab taken off the page (Johnny); both stay in the HTML, hidden -->
     <span class="psu" id="psu" hidden>Battery 9.0 V · rail 100%</span>
     <div class="transport">
@@ -50,6 +67,7 @@ try {
           <input type="file" id="prj-file" accept=".json,application/json" hidden>
         </div>
       </div>
+      <button type="button" class="btn gear to3d" id="to-3d" aria-label="3D panel" onclick="shyoyView('3d')">3d</button>
       <button type="button" class="btn gear" id="open-options" aria-haspopup="dialog" aria-label="Options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z M12 8.4a3.6 3.6 0 1 0 0 7.2a3.6 3.6 0 1 0 0-7.2z" fill-rule="evenodd"/></svg></button>
     </div>
   </header>
@@ -213,7 +231,7 @@ try {
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.23.0</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.24.0</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
@@ -280,6 +298,18 @@ try {
 <script src="js/app/midi.js"></script>
 <script src="js/app/cseq.js"></script>
 <script src="js/app/app.js"></script>
+<script>
+// v0.24.0: the 3D panel (js/app/view3d.js, three.js) over the 2D app, which keeps running underneath; 2D is still one key away
+window.shyoyView = (v, tab) => {
+  const root = document.documentElement; root.dataset.view = v;
+  try { localStorage.setItem('shyoy.view', v); } catch (e) {}
+  if (v === '3d') {
+    if (window.shyoy3d) window.shyoy3d.show();
+    else import('./js/app/view3d.js?v=0.24.0').catch((e) => { console.warn('3D view', e); root.dataset.view = '2d'; window.shyoySplash.done(); });
+  } else { if (window.shyoy3d) window.shyoy3d.hide(); if (tab) showTab(tab); window.shyoySplash.done(); }
+};
+if (document.documentElement.dataset.view === '3d') window.shyoyView('3d'); else window.shyoySplash.done();
+</script>
 
 </body>
 </html>

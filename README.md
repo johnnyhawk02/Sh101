@@ -61,6 +61,8 @@ site/js/app/*.js         the UI, as plain scripts sharing one scope, in this ord
   options     the Options sheet (gear): tabs, Colours
   midi        MIDI CC to the front-panel controls, the MIDI tab's map and status
   app         install, check for update, auto-update
+  view3d      (ES module, loaded after the rest) the 3D panel: three.js, drives the 2D app's own controls
+site/js/vendor/          three.js r160 (three.module.min.js, RoomEnvironment.js, MIT licence) for the 3D panel
 site/sw.js               offline cache: lists every file above (add new files there)
 ```
 
@@ -80,6 +82,15 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 ```
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
+
+### 3D panel (v0.24.0)
+
+The default view is now one flat 3D panel (three.js, in the style of FILTH): every control on one plane in an 18-column
+grid, boxed sections with their names printed on the panel, black drag-only knobs (vertical drag, Shift for fine; hold or
+right-click for the control's step sequencer), black keys with red LEDs. Tap the shyoy logo for OPTIONS: panel colour,
+lighting, finish, lens, MIDI/About and the 2D view (the 2D screen has a "3d" key to come back). The sequencer's piano roll
+opens in 2D from EDIT. The 3D layer never talks to the engine: it works the 2D app's own setters and buttons, which stay
+loaded underneath, so the messages the engine gets (and the sound) are the same as from the 2D screen.
 
 ### Header tagline removed (v0.22.18)
 
