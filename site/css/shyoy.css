@@ -386,6 +386,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .fxu { flex: none; display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 0 20px; border-left: 1px solid var(--line); }
 .fxu:first-child { padding-left: 0; border-left: 0; }
 .fxr0 .fxu:last-child { flex: 1 1 auto; }   /* the compactor takes what is left of the first row */
+.fxr0 { --kn-w: 77px; } .fxr0 .fxu { padding: 0 13px; } .fxr0 .fxu:first-child { padding-left: 0; }   /* v0.26.0: room for the drive Mix dial */
 .fxu.rv { flex: 1 1 auto; }                  /* the reverb most of the second row, the flanger at its right */
 .fxu.fg { padding-right: 0; }
 .fxu .fxh { display: flex; align-items: center; gap: 14px; height: var(--h-top); flex-wrap: nowrap; white-space: nowrap; }

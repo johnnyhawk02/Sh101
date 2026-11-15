@@ -38,6 +38,7 @@ const DEF = {}; for (const m of RACK) for (const it of m.items) DEF[it.f || it.s
 for (const b of BENDER) DEF[b.f] = b; for (const u of FX) for (const it of u.items) DEF[it.f || it.s] = it;
 const K = (id, label) => ({ t: 'knob', id, label });
 const S = (id, label, opts, w = 1) => ({ t: 'sw', id, label, opts, w });
+const squeeze = (k, bs) => bs.map((b) => ({ ...b, c: b.c * k, s: b.s * k, it: b.it.map((it) => ({ ...it, w: (it.w || 1) * k })) }));
 const BOXES = [
   { r: 0, c: 0, s: 2, n: 'LFO', it: [K('lfoRate', 'RATE'), S('lfoWave', 'WAVE', ['TRI', 'SQR', 'RND', 'NOISE'])] },
   { r: 0, c: 2, s: 6, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV']), K('drift', 'DRIFT')] },
@@ -46,10 +47,12 @@ const BOXES = [
   { r: 1, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
   { r: 1, c: 12, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
   { r: 1, c: 14, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('slide', 'SLIDE'), K('accent', 'ACCENT')] },
+  // row 2 holds 19 columns of controls since the drive's Mix (v0.26.0): its boxes and columns are 18/19 of the grid
+  ...squeeze(18 / 19, [
   { r: 2, c: 0, s: 3, n: 'FOLDER', on: 'fold', it: [K('fldtimbre', 'TIMBRE'), K('fldsym', 'SYMM'), K('fldlevel', 'LEVEL')] },
-  { r: 2, c: 3, s: 4, n: 'DRIVE', on: 'rat', it: [S('drvtype', 'PEDAL', ['RAT', 'DS-1', 'TS808']), { t: 'slot', g: 'drv', k: 0 }, { t: 'slot', g: 'drv', k: 1 }, { t: 'slot', g: 'drv', k: 2 }] },
-  { r: 2, c: 7, s: 5, n: 'FLANGER', on: 'flg', it: [S('flgmode', 'MODE', ['FLANGE', 'CHORUS']), K('flgman', 'MANUAL'), K('flgdep', 'DEPTH'), K('flgrate', 'RATE'), K('flgres', 'RES')] },
-  { r: 2, c: 12, s: 6, n: 'DELAY', on: 'dly', it: [K('dlytime', 'TIME'), K('dlyfb', 'FDBK'), K('dlylo', 'LO CUT'), K('dlyhi', 'HI CUT'), K('dlymix', 'RETURN'), S('dlypp', 'MODE', ['MONO', 'PING'])] },
+  { r: 2, c: 3, s: 5, n: 'DRIVE', on: 'rat', it: [S('drvtype', 'PEDAL', ['RAT', 'DS-1', 'TS808']), { t: 'slot', g: 'drv', k: 0 }, { t: 'slot', g: 'drv', k: 1 }, { t: 'slot', g: 'drv', k: 2 }, K('drvmix', 'MIX')] },
+  { r: 2, c: 8, s: 5, n: 'FLANGER', on: 'flg', it: [S('flgmode', 'MODE', ['FLANGE', 'CHORUS']), K('flgman', 'MANUAL'), K('flgdep', 'DEPTH'), K('flgrate', 'RATE'), K('flgres', 'RES')] },
+  { r: 2, c: 13, s: 6, n: 'DELAY', on: 'dly', it: [K('dlytime', 'TIME'), K('dlyfb', 'FDBK'), K('dlylo', 'LO CUT'), K('dlyhi', 'HI CUT'), K('dlymix', 'RETURN'), S('dlypp', 'MODE', ['MONO', 'PING'])] }]),
   { r: 3, c: 0, s: 13, n: 'REVERB', on: 'lex', it: [S('revtype', 'TYPE', ['224', 'PLATE', 'SPRING', 'CONV']), { t: 'prog', w: 2 },
     ...Array.from({ length: 10 }, (_, k) => ({ t: 'slot', g: 'rev', k }))] },
   { r: 3, c: 13, s: 2, n: 'COMPACTOR', it: [K('cmpamt', 'AMOUNT'), K('cmprel', 'RELEASE')] },

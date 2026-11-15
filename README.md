@@ -83,6 +83,11 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Drive mix (v0.26.0)
+
+The drive slot has a Mix knob, from fully dry to fully wet (smoothed), on the 3D panel and the 2D FX page. It defaults
+to fully wet, and at fully wet the output is exactly what it was before, so existing sounds are unchanged.
+
 ### 3D sequencer page and sheets (v0.25.0)
 
 The 3D panel has two pages, picked with the SYNTH / SEQUENCER keys under the logo (EDIT also goes to the sequencer):

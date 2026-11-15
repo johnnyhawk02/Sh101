@@ -134,7 +134,8 @@ const FX = [
     { s: 'drvtype', label: 'Pedal', opts: DRV_NAMES, def: 0, val: i => i / 2 },
     { f: 'dist', drv: 'rat', label: 'Distortion', def: .5, fmt: pct }, { f: 'filter', drv: 'rat', label: 'Filter', def: .4, fmt: pct }, { f: 'ratvol', drv: 'rat', label: 'Volume', def: .5, fmt: pct },
     { f: 'dsdist', drv: 'ds', label: 'Dist', def: .5, fmt: pct }, { f: 'dstone', drv: 'ds', label: 'Tone', def: .5, fmt: pct }, { f: 'dslevel', drv: 'ds', label: 'Level', def: .5, fmt: pct },
-    { f: 'tsdrive', drv: 'ts', label: 'Drive', def: .5, fmt: pct }, { f: 'tstone', drv: 'ts', label: 'Tone', def: .5, fmt: pct }, { f: 'tslevel', drv: 'ts', label: 'Level', def: .5, fmt: pct } ] },
+    { f: 'tsdrive', drv: 'ts', label: 'Drive', def: .5, fmt: pct }, { f: 'tstone', drv: 'ts', label: 'Tone', def: .5, fmt: pct }, { f: 'tslevel', drv: 'ts', label: 'Level', def: .5, fmt: pct },
+    { f: 'drvmix', label: 'Mix', def: 1, fmt: v => v >= 1 ? 'Wet' : v <= 0 ? 'Dry' : pct(v) } ] },
   { id: 'dly', name: 'Delay', sub: 'tempo synced', items: [
     { f: 'dlytime', label: 'Time', def: .7, fmt: v => DLY_DIV_NAMES[Math.round(v * 10)] }, { f: 'dlyfb', label: 'Feedback', def: .35, fmt: v => Math.round(v * 95) + '%' },
     { f: 'dlylo', label: 'Low cut', def: .3, fmt: v => hz(20 * Math.pow(50, v)) }, { f: 'dlyhi', label: 'High cut', def: .55, fmt: v => hz(1000 * Math.pow(20, v)) },

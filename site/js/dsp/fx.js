@@ -993,7 +993,7 @@ class BF2Flanger {
 // (fxorder swaps them), then the BF-2 flanger, then the reverb slot and the delay as returns, in parallel or one into the
 // other (fxret), both ducked by the Compactor keyed from the dry synth, then a soft clip.
 const FX_KNOB_DEFS = { dist: 0.5, filter: 0.4, ratvol: 0.5,
-  drvtype: 0, dsdist: 0.5, dstone: 0.5, dslevel: 0.5, tsdrive: 0.5, tstone: 0.5, tslevel: 0.5, fldtimbre: 0.5, fldsym: 0.5, fldlevel: 0.5,
+  drvtype: 0, drvmix: 1, dsdist: 0.5, dstone: 0.5, dslevel: 0.5, tsdrive: 0.5, tstone: 0.5, tslevel: 0.5, fldtimbre: 0.5, fldsym: 0.5, fldlevel: 0.5,
   lexprog: 0.125, lexbass: 0.3, lexmid: 0.27, lexxover: 0.443, lextreble: 0.834, lexdepth: 0.5, lexdiff: 0.55, lexpre: 0.2, lexme: 0.5, lexpitch: 0.2, lexmix: 0.5,
   revtype: 0, plateprog: 0.5, platepre: 0.2, platedecay: 0.45, platedamp: 0.6, platebw: 0.75, platelo: 0.35, platediff: 0.88, platemod: 0.5, platemix: 0.5,
   sprprog: 2 / 3, sprdwell: 0.4, sprdecay: 0.5, sprtension: 0.5, sprtone: 0.5, sprlo: 0.4, sprmix: 0.5,
@@ -1006,7 +1006,7 @@ class FxChain {
   constructor(fs) {
     this.fs = fs; this.c = { ...FX_PARTS }; this.knobs = { ...FX_KNOB_DEFS };
     this.fx = { rat: false, lex: false, dly: false, fold: false, flg: false }; this.bpm = 120;
-    this.ds = new BossDS1(fs); this.ts = new TubeScreamer(fs); this.b259 = new Buchla259(fs); this.drvT = 0;
+    this.ds = new BossDS1(fs); this.ts = new TubeScreamer(fs); this.b259 = new Buchla259(fs); this.drvT = 0; this.drvM = 1;
     this.lex = new Lexicon224(fs); this.dly = new DigitalDelay(fs); this.flg = new BF2Flanger(fs);
     this.plate = new DattorroPlate(fs); this.spring = new SpringReverb(fs); this.conv = new ConvReverb(fs); this.revT = 0; this.cmp = new Compactor(fs);
     this.rt = { hin: 0, xin: 0, h1: 0, h2: 0, x1: 0, fb: 0, y: 0, hc: 0, xc: 0, v: 0, f: 0, xp: 0, dco: 0, dci: 0 };
@@ -1097,7 +1097,13 @@ class FxChain {
     return s.f * this.ratLevel;
   }
   // one host-rate sample in; sets this.L / this.R
-  _drv(x) { const d = this.drvT === 1 ? this.ds.run(x) : this.drvT === 2 ? this.ts.run(x) : this._rat(x); return 0.95 * Math.tanh(d / 0.95); }
+  // the drive slot's Mix (v0.26.0, Johnny): dry to fully wet, smoothed; at fully wet (the default) the output is the pedal's alone, as before
+  _drv(x) {
+    const d = this.drvT === 1 ? this.ds.run(x) : this.drvT === 2 ? this.ts.run(x) : this._rat(x), y = 0.95 * Math.tanh(d / 0.95);
+    const m = Math.max(0, Math.min(1, this.knobs.drvmix ?? 1));
+    if (this.drvM !== m) { this.drvM += (m - this.drvM) * 0.003; if (Math.abs(m - this.drvM) < 1e-5) this.drvM = m; }
+    return this.drvM >= 1 ? y : x + this.drvM * (y - x);
+  }
   run(x) {
     let y = x;
     if (this.fxSwap) { // routing: the drive slot first, then the folder
