@@ -9,6 +9,7 @@ const fitK = () => fitScale;
 (() => {
   const root = document.documentElement;
   root.classList.add('fit');
+  if (!('HTMLDialogElement' in window)) root.classList.add('nodialog');   // older WebKit: no <dialog> (shyoy.css)
   const fit = () => {
     const vw = (window.visualViewport && visualViewport.width) || innerWidth, vh = (window.visualViewport && visualViewport.height) || innerHeight;
     const pad = Math.min(vw, vh) < 600 ? 4 : 64;   // a phone needs every pixel; on a desktop leave a clear dark margin so the window's shape shows

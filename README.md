@@ -110,6 +110,9 @@ grid, boxed sections with their names printed on the panel, black drag-only knob
 right-click for the control's step sequencer), black keys with red LEDs. Tap the shyoy logo for OPTIONS: panel colour,
 lighting, finish, lens, MIDI/About and the 2D view (the 2D screen has a "3d" key to come back). The 3D layer never talks to the engine: it works the 2D app's own setters and buttons, which stay
 loaded underneath, so the messages the engine gets (and the sound) are the same as from the 2D screen.
+### Older macOS web views (v0.23.1)
+
+Safari before 15.4 (an un-updated macOS 11 or 12, whose WebKit is also what the VST's window uses) has no `<dialog>`, so the Options sheet and the control sequencer card were drawn open over the screen, and `100dvh` / `aspect-ratio` were ignored (the screen sat half off the top, the logo had no width). shyoy.css now hides closed dialogs itself, has `100vh` fallbacks and a fixed logo width; fit.js marks `html.nodialog` so an open sheet is placed by the CSS; cseq.js reads the `open` attribute rather than the `.open` property. Modern browsers are unchanged.
 
 ### Header tagline removed (v0.22.18)
 
