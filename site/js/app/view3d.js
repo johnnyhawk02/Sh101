@@ -610,7 +610,7 @@ for (const b of BOXES) {
       labelAt(() => 'PATTERN', cx, ly);
     } else if (it.t === 'preset') {
       const dw = w * C - 16, dx = cx - dw / 2, ks = [0, 1, 2].map((k) => colX(b, col + k));
-      makeDisplay(dx, y0 + 26, dw, 24, () => (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
+      makeDisplay(dx, y0 + 26, dw, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
       makeKey(ks[0], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click(), pad: 8, tag: 'pre-' });
       makeKey(ks[1], y0 + KEYY, 24, 14, { on: () => false, press: () => openBrowser(), pad: 8, tag: 'browse' });
       makeKey(ks[2], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click(), pad: 8, tag: 'pre+' });
@@ -760,13 +760,23 @@ function stickerAt(p) {
   }
   return null;
 }
+// v0.36.5 (Johnny: show something is going on): while the new sound is measured the clicked sticker spins, then it
+// eases round to rest and gives its wobble
 const wobbles = new Map();
-const wobble = (st) => { wobbles.set(st, performance.now()); dirty = true; };
+const wobble = (st, spin) => { wobbles.set(st, { t0: performance.now(), mode: spin ? 'spin' : 'wob' }); dirty = true; };
 function wobbleStep(now) {
-  for (const [st, t0] of wobbles) {
-    const k = STICKERS.findIndex((t) => t.id === st.id), base = -stkPlace(STICKERS[k]).rot * Math.PI / 180, t = (now - t0) / 1000;
-    if (t > 0.7) { st.m.rotation.z = base; wobbles.delete(st); } else st.m.rotation.z = base + Math.sin(t * 34) * Math.exp(-t * 6) * 0.16;
-    dirty = true;
+  for (const [st, w] of wobbles) {
+    const k = STICKERS.findIndex((t) => t.id === st.id), base = -stkPlace(STICKERS[k]).rot * Math.PI / 180, t = (now - w.t0) / 1000;
+    let off = 0;
+    if (w.mode === 'spin') {
+      off = -t * 7;
+      if (!shyoyRand.working && t > 0.2) { w.mode = 'settle'; w.a0 = off % (2 * Math.PI); w.t0 = now; }
+    } else if (w.mode === 'settle') {
+      const u = Math.min(1, t / 0.45), e = 1 - (1 - u) * (1 - u);
+      off = w.a0 + (-2 * Math.PI - w.a0) * e; if (u >= 1) { w.mode = 'wob'; w.t0 = now; off = 0; }
+    } else if (t > 0.7) { st.m.rotation.z = base; wobbles.delete(st); dirty = true; continue; }
+    else off = Math.sin(t * 34) * Math.exp(-t * 6) * 0.16;
+    st.m.rotation.z = base + off; dirty = true;
   }
 }
 prints.push((x, ink) => {
@@ -1096,7 +1106,7 @@ function release(e) {
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
-  else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) shyoyRand.back(); else shyoyRand.roll(); wobble(c.st); printDirty = true; }
+  else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) { if (shyoyRand.back()) wobble(c.st); } else { shyoyRand.roll(); wobble(c.st, true); } printDirty = true; }
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);

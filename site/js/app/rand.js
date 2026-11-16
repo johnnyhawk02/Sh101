@@ -120,7 +120,7 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
   }
   // the fade (Johnny: fade low, then bring it up): the new sound goes on with its trim knob (the pedal's output, else
   // Level) at 0 while it is measured, then that knob rises to the matched value
-  let fadeTok = 0, curP = null;
+  let fadeTok = 0, curP = null, reel = [], reelTok = 0;
   function fadeTo(tok, id, to) {
     const from = state.params[id], t0 = performance.now(), T = 700;
     const step = () => {
@@ -157,8 +157,12 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     // a new name from the namer, shown unsaved; SAVE stores it under that name
     name = NAMER(prjBar.user); nameEl.value = name;
     prjSel.value = ''; prjSel.dispatchEvent(new Event('sync')); const c = curEl(); if (c) c.textContent = name + ' *';
+    // while it is measured the PRESET display runs names past like a slot machine (v0.36.5, Johnny: show something is
+    // going on); view3d.js reads shyoyRand.reel and spins the sticker while shyoyRand.working
+    reel = [name, ...Array.from({ length: 11 }, () => NAMER(prjBar.user))]; reelTok = tok;
     busy = false;   // a new click may start now; this one's fade is dropped if so
     const P = curP = levelled(clone(snap)), fin = await P; if (curP === P) curP = null; if (tok !== fadeTok) return;
+    reelTok = 0;
     for (const q of TRIMS) if (q !== trim && fin.params[q] !== state.params[q]) { state.params[q] = fin.params[q]; post({ type: 'param', id: q, v: fin.params[q] }); if (ui[q]) ui[q](fin.params[q]); }
     fadeTo(tok, trim, fin.params[trim]);
   }
@@ -177,6 +181,8 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     set amount(v) { amount = clamp(v); store.set('rndAmount', amount); },
     get depth() { return undo.length; },
     get last() { return last; }, meter,
+    get working() { return reelTok !== 0 && reelTok === fadeTok; },
+    get reel() { return this.working ? reel[Math.floor(performance.now() / 85) % reel.length] : null; },
     // for tests: a whole new sound, drawn but not played
     sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), fx: t.fx, strip: clone(state.strip) }; },
     refSnap,
