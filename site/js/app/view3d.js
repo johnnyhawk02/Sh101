@@ -147,7 +147,6 @@ print.position.z = 0.05; print.renderOrder = 1; scene.add(print);
 const mat = {
   knob: new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.85, metalness: 0, envMapIntensity: 0.3 }),
   knobTop: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.45, metalness: 0, envMapIntensity: 0.8 }),
-  rim: new THREE.MeshStandardMaterial({ color: 0xb4b4b4, roughness: 0.3, metalness: 1, envMapIntensity: 0.5 }),
   white: new THREE.MeshBasicMaterial({ color: 0xffffff }),
   keyTop: new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.42, metalness: 0, envMapIntensity: 0.9 }),
   keySide: new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.5, metalness: 0, envMapIntensity: 0.7 }),
@@ -155,12 +154,31 @@ const mat = {
   ledOff: new THREE.MeshStandardMaterial({ color: 0x3a0906, roughness: 0.35, metalness: 0, envMapIntensity: 1 }),
   glow: new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,60,30,.9)'); g.addColorStop(0.35, 'rgba(255,40,20,.35)'); g.addColorStop(1, 'rgba(255,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }),
 };
-const knobGeo = (() => {
-  const p = [[0, 0], [KR + 2.6, 0], [KR + 2.6, 2.4], [KR + 0.6, 4.2], [KR, 12], [KR - 1.5, 15], [KR - 3.2, 15.9], [0, 15.9]].map(([r, y]) => new THREE.Vector2(r, y));
-  const g = new THREE.LatheGeometry(p, 48); g.rotateX(Math.PI / 2); return g;
+// the knob: Johnny's pot-knob5.stl (v0.29.0), a 32-sided cap with a raised pointer bar, scaled to KR. The STL's
+// triangles are sorted three ways: the pointer bar (white), the flat top (satin) and the rest (body); flat-shaded so
+// the facets show. Its pointer lies along +y, as the old one did, so the value-to-angle mapping is unchanged.
+const KNOB = await (async () => {
+  const buf = await (await fetch(new URL('../../models/pot-knob5.stl', import.meta.url))).arrayBuffer();
+  const dv = new DataView(buf), n = dv.getUint32(80, true), sets = { body: [], top: [], ptr: [] };
+  const read = (o) => [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)];
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, zTop = 0;
+  const tris = [];
+  for (let i = 0; i < n; i++) {
+    const o = 84 + 50 * i, t = [read(o + 12), read(o + 24), read(o + 36)]; tris.push(t);
+    for (const [x, y] of t) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, r = (x1 - x0) / 2;
+  // the body's top face is the highest z any full-radius vertex reaches; the pointer bar is what stands above it
+  for (const t of tris) for (const [x, y, z] of t) if (Math.hypot(x - cx, y - cy) > r * 0.99) zTop = Math.max(zTop, z);
+  for (const t of tris) {
+    const p = t.map(([x, y, z]) => [x - cx, y - cy, z]);
+    const isPtr = p.every(([x, y]) => Math.abs(x) < r * 0.2 && y > -r * 0.3) && p.some(([, , z]) => z > zTop + 1e-3);
+    const isTop = !isPtr && p.every(([, , z]) => Math.abs(z - zTop) < 1e-3);
+    sets[isPtr ? 'ptr' : isTop ? 'top' : 'body'].push(...p.flat());
+  }
+  const s = (KR + 1) / r, geo = (a) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.scale(s, s, s); g.computeVertexNormals(); return g; };
+  return { body: geo(sets.body), top: geo(sets.top), ptr: geo(sets.ptr), h: Math.max(...sets.ptr.filter((_, i) => i % 3 === 2)) * s };
 })();
-const rimGeo = (() => { const p = [[KR + 0.05, 11], [KR - 0.2, 13], [KR - 1.4, 15], [KR - 3, 15.92]].map(([r, y]) => new THREE.Vector2(r, y)); const g = new THREE.LatheGeometry(p, 48); g.rotateX(Math.PI / 2); return g; })();
-const pointerGeo = new THREE.BoxGeometry(2.6, KR - 5, 0.8); pointerGeo.translate(0, 3 + (KR - 5) / 2, 16.2);
 const ledGeo = new THREE.CylinderGeometry(2.2, 2.2, 1.4, 20); ledGeo.rotateX(Math.PI / 2);
 const keyGeos = {};
 function keyGeo(w, h, d) {
@@ -177,11 +195,10 @@ const knobs = [];
 let dirty = true, shadowDirty = true, printDirty = true;
 function makeKnob(cx, cy, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
-  const body = new THREE.Mesh(knobGeo, mat.knob); body.castShadow = true; body.receiveShadow = true;
-  const rim = new THREE.Mesh(rimGeo, mat.rim);
-  const top = new THREE.Mesh(new THREE.CircleGeometry(KR - 3.2, 40), mat.knobTop); top.position.z = 15.95;
-  const ptr = new THREE.Mesh(pointerGeo, mat.white);
-  const spin = new THREE.Group(); spin.add(body, rim, top, ptr); g.add(spin); grp.add(g);
+  const body = new THREE.Mesh(KNOB.body, mat.knob); body.castShadow = true; body.receiveShadow = true;
+  const top = new THREE.Mesh(KNOB.top, mat.knobTop); top.castShadow = true;
+  const ptr = new THREE.Mesh(KNOB.ptr, mat.white);
+  const spin = new THREE.Group(); spin.add(body, top, ptr); g.add(spin); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
@@ -781,7 +798,7 @@ window.shyoy3d = {
   show() { if (!live) { live = true; fit(); dirty = printDirty = shadowDirty = true; requestAnimationFrame(frame); } },
   hide() { live = false; opt.close(); pb.close(); },
   // for headless checks: where a control is on screen
-  where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy, 16).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
+  where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy, KNOB.h).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
   title() { return this.at(TITLE.x + TITLE.w / 2, TITLE.y + 50); },
   rollCell(i, key) { const ri = ROWS_DEF.findIndex((r) => r[0] + r[1] === key); return this.at(RL.x + (i - rollPage * SHOW + 0.5) * colW, rowsY[ri] + rowH / 2); },
