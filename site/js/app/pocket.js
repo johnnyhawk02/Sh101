@@ -45,7 +45,23 @@ html.pocket #pocket { display: block; }
 #pocket .pk-full { margin-top: auto; align-self: center; background: none; border: 0; color: #141414; font: inherit; font-size: 12px; text-decoration: underline; opacity: .7; padding: 10px; cursor: pointer; }
 #pk-back { position: fixed; z-index: 150; right: 10px; top: max(10px, env(safe-area-inset-top)); display: none; border: 0; border-radius: 16px; background: #141414; color: #eee;
   font: 600 12px "Geist Mono", ui-monospace, monospace; letter-spacing: .08em; padding: 9px 14px; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
-html.pocket-able:not(.pocket) #pk-back { display: block; }`;
+html.pocket-able:not(.pocket) #pk-back { display: block; }
+/* v0.37.1 (Johnny: not showing properly in landscape): sideways, the sound sits on the left and the name and pattern on
+   the right, sized to the short height */
+@media (orientation: landscape) {
+  #pocket { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-top: 12px; padding-bottom: 12px; }
+  #pocket .pk-in { max-width: 900px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr auto; gap: 12px 18px; align-content: start; }
+  #pocket .pk-top { grid-column: 1; grid-row: 1; }
+  #pocket .pk-logo { width: 96px; }
+  #pocket .pk-lcd { grid-column: 2; grid-row: 1; align-self: end; min-height: 40px; padding: 9px 12px; font-size: 15px; }
+  #pocket .pk-box.snd { grid-column: 1; grid-row: 2 / 5; gap: 10px; }
+  #pocket .pk-box.pat { grid-column: 2; grid-row: 2; }
+  #pocket .pk-full { grid-column: 2; grid-row: 4; margin: 0; align-self: end; justify-self: end; }
+  #pocket .pk-rnd { width: min(34vh, 160px); }
+  #pocket .pk-cap { display: none; }
+  #pocket .pk-key { min-height: 42px; }
+  #pocket .pk-name { height: 42px; }
+}`;
   document.head.appendChild(css);
   // the smiley, drawn as on the panel's sticker: yellow face on a white die-cut border
   const SMILE = `<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48" fill="#fff"/><circle cx="50" cy="50" r="41" fill="#ffd400" stroke="rgba(0,0,0,.8)" stroke-width="1.2"/>
@@ -56,13 +72,13 @@ html.pocket-able:not(.pocket) #pk-back { display: block; }`;
   el.innerHTML = `<div class="pk-in">
   <div class="pk-top"><span class="pk-logo" role="img" aria-label="Shyoy"></span><span class="pk-ver"></span></div>
   <div class="pk-lcd" aria-live="polite"></div>
-  <section class="pk-box"><h2>SOUND</h2>
+  <section class="pk-box snd"><h2>SOUND</h2>
     <button class="pk-rnd" aria-label="Randomise the sound">${SMILE}</button>
     <div class="pk-cap">TAP FOR A NEW SOUND</div>
     <div class="pk-row"><button class="pk-key small" data-k="undo">UNDO</button><input class="pk-name" type="text" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="NAME…" aria-label="Preset name"><button class="pk-key small" data-k="name" aria-label="Another name">🎲</button></div>
     <div class="pk-row"><button class="pk-key" data-k="save">SAVE</button></div>
   </section>
-  <section class="pk-box"><h2>PATTERN</h2>
+  <section class="pk-box pat"><h2>PATTERN</h2>
     <div class="pk-row"><button class="pk-key" data-k="run"><i></i><span>RUN</span></button><button class="pk-key" data-k="gen">GENERATE</button></div>
     <label class="pk-sld"><span>DENSITY</span><input type="range" min="10" max="100" step="1" aria-label="Pattern density"><b></b></label>
   </section>
