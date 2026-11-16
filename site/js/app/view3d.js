@@ -1089,8 +1089,9 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
-  const same = (a, b) => !!a && JSON.stringify(['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights'].map((k) => a[k])) === JSON.stringify(['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights'].map((k) => b[k]));
+  const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
   $o('#o3-lsave').classList.toggle('lit', lookSaving); $o('#o3-lsave').textContent = lookSaving ? 'PICK A SLOT' : 'SAVE…';
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
@@ -1124,7 +1125,8 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   const i = +b.dataset.look;
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
-  Object.assign(look, copyLook(lookSlots[i])); saveLook(); applyLook(); drawOpt();
+  // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {} }, copyLook(lookSlots[i])); saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
