@@ -727,23 +727,23 @@ function stickerBump(st, own, p) {   // the page's wear under the sticker plus t
 // v0.33.0: each sticker can be resized, moved and turned in OPTIONS > STICKERS (look.stk); a move re-cuts it at the panel
 // edge and re-samples the wear under it.
 const stkPlace = () => { const q = look.stk.one || {}, d = STICKERS[0]; return { cx: q.x ?? d.cx, cy: q.y ?? d.cy, size: d.size * (q.s ?? 1), rot: q.r ?? d.rot }; };   // v0.35.2: one place for whichever sticker
+// v0.36.6 (Johnny: a spinning sticker lost its corners): the cut at the panel's edge was baked into the texture at the
+// sticker's resting angle, so it turned with the spin. Now four clipping planes at the panel's edges cut it, whatever
+// the angle.
+renderer.localClippingEnabled = true;
+const STK_CLIP = [new THREE.Plane(new THREE.Vector3(1, 0, 0), W / 2 - 0.5), new THREE.Plane(new THREE.Vector3(-1, 0, 0), W / 2 - 0.5),
+  new THREE.Plane(new THREE.Vector3(0, 1, 0), H / 2 - 0.5), new THREE.Plane(new THREE.Vector3(0, -1, 0), H / 2 - 0.5)];
 const stickers = STICKERS.map((st, k) => {
   const n = 384, src = document.createElement('canvas'); src.width = src.height = n; const sx = src.getContext('2d');
   const R = rng(777 + k); drawSticker(sx, st.id, n, R); const own = stickerWear(sx, n, R);
   const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpScale: STICKER_BUMP }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpScale: STICKER_BUMP, clippingPlanes: STK_CLIP }));
   m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
   const o = { id: st.id, m, bumps: null, key: '' };
   o.place = () => {
     const q = stkPlace(st), key = JSON.stringify(q); if (key === o.key) return; o.key = key;
-    x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0);
-    const a = -q.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, n, n), d = img.data, S = n / q.size;
-    for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {   // cut off past the panel's edge
-      const lx = u / S - q.size / 2, ly = v / S - q.size / 2, px2 = q.cx + lx * ca + ly * sa, py2 = q.cy - (lx * sa - ly * ca);
-      if (px2 < 0.5 || py2 < 0.5 || px2 > W - 0.5 || py2 > H - 0.5) d[i + 3] = 0;
-    }
-    x.putImageData(img, 0, 0); map.needsUpdate = true;
+    x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0); map.needsUpdate = true;   // the panel's edge is cut by STK_CLIP
     if (o.bumps) { o.bumps.synth.dispose(); o.bumps.seq.dispose(); }
     o.bumps = { synth: stickerBump(q, own, 'synth'), seq: stickerBump(q, own, 'seq') }; m.material.bumpMap = o.bumps[page]; m.material.needsUpdate = true;
     m.position.copy(P(q.cx, q.cy, 0.25 + k * 0.01)); m.rotation.z = -q.rot * Math.PI / 180; m.scale.set(q.size, q.size, 1);
@@ -770,7 +770,7 @@ function wobbleStep(now) {
     let off = 0;
     if (w.mode === 'spin') {
       off = -t * 7;
-      if (!shyoyRand.working && t > 0.2) { w.mode = 'settle'; w.a0 = off % (2 * Math.PI); w.t0 = now; }
+      if (!shyoyRand.spinning) { w.mode = 'settle'; w.a0 = off % (2 * Math.PI); w.t0 = now; }
     } else if (w.mode === 'settle') {
       const u = Math.min(1, t / 0.45), e = 1 - (1 - u) * (1 - u);
       off = w.a0 + (-2 * Math.PI - w.a0) * e; if (u >= 1) { w.mode = 'wob'; w.t0 = now; off = 0; }

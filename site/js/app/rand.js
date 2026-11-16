@@ -120,7 +120,8 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
   }
   // the fade (Johnny: fade low, then bring it up): the new sound goes on with its trim knob (the pedal's output, else
   // Level) at 0 while it is measured, then that knob rises to the matched value
-  let fadeTok = 0, curP = null, reel = [], reelTok = 0;
+  let fadeTok = 0, curP = null, reel = [], reelTok = 0, pend = false;
+  const hush = () => { post({ type: 'param', id: 'level', v: 0 }); return new Promise((r) => setTimeout(r, 90)); };
   function fadeTo(tok, id, to) {
     const from = state.params[id], t0 = performance.now(), T = 700;
     const step = () => {
@@ -138,8 +139,8 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
   const curEl = () => document.querySelector('#prj-bar .pm-btn .cur');
   function load(snap) { applySound(snap); pushAll(); save(); }
   async function roll() {
-    if (busy) return; busy = true;
-    try { await boot(); await roll1(); } finally { busy = false; }
+    if (busy) return; busy = true; pend = true;
+    try { await boot(); await roll1(); } finally { busy = false; pend = false; }
   }
   async function roll1() {
     const before = soundSnap(), entry = { snap: before, name, sel: prjSel.value }; undo.push(entry); if (undo.length > 20) undo.shift();
@@ -153,13 +154,17 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     if (p.reso > 0.75) p.cutoff = Math.min(p.cutoff, 0.7);
     const m = Math.max(p.saw, p.pulse, p.sub); if (m < 0.5) { const k = ['saw', 'pulse', 'sub'].find((k) => p[k] === m); p[k] = 0.5; }
     const snap = { params: p, bend: clone(state.bend), br: clone(state.br), fx, strip: clone(state.strip) }, tok = ++fadeTok;
-    const trim = postOf(snap) || 'level'; load({ ...snap, params: { ...p, [trim]: 0 } });
+    // v0.36.6 (Johnny: loud blips before the volume changes): the engine glides the VCA Level over ~10 ms but switches,
+    // FX and pedals change at once, so the old sound is first taken to silence, and only then does the new one go on,
+    // still at Level 0; the output knobs are set while it is silent and Level fades up (the drive's own trim stays put)
+    const trim = 'level'; await hush(); if (tok !== fadeTok) return;
+    load({ ...snap, params: { ...p, level: 0 } });
     // a new name from the namer, shown unsaved; SAVE stores it under that name
     name = NAMER(prjBar.user); nameEl.value = name;
     prjSel.value = ''; prjSel.dispatchEvent(new Event('sync')); const c = curEl(); if (c) c.textContent = name + ' *';
     // while it is measured the PRESET display runs names past like a slot machine (v0.36.5, Johnny: show something is
     // going on); view3d.js reads shyoyRand.reel and spins the sticker while shyoyRand.working
-    reel = [name, ...Array.from({ length: 11 }, () => NAMER(prjBar.user))]; reelTok = tok;
+    reel = [name, ...Array.from({ length: 11 }, () => NAMER(prjBar.user))]; reelTok = tok; pend = false;
     busy = false;   // a new click may start now; this one's fade is dropped if so
     const P = curP = levelled(clone(snap)), fin = await P; if (curP === P) curP = null; if (tok !== fadeTok) return;
     reelTok = 0;
@@ -168,7 +173,9 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
   }
   function back() {
     const u = undo.pop(); if (!u) return false;
-    fadeTok++; curP = null; boot(); load(u.snap); name = u.name;
+    const tok = ++fadeTok; curP = null; boot(); const lv = u.snap.params.level;
+    hush().then(() => { if (tok !== fadeTok) return; load({ ...u.snap, params: { ...u.snap.params, level: 0 } }); fadeTo(tok, 'level', lv); });
+    name = u.name;
     prjSel.value = u.sel; prjSel.dispatchEvent(new Event('sync'));
     nameEl.value = u.name; const c = curEl(); if (c && u.name) c.textContent = u.name + ' *';
     return true;
@@ -182,6 +189,7 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     get depth() { return undo.length; },
     get last() { return last; }, meter,
     get working() { return reelTok !== 0 && reelTok === fadeTok; },
+    get spinning() { return pend || this.working; },   // from the click (audio may still be starting) to the fade
     get reel() { return this.working ? reel[Math.floor(performance.now() / 85) % reel.length] : null; },
     // for tests: a whole new sound, drawn but not played
     sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), fx: t.fx, strip: clone(state.strip) }; },
