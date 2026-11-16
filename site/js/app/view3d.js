@@ -451,10 +451,11 @@ function stepProg(d) { const pit = progOf(), n = pit.opts.length, cur = Math.max
 buildPage = 'all'; grp = scene; prints = printsBy.all;
 // v0.31.1: the logo is printed on its own lit layer over the title, carrying the panel's wear (the same bump map,
 // cut to the title's patch of it), so the scuffs and dents run through it (Johnny). The rest of the print stays flat.
+const LOGO_WEAR = [78, 26];   // wear-map level where the ink is gone, and the span over which it fades back to full
 const logoCv = document.createElement('canvas'); logoCv.width = TITLE.w * S2; logoCv.height = TITLE.h * S2;
 const logoTex = new THREE.CanvasTexture(logoCv); logoTex.colorSpace = THREE.SRGBColorSpace; logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 const logoWear = panelWear.clone(); logoWear.repeat.set(TITLE.w / W, TITLE.h / H); logoWear.offset.set(TITLE.x / W, 1 - (TITLE.y + TITLE.h) / H);
-const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.6, metalness: 0, envMapIntensity: 0.3, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
+const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
 logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
 prints.push((x, ink) => {
@@ -462,6 +463,14 @@ prints.push((x, ink) => {
     const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;
     const lx2 = logoCv.getContext('2d'); lx2.setTransform(1, 0, 0, 1, 0, 0); lx2.globalCompositeOperation = 'source-over'; lx2.clearRect(0, 0, logoCv.width, logoCv.height);
     lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
+    // worn ink (v0.31.2): where the wear map dips (scuffs, scratches, dents) the ink is rubbed thin or through to the
+    // panel, so the wear reads on a black logo too
+    const wc = panelWear.image, sx = wc.width / W, sy = wc.height / H, pw = TITLE.w * sx | 0, ph = TITLE.h * sy | 0;
+    const patch = document.createElement('canvas'); patch.width = logoCv.width; patch.height = logoCv.height;
+    const pc2 = patch.getContext('2d'); pc2.drawImage(wc, TITLE.x * sx, TITLE.y * sy, pw, ph, 0, 0, patch.width, patch.height);
+    const wv = pc2.getImageData(0, 0, patch.width, patch.height).data, img = lx2.getImageData(0, 0, logoCv.width, logoCv.height), d = img.data;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const v = wv[i]; d[i + 3] *= Math.max(0, Math.min(1, (v - LOGO_WEAR[0]) / LOGO_WEAR[1])); }
+    lx2.putImageData(img, 0, 0);
     logoTex.needsUpdate = true;
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
   x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 98, 10, 'right');
