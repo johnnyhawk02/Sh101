@@ -217,6 +217,8 @@ const edgeWear = wearTex(1024, 128, 202, { scuff: 0.5, dent: 0.3, tile: 8, big: 
 // knobs: four worn sets; each knob takes one, turned and shifted its own way, and a wear depth from barely to well used
 panelMat.bumpMap = panelWear; panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
 window.shyoyWearMaps = () => ({ panel: panelWear.image, edges: edgeWear.image, knobs: knobWear.map((t) => t.image) });   // to look at the bump maps (console)
+print.material = new THREE.MeshStandardMaterial({ map: printTex, transparent: true, depthWrite: false, roughness: 0.45, metalness: 0, envMapIntensity: 0.7, bumpMap: panelWear, bumpScale: PANEL_BUMP * 1.6 });   // v0.31.3: the print is lit and carries the dents
+print.receiveShadow = true;
 const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.12 + 0.06 * i, dent: 0.25 + 0.1 * i, tile: 1, big: [2 + 2 * i, 14, 0.3 + 0.08 * i], scratches: [6 + 5 * i, 70] }));
 
 // the knob (v0.30.0): Johnny's Yamaha CS1x/CS2x/AN1x knob STL: a fluted, tapered cap on a flared skirt with a pointed
@@ -680,10 +682,20 @@ function applyLook() {
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
   printDirty = shadowDirty = dirty = true;
 }
+let pMask = null;
+function printMask() {   // alpha: 1 where the ink holds, fading to 0 where the wear map is lowest (same thresholds as the logo)
+  if (pMask) return pMask;
+  pMask = document.createElement('canvas'); pMask.width = pc.width; pMask.height = pc.height; const m = pMask.getContext('2d');
+  m.drawImage(panelWear.image, 0, 0, pc.width, pc.height); const img = m.getImageData(0, 0, pc.width, pc.height), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { d[i + 3] = 255 * Math.max(0, Math.min(1, (d[i] - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i] = d[i + 1] = d[i + 2] = 0; }
+  m.putImageData(img, 0, 0); return pMask;
+}
 function repaintPrint() {
   const ink = curInk, paper = inkOf(ink);
   px.clearRect(0, 0, W, H);
   for (const f of [...printsBy.all, ...printsBy[page]]) f(px, ink, paper);
+  // worn ink (v0.31.3): the whole print is rubbed through where the panel's wear map dips, like the logo
+  px.save(); px.setTransform(1, 0, 0, 1, 0, 0); px.globalCompositeOperation = 'destination-in'; px.drawImage(printMask(), 0, 0); px.restore();
   printTex.needsUpdate = true;
 }
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
