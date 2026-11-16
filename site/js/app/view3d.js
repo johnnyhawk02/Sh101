@@ -123,6 +123,7 @@ scene.add(key, key.target);
 const P = (px, py, z = 0) => new THREE.Vector3(px - W / 2, H / 2 - py, z);   // panel px (y down) -> world
 const panelMat = new THREE.MeshStandardMaterial({ color: 0xe4e2da, roughness: 0.6 });
 const edgeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+const KNOB_BUMP = 4.5, PANEL_BUMP = 1.4, EDGE_BUMP = 1.5;   // wear depths (bump maps, below)
 const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H, DEPTH), [edgeMat, edgeMat, edgeMat, edgeMat, panelMat, edgeMat]);
 slab.position.z = -DEPTH / 2; slab.receiveShadow = true; scene.add(slab);
 // two pages on the one panel (v0.25.0): the synth, and the sequencer; the logo and the page keys are on both
@@ -145,7 +146,7 @@ const print = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicM
 print.position.z = 0.05; print.renderOrder = 1; scene.add(print);
 
 const mat = {
-  knob: new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.85, metalness: 0, envMapIntensity: 0.3 }),
+  knob: new THREE.MeshStandardMaterial({ color: 0x0e0e0e, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 }),
   knobTop: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.45, metalness: 0, envMapIntensity: 0.8 }),
   white: new THREE.MeshBasicMaterial({ color: 0xffffff }),
   keyTop: new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.42, metalness: 0, envMapIntensity: 0.9 }),
@@ -154,53 +155,102 @@ const mat = {
   ledOff: new THREE.MeshStandardMaterial({ color: 0x3a0906, roughness: 0.35, metalness: 0, envMapIntensity: 1 }),
   glow: new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,60,30,.9)'); g.addColorStop(0.35, 'rgba(255,40,20,.35)'); g.addColorStop(1, 'rgba(255,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }),
 };
-// the knob: Johnny's pot-knob5.stl (v0.29.0), a 32-sided cap with a raised pointer bar, scaled to KR. The STL's
-// triangles are sorted three ways: the pointer bar (white), the flat top and bevel (satin) and the rest (body); flat-shaded so
-// the facets show. Its pointer lies along +y, as the old one did, so the value-to-angle mapping is unchanged.
+// ---------------------------------------------------------------- wear (v0.30.0): scuffs, dents and knocks
+// Bump maps built on canvases from two CC0 ambientCG height maps (site/textures/SOURCES.txt): SurfaceImperfections014
+// for fine scuffing, Metal049C for small dents; bigger dents, knocks and scratches are drawn on top. A seeded random, so
+// the same knob keeps the same marks on every load.
+const rng = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const loadImg = (u) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = new URL(u, import.meta.url).href; });
+const [scuffImg, dentImg] = await Promise.all([loadImg('../../textures/scuffs.jpg'), loadImg('../../textures/dents.jpg')]);
+// w x h canvas, mid grey = untouched; o: scuff/dent image strength, tile (image repeats across), big dents [n, size, depth],
+// scratches [n, length], knocks [n, size] crowded to the edges (for the case)
+function wearTex(w, h, seed, o) {
+  const R = rng(seed), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.fillStyle = '#808080'; x.fillRect(0, 0, w, h);
+  const tiled = (img, alpha, tile) => {
+    if (!img || !alpha) return; x.globalAlpha = alpha; const tw = w / tile, ox = R() * tw, oy = R() * tw;
+    for (let ty = -oy; ty < h; ty += tw) for (let tx = -ox; tx < w; tx += tw) x.drawImage(img, tx, ty, tw, tw);
+    x.globalAlpha = 1;
+  };
+  tiled(scuffImg, o.scuff, o.tile || 1); tiled(dentImg, o.dent, (o.tile || 1) * 1.5);
+  const wrap = (fn) => { for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) fn(dx, dy); };
+  const dent = (px, py, r, d) => wrap((dx, dy) => {
+    const g = x.createRadialGradient(px + dx, py + dy, 0, px + dx, py + dy, r);
+    g.addColorStop(0, `rgba(0,0,0,${d})`); g.addColorStop(0.55, `rgba(0,0,0,${d * 0.45})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = g; x.beginPath(); x.ellipse(px + dx, py + dy, r, r * (0.6 + 0.4 * R()), 0, 0, 7); x.fill();
+  });
+  const [bn = 0, bs = 0, bd = 0] = o.big || [];
+  for (let i = 0; i < bn; i++) dent(R() * w, R() * h, bs * (0.4 + R()), bd * (0.4 + 0.6 * R()));
+  const [kn = 0, ks = 0] = o.knocks || [];
+  for (let i = 0; i < kn; i++) {   // knocks: near an edge or a corner, a dent with a chipped, raised lip
+    const e = R() * 4 | 0, t = R(), m = R() * R() * ks * 1.5;
+    const px = e === 0 ? m : e === 1 ? w - m : t * w, py = e === 2 ? m : e === 3 ? h - m : t * h, r = ks * (0.4 + R());
+    x.strokeStyle = 'rgba(255,255,255,.25)'; x.lineWidth = r * 0.25; x.beginPath(); x.arc(px, py, r * 0.9, 0, 7); x.stroke();
+    dent(px, py, r, 0.55 + 0.4 * R());
+  }
+  const [sn = 0, sl = 0] = o.scratches || [];
+  x.lineCap = 'round';
+  for (let i = 0; i < sn; i++) {
+    const px = R() * w, py = R() * h, a = R() * Math.PI, l = sl * (0.3 + R()), bend = (R() - 0.5) * l * 0.3;
+    x.strokeStyle = `rgba(0,0,0,${0.25 + 0.4 * R()})`; x.lineWidth = 0.6 + R() * 1.4;
+    wrap((dx, dy) => { x.beginPath(); x.moveTo(px + dx, py + dy); x.quadraticCurveTo(px + dx + Math.cos(a) * l / 2 - Math.sin(a) * bend, py + dy + Math.sin(a) * l / 2 + Math.cos(a) * bend, px + dx + Math.cos(a) * l, py + dy + Math.sin(a) * l); x.stroke(); });
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+}
+// the case: the face, and the black edges round it
+const panelWear = wearTex(2048, 1024, 101, { scuff: 0.35, dent: 0.35, tile: 4, big: [26, 22, 0.35], knocks: [16, 26], scratches: [90, 120] });
+const edgeWear = wearTex(1024, 128, 202, { scuff: 0.5, dent: 0.3, tile: 8, big: [10, 10, 0.5], knocks: [22, 16], scratches: [30, 50] });
+// knobs: four worn sets; each knob takes one, turned and shifted its own way, and a wear depth from barely to well used
+panelMat.bumpMap = panelWear; panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
+const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.12 + 0.06 * i, dent: 0.25 + 0.1 * i, tile: 1, big: [2 + 2 * i, 14, 0.3 + 0.08 * i], scratches: [6 + 5 * i, 70] }));
+
+// the knob (v0.30.0): Johnny's Yamaha CS1x/CS2x/AN1x knob STL: a fluted, tapered cap on a flared skirt with a pointed
+// nub, and a triangle on top. The 50k-triangle original is simplified to ~5.6k offline (its top's shallow triangle
+// recess flattened first, and drawn back here as a white inlay). Smooth-shaded with creases kept, squashed to SQ of
+// its height, scaled so the skirt is KR + 2 across. Its pointer lies along +y, so the value-to-angle mapping is unchanged.
 const KNOB = await (async () => {
-  const buf = await (await fetch(new URL('../../models/pot-knob5.stl', import.meta.url))).arrayBuffer();
-  const dv = new DataView(buf), n = dv.getUint32(80, true), sets = { body: [], top: [], ptr: [] };
-  const read = (o) => [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)];
-  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, zTop = 0;
-  const tris = [];
+  const buf = await (await fetch(new URL('../../models/yamaha-knob.stl', import.meta.url))).arrayBuffer();
+  const dv = new DataView(buf), n = dv.getUint32(80, true), SQ = 0.7, TRI = [[0, 3.03], [-2.02, -3.03], [2.02, -3.03]];
+  const pos = new Float32Array(n * 9);
+  for (let i = 0; i < n; i++) for (let j = 0; j < 9; j++) pos[i * 9 + j] = dv.getFloat32(84 + 50 * i + 12 + 4 * j, true);
+  let zTop = 0; for (let i = 2; i < pos.length; i += 3) zTop = Math.max(zTop, pos[i]);
+  const s = (KR + 2) / 9.9, sets = { body: [], top: [] };
   for (let i = 0; i < n; i++) {
-    const o = 84 + 50 * i, t = [read(o + 12), read(o + 24), read(o + 36)]; tris.push(t);
-    for (const [x, y] of t) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const p = [0, 1, 2].map((j) => [pos[i * 9 + j * 3], pos[i * 9 + j * 3 + 1], pos[i * 9 + j * 3 + 2]]);
+    const e1 = p[1].map((v, k) => v - p[0][k]), e2 = p[2].map((v, k) => v - p[0][k]);
+    const nz = (e1[0] * e2[1] - e1[1] * e2[0]) / (Math.hypot(e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]) || 1);
+    sets[nz > 0.9 && p.every(([, , z]) => z > zTop - 0.2) ? 'top' : 'body'].push(...p.flat());
   }
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, r = (x1 - x0) / 2;
-  // the body's top face is the highest z any full-radius vertex reaches; the pointer bar is what stands above it
-  for (const t of tris) for (const [x, y, z] of t) if (Math.hypot(x - cx, y - cy) > r * 0.99) zTop = Math.max(zTop, z);
-  // Johnny's edits (v0.29.1): the body squashed to SQ of its height, a 45 degree bevel BEV wide round the top edge,
-  // and the pointer bar PW of its width, shortened to stay on the flat top and still standing PH proud of it
-  const SQ = 0.5, BEV = 1.1, PW = 0.5, zT = zTop * SQ, near = (v, w) => Math.abs(v - w) < 1e-3;
-  const ring = (x, y, rr) => { const h = Math.hypot(x, y); return [x * rr / h, y * rr / h]; };
-  const edges = new Map();
-  for (const t of tris) {
-    const p = t.map(([x, y, z]) => [x - cx, y - cy, z]);
-    const isPtr = p.every(([x, y]) => Math.abs(x) < r * 0.2 && y > -r * 0.3) && p.some(([, , z]) => z > zTop + 1e-3);
-    const isTop = !isPtr && p.every(([, , z]) => near(z, zTop));
-    if (!isPtr && p.every(([x, y]) => Math.hypot(x, y) < r * 0.6)) continue;   // the shaft bore and its insert: never seen, and they z-fight the squashed top
-    if (isPtr) { sets.ptr.push(...p.flatMap(([x, y, z]) => [x * PW, Math.min(y, r - BEV - 0.35), z - zTop + zT])); continue; }
-    const out = p.map(([x, y, z]) => {
-      const rim = near(z, zTop) && Math.hypot(x, y) > r * 0.99;
-      if (rim && isTop) return [...ring(x, y, r - BEV), zT];         // the flat top shrinks inside the bevel
-      if (rim) return [x, y, zT - BEV];                                // the sides stop below it
-      return [x, y, z * SQ];
-    });
-    if (!isTop) {   // the side facets' top edges, to hang the bevel on
-      const top = p.filter(([x, y, z]) => near(z, zTop) && Math.hypot(x, y) > r * 0.99);
-      if (top.length === 2) edges.set(top.map(([x, y]) => x.toFixed(3) + ',' + y.toFixed(3)).sort().join('|'), top);
+  // smooth normals, but only across edges under CREASE: the flutes and the skirt's rim stay sharp
+  const CREASE = Math.cos(35 * Math.PI / 180);
+  function geo(a, sc) {
+    const g = new THREE.BufferGeometry(), m = a.length / 9, fn = [], at = new Map(), key = (i) => a[i].toFixed(3) + ',' + a[i + 1].toFixed(3) + ',' + a[i + 2].toFixed(3);
+    for (let f = 0; f < m; f++) {
+      const o = f * 9, u = [a[o + 3] - a[o], a[o + 4] - a[o + 1], a[o + 5] - a[o + 2]], v = [a[o + 6] - a[o], a[o + 7] - a[o + 1], a[o + 8] - a[o + 2]];
+      const c = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], l = Math.hypot(...c) || 1;
+      fn.push([c[0] / l, c[1] / l, c[2] / l, l]);
+      for (let j = 0; j < 3; j++) { const k = key(o + j * 3); (at.get(k) || at.set(k, []).get(k)).push(f); }
     }
-    sets[isTop ? 'top' : 'body'].push(...out.flat());
+    const nor = new Float32Array(a.length), uv = new Float32Array(m * 6);
+    for (let f = 0; f < m; f++) {
+      const N = fn[f], us = [];
+      for (let j = 0; j < 3; j++) {
+        const o = f * 9 + j * 3; let x = 0, y = 0, z = 0;
+        for (const g of at.get(key(o))) { const M = fn[g]; if (M[0] * N[0] + M[1] * N[1] + M[2] * N[2] > CREASE) { x += M[0] * M[3]; y += M[1] * M[3]; z += M[2] * M[3]; } }
+        const l = Math.hypot(x, y, z) || 1; nor[o] = x / l; nor[o + 1] = y / l; nor[o + 2] = z / l;
+        // texture: wrapped round the sides (one turn = one texture width), straight down on anything facing up
+        const X = a[o], Y = a[o + 1], Z = a[o + 2];
+        us.push(Math.abs(N[2]) > 0.7 ? [X / 50 + 0.5, Y / 50 + 0.5, 1] : [Math.atan2(Y, X) / (2 * Math.PI) + 0.5, Z / 50, 0]);
+      }
+      if (!us[0][2]) { const lo = Math.min(...us.map((q) => q[0])); for (const q of us) if (q[0] - lo > 0.5) q[0] -= 1; }   // across the seam
+      us.forEach((q, j) => { uv[f * 6 + j * 2] = q[0]; uv[f * 6 + j * 2 + 1] = q[1]; });
+    }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.scale(s, s, s * sc); return g;
   }
-  for (const [[ax, ay], [bx, by]] of edges.values()) {
-    const lo = (x, y) => [x, y, zT - BEV], hi = (x, y) => [...ring(x, y, r - BEV), zT];
-    // wind outward: (a, b) counter-clockwise seen from outside
-    const ccw = ax * by - ay * bx > 0, [p, q] = ccw ? [[ax, ay], [bx, by]] : [[bx, by], [ax, ay]];
-    sets.top.push(...lo(...p), ...lo(...q), ...hi(...q), ...lo(...p), ...hi(...q), ...hi(...p));
-  }
-  const s = (KR + 1) / r, geo = (a) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.scale(s, s, s); g.computeVertexNormals(); return g; };
-  return { body: geo(sets.body), top: geo(sets.top), ptr: geo(sets.ptr), h: Math.max(...sets.ptr.filter((_, i) => i % 3 === 2)) * s };
+  const z = zTop + 0.03, tri = new THREE.BufferGeometry();
+  tri.setAttribute('position', new THREE.Float32BufferAttribute(TRI.flatMap(([x, y]) => [x, y, z]), 3)); tri.computeVertexNormals(); tri.scale(s, s, s * SQ);
+  return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, h: z * s * SQ };
 })();
 const ledGeo = new THREE.CylinderGeometry(2.2, 2.2, 1.4, 20); ledGeo.rotateX(Math.PI / 2);
 const keyGeos = {};
@@ -218,8 +268,12 @@ const knobs = [];
 let dirty = true, shadowDirty = true, printDirty = true;
 function makeKnob(cx, cy, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
-  const body = new THREE.Mesh(KNOB.body, mat.knob); body.castShadow = true; body.receiveShadow = true;
-  const top = new THREE.Mesh(KNOB.top, mat.knobTop); top.castShadow = true;
+  // its own wear: one of the worn sets, turned and shifted, at a depth from barely marked to well knocked about
+  const R = rng(knobs.length * 7919 + 13), wear = knobWear[R() * knobWear.length | 0].clone();
+  wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
+  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
+  const body = new THREE.Mesh(KNOB.body, mBody); body.castShadow = true; body.receiveShadow = true;
+  const top = new THREE.Mesh(KNOB.top, mTop); top.castShadow = true;
   const ptr = new THREE.Mesh(KNOB.ptr, mat.white);
   const spin = new THREE.Group(); spin.add(body, top, ptr); g.add(spin); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
