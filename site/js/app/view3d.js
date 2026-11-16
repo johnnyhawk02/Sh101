@@ -449,12 +449,20 @@ let modHeld = false;
 function stepProg(d) { const pit = progOf(), n = pit.opts.length, cur = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0)); boot(); setRev(pit.s, (cur + d + n) % n); }
 // the title: Johnny's logo, printed; tapping it opens OPTIONS. Under it, the page keys (on both pages)
 buildPage = 'all'; grp = scene; prints = printsBy.all;
+// v0.31.1: the logo is printed on its own lit layer over the title, carrying the panel's wear (the same bump map,
+// cut to the title's patch of it), so the scuffs and dents run through it (Johnny). The rest of the print stays flat.
+const logoCv = document.createElement('canvas'); logoCv.width = TITLE.w * S2; logoCv.height = TITLE.h * S2;
+const logoTex = new THREE.CanvasTexture(logoCv); logoTex.colorSpace = THREE.SRGBColorSpace; logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const logoWear = panelWear.clone(); logoWear.repeat.set(TITLE.w / W, TITLE.h / H); logoWear.offset.set(TITLE.x / W, 1 - (TITLE.y + TITLE.h) / H);
+const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.6, metalness: 0, envMapIntensity: 0.3, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
+const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
+logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
-    const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = TITLE.x + (TITLE.w - lw) / 2, ly = TITLE.y + 10;
-    const t = document.createElement('canvas'); t.width = lw * S2; t.height = lh * S2; const tx = t.getContext('2d');
-    tx.drawImage(logo, 0, 0, t.width, t.height); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = ink; tx.fillRect(0, 0, t.width, t.height);
-    x.drawImage(t, lx, ly, lw, lh);
+    const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;
+    const lx2 = logoCv.getContext('2d'); lx2.setTransform(1, 0, 0, 1, 0, 0); lx2.globalCompositeOperation = 'source-over'; lx2.clearRect(0, 0, logoCv.width, logoCv.height);
+    lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
+    logoTex.needsUpdate = true;
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
   x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 98, 10, 'right');
 });
