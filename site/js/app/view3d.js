@@ -316,7 +316,7 @@ function makeKnob(cx, cy, o) {
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
     const v = knobVal(id); if (v === k.shown) return false;
-    k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; return true;
+    k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; shadowDirty = true; return true;   // the skirt's nub turns, so its shadow must too
   };
   k.tilt(look.tilt); k.size(look.ksize); addCtl(k); knobs.push(k); return k;
 }
