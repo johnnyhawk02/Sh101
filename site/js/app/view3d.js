@@ -645,6 +645,25 @@ const stickers = STICKERS.map((st, k) => {
   };
   o.place(); return o;
 });
+// v0.34.0 (Johnny): clicking a sticker randomises the sound (rand.js); right-click or Shift-click steps back.
+// A hit is inside the die-cut circle of a shown sticker, top one first; the sticker gives a little wobble.
+function stickerAt(p) {
+  if (!p) return null;
+  for (let k = stickers.length - 1; k >= 0; k--) {
+    const st = stickers[k]; if (!st.m.visible) continue;
+    const q = stkPlace(STICKERS[k]); if (Math.hypot(p[0] - q.cx, p[1] - q.cy) < q.size * 0.42) return st;
+  }
+  return null;
+}
+const wobbles = new Map();
+const wobble = (st) => { wobbles.set(st, performance.now()); dirty = true; };
+function wobbleStep(now) {
+  for (const [st, t0] of wobbles) {
+    const k = STICKERS.findIndex((t) => t.id === st.id), base = -stkPlace(STICKERS[k]).rot * Math.PI / 180, t = (now - t0) / 1000;
+    if (t > 0.7) { st.m.rotation.z = base; wobbles.delete(st); } else st.m.rotation.z = base + Math.sin(t * 34) * Math.exp(-t * 6) * 0.16;
+    dirty = true;
+  }
+}
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
     const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;
@@ -936,6 +955,8 @@ const grabs = new Map();
 const dragRange = () => Math.max(140, Math.min(220, innerHeight * 0.38));
 cv.addEventListener('pointerdown', (e) => {
   if (e.button === 2) return;
+  const sk = stickerAt(toPanel(e));
+  if (sk) { e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {} grabs.set(e.pointerId, { c: { kind: 'sticker', st: sk }, x: e.clientX, y: e.clientY, moved: false, back: e.shiftKey }); return; }
   const c = pick(e); if (!c) return;
   e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   boot();
@@ -970,10 +991,11 @@ function release(e) {
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
+  else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) shyoyRand.back(); else shyoyRand.roll(); wobble(c.st); printDirty = true; }
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
-cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const c = pick(e); if (c && c.kind === 'knob' && c.cur() !== 'bpm' && !SQK[c.cur()]) { sheetVars(); cseqOpen(c.cur()); } });
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const sk = stickerAt(toPanel(e)); if (sk) { if (shyoyRand.back()) wobble(sk); return; } const c = pick(e); if (c && c.kind === 'knob' && c.cur() !== 'bpm' && !SQK[c.cur()]) { sheetVars(); cseqOpen(c.cur()); } });
 cv.addEventListener('wheel', (e) => {
   const c = pick(e); if (!c || c.kind !== 'knob') return; e.preventDefault(); boot();
   const id = c.cur(); setKnob(id, knobBase(id) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02));
@@ -1005,7 +1027,7 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet [hidden] { display: none !important; }
 .v3d-sheet .chk { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
 .v3d-sheet .chk input { width: 18px; height: 18px; accent-color: var(--v3d-ink); margin: 0; }
-.v3d-sheet .f { margin: 0 0 14px; } .v3d-sheet .f > span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .08em; margin-bottom: 6px; }
+.v3d-sheet .f { margin: 0 0 14px; } .v3d-sheet .hint { margin: 6px 0 0; font-size: 9px; letter-spacing: .06em; opacity: .6; } .v3d-sheet .f > span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .08em; margin-bottom: 6px; }
 .v3d-sheet .row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .v3d-sheet button { font: 600 11px ${MONO}; letter-spacing: .06em; color: #fff; background: #0c0c0c; border: 0; border-radius: 3px; padding: 7px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .v3d-sheet button i { width: 6px; height: 6px; border-radius: 50%; background: #3a0906; display: inline-block; }
@@ -1079,6 +1101,8 @@ opt.body.innerHTML = `
   </div>
   <div class="pane" data-pane="stickers">
   <div class="f"><label class="chk"><input type="checkbox" id="o3-stkon"> SHOW STICKERS</label></div>
+  <div class="f"><span>RANDOM AMOUNT</span><div class="row"><input type="range" min="0" max="100" id="o3-rnd" aria-label="How far a sticker click moves the sound"><b class="val" id="o3-rndv"></b></div>
+    <p class="hint">CLICK A STICKER FOR A NEW SOUND. RIGHT-CLICK OR SHIFT-CLICK ONE TO GO BACK.</p></div>
   <div class="f" id="o3-stklist"><span>STICKERS</span>${STICKERS.map((st) => `<div class="stk" data-sk="${st.id}"><button data-st="${st.id}"><i></i>${st.name}</button>
     <label>SIZE<input type="range" data-k="s" min="40" max="300" aria-label="${st.name} size"><i></i></label>
     <label>ACROSS<input type="range" data-k="x" min="0" max="${W}" aria-label="${st.name} across"><i></i></label>
@@ -1119,6 +1143,7 @@ function drawOpt() {
     d.querySelectorAll('[data-k]').forEach((inp) => { inp.value = vals[inp.dataset.k]; inp.nextElementSibling.textContent = inp.dataset.k === 's' ? vals.s + '%' : inp.dataset.k === 'r' ? vals.r + '°' : vals[inp.dataset.k]; });
   });
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
+  $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
   $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
@@ -1151,6 +1176,7 @@ opt.body.querySelectorAll('.stk [data-k]').forEach((inp) => inp.oninput = () => 
   if (!look.stickers.includes(id)) look.stickers = [...look.stickers, id];
   setLook('stk', look.stk);
 });
+$o('#o3-rnd').oninput = (e) => { shyoyRand.amount = e.target.value / 100; $o('#o3-rndv').textContent = e.target.value; };
 $o('#o3-stkon').onchange = (e) => setLook('stkOn', e.target.checked);
 $o('#o3-stkreset').onclick = () => setLook('stk', {});
 $o('#o3-ocd').oninput = (e) => setLook('ocd', e.target.value / 100);
@@ -1200,6 +1226,7 @@ let live = true, drawn = 0;
 function frame() {
   if (!live) return;
   for (const c of ctls) if (c.sync()) dirty = true;
+  if (wobbles.size) wobbleStep(performance.now());
   const sig = printSigNow(); if (sig !== printSig) { printSig = sig; printDirty = true; }
   if (printDirty) { printDirty = false; repaintPrint(); dirty = true; }
   if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; dirty = true; }
