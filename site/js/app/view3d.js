@@ -72,10 +72,15 @@ function presetLights(name) {
 // v0.35.5 (Johnny): "one ambient and two very diffuse left and right". Older rigs (lv 2) keep their colours and levels;
 // light 1 becomes the ambient (half its level), 2 and 3 move to the left and right sides
 function migLights(o) {
-  if (o.lv === 3 && Array.isArray(o.lights) && o.lights.length === 3) return o;
+  if (o.lv === 4) return o;
+  if (o.lv === 3 && Array.isArray(o.lights) && o.lights.length === 3) {   // v0.35.6 (Johnny): no lighting presets or brightness any more;
+    const L = LIGHTS[o.light] || LIGHTS.studio, b = typeof o.bright === 'number' ? o.bright : 1;   // the preset's sky light and the brightness go into the levels
+    o.lights[0].int = +Math.min(3, o.lights[0].int * b + L.hemi * b * 0.8).toFixed(2); o.lights[1].int = +Math.min(3, o.lights[1].int * b).toFixed(2); o.lights[2].int = +Math.min(3, o.lights[2].int * b).toFixed(2);
+    o.bright = 1; o.lv = 4; return o;
+  }
   const l = Array.isArray(o.lights) && o.lights.length === 3 ? o.lights : presetLights(o.light);
   o.lights = [{ col: l[0].col, int: Math.min(1, l[0].int * 0.45), az: 0, el: 90 }, { col: l[1].col, int: Math.max(0.8, l[1].int), az: 180, el: 32 }, { col: l[2].col, int: Math.max(0.8, l[2].int), az: 0, el: 32 }];
-  o.lv = 3; return o;
+  o.lv = 3; return migLights(o);
 }
 const saveLook = () => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} };
 const SWATCHES = ['#e4e2da', '#f4f3ef', '#b9bbb8', '#6c6e70', '#202122', '#c4352b', '#df7a2c', '#e6c24a', '#4e7b56', '#2f5c88', '#ef9fbf'];
@@ -985,8 +990,7 @@ function applyLook() {
   const F = FINISH[look.finish] || FINISH.satin;
   panelMat.roughness = F.r; panelMat.metalness = F.m; panelMat.envMapIntensity = F.e;
   const rm = F.brushed ? brushed : null; if (panelMat.roughnessMap !== rm) { panelMat.roughnessMap = rm; panelMat.needsUpdate = true; }
-  const L = LIGHTS[look.light] || LIGHTS.studio, b = look.bright;
-  hemi.intensity = L.hemi * b; hemi.color.set(L.hemiCol || 0xffffff); hemi.groundColor.set(0x404040);
+  const b = 1; hemi.intensity = 0;   // v0.35.6: only the ambient and the two side lights
   look.lights.forEach((l, i) => {
     const a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, lamp = lamps[i];
     lamp.color.set(l.col); lamp.intensity = l.int * b; if (!i) return;
@@ -1202,8 +1206,6 @@ opt.body.innerHTML = `
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   </div>
   <div class="pane" data-pane="light">
-  <div class="f"><span>LIGHTING</span><div class="row" id="o3-light">${Object.entries(LIGHTS).map(([k, l]) => `<button data-l="${k}"><i></i>${l.name}</button>`).join('')}</div>
-    <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
     <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
     ${i ? `<label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
@@ -1245,9 +1247,8 @@ function drawOpt() {
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
   $o('#o3-lsave').classList.toggle('lit', lookSaving); $o('#o3-lsave').textContent = lookSaving ? 'PICK A SLOT' : 'SAVE…';
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
-  opt.body.querySelectorAll('[data-l]').forEach((b) => b.classList.toggle('lit', b.dataset.l === look.light));
   opt.body.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('lit', b.dataset.f === look.finish));
-  $o('#o3-col').value = look.colour; $o('#o3-bright').value = Math.round(look.bright * 100); $o('#o3-brightv').textContent = Math.round(look.bright * 100) + '%';
+  $o('#o3-col').value = look.colour;
   opt.body.querySelectorAll('.lamp').forEach((d) => {
     const l = look.lights[+d.dataset.i];
     d.querySelectorAll('[data-k]').forEach((inp) => {
@@ -1285,13 +1286,11 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
 $o('#o3-col').oninput = (e) => setLook('colour', e.target.value);
-opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => { look.lights = presetLights(b.dataset.l); setLook('light', b.dataset.l); });
 opt.body.querySelectorAll('.lamp [data-k]').forEach((inp) => inp.oninput = () => {
   const l = look.lights[+inp.closest('.lamp').dataset.i], k = inp.dataset.k;
   l[k] = k === 'col' ? inp.value : k === 'int' ? inp.value / 100 : +inp.value; setLook('lights', look.lights);
 });
 opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
-$o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 opt.body.querySelectorAll('[data-st]').forEach((b) => b.onclick = () => setLook('stickers', [b.dataset.st]));
 opt.body.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => { optTab = b.dataset.tab; try { localStorage.setItem('shyoy.opttab3d', optTab); } catch (e) {} drawOpt(); });
