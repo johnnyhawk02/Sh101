@@ -20,7 +20,7 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobCol: {}, oddOn: true, oddK: -1, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
@@ -43,6 +43,7 @@ if (typeof look.kstyle !== 'string') look.kstyle = 'yamaha';
 if (typeof look.oddOn !== 'boolean') look.oddOn = true; if (typeof look.oddK !== 'number') look.oddK = -1;   // -1 = the cutoff
 delete look.boxCol;   // v0.35.0's section backgrounds, dropped (Johnny meant knob colours)
 if (!look.knobCol || typeof look.knobCol !== 'object') look.knobCol = {};
+if (typeof look.knobAll !== 'string') look.knobAll = '';
 // v0.33.4 (Johnny): KNOB SIZE runs 0-100 over the real scale 0.9-1.5 (was 60-135%)
 const KSIZE = [0.9, 1.5], ksizeToUI = (k) => Math.max(0, Math.min(100, (k - KSIZE[0]) / (KSIZE[1] - KSIZE[0]) * 100));
 look.ksize = Math.max(KSIZE[0], Math.min(KSIZE[1], look.ksize));
@@ -466,7 +467,8 @@ function makeKnob(cx, cy, o) {
   const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
   const spin = new THREE.Group(); spin.add(std); tiltG.add(spin); g.add(tiltG); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle,
-    colour: () => { const c = look.knobCol[secKey]; mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color); if (c) mTop.color.multiplyScalar(1.08);
+    colour: () => { const c = look.knobCol[secKey] || look.knobAll;   // v0.35.8: a section's colour, else the global one
+      mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color); if (c) mTop.color.multiplyScalar(1.08);
       mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); mRec.color.copy(mTop.color); },   // a pale knob gets a black line
     clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
     mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
@@ -1219,6 +1221,7 @@ opt.body.innerHTML = `
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
+  <div class="f"><span>ALL KNOBS</span><div class="bxc"><label id="o3-kall"><input type="color" aria-label="All knobs colour"><span>EVERY KNOB</span><button class="clr" aria-label="Clear">×</button></label></div></div>
   ${['synth', 'seq'].map((pg) => `<div class="f"><span>${pg === 'synth' ? 'SYNTH PAGE' : 'SEQUENCER PAGE'}</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
   <div class="row"><button id="o3-bxall">ALL BLACK</button></div>
   </div>
@@ -1247,7 +1250,7 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
@@ -1274,7 +1277,8 @@ function drawOpt() {
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
   opt.body.querySelectorAll('[data-ks]').forEach((b) => b.classList.toggle('lit', b.dataset.ks === kstyle()));
-  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || '#0e0e0e'; l.classList.toggle('set', !!c); });
+  $o('#o3-kall input').value = look.knobAll || '#0e0e0e'; $o('#o3-kall').classList.toggle('set', !!look.knobAll);
+  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || look.knobAll || '#0e0e0e'; l.classList.toggle('set', !!c); });
   $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
   $o('#o3-odd').checked = look.oddOn;
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
@@ -1287,7 +1291,7 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
   // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look); migLights(look); saveLook(); applyLook(); drawOpt();
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look); migLights(look); saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
@@ -1313,7 +1317,9 @@ opt.body.querySelectorAll('[data-bk]').forEach((l) => {
   l.querySelector('input').oninput = (e) => setLook('knobCol', { ...look.knobCol, [l.dataset.bk]: e.target.value });
   l.querySelector('.clr').onclick = (e) => { e.preventDefault(); const c = { ...look.knobCol }; delete c[l.dataset.bk]; setLook('knobCol', c); };
 });
-$o('#o3-bxall').onclick = () => setLook('knobCol', {});
+$o('#o3-bxall').onclick = () => { look.knobAll = ''; setLook('knobCol', {}); };
+$o('#o3-kall input').oninput = (e) => setLook('knobAll', e.target.value);
+$o('#o3-kall .clr').onclick = (e) => { e.preventDefault(); setLook('knobAll', ''); };
 opt.body.querySelectorAll('[data-ks]').forEach((b) => b.onclick = () => setLook('kstyle', b.dataset.ks));
 $o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
 $o('#o3-odd').onchange = (e) => setLook('oddOn', e.target.checked);
