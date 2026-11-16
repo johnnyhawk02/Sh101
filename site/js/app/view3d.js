@@ -170,7 +170,7 @@ await Promise.race([logo.decode().catch(() => {}), new Promise((r) => setTimeout
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.NoToneMapping;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;   // v0.35.9: bright colours roll off like a camera instead of clipping to flat white
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;   // v0.35.5: plain PCF so shadow.radius blurs (very diffuse side lights) renderer.shadowMap.autoUpdate = false;
 const cv = renderer.domElement; cv.id = 'v3d';
 document.body.appendChild(cv);
@@ -180,7 +180,7 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(15, 1, 10, 100000);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x303030, 1); scene.add(hemi);
-const amb = new THREE.AmbientLight(0xffffff, 0); scene.add(amb);   // v0.35.5: light 1
+const amb = new THREE.HemisphereLight(0xffffff, 0x3a3a3a, 0); amb.position.set(0, 0.35, 1); scene.add(amb);   // v0.35.5: light 1, the ambient; v0.35.9 a sky light (darker from below) so shapes still shade
 const key = new THREE.DirectionalLight(0xffffff, 0); key.castShadow = false;   // the old key light, now unused
 key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.5; key.shadow.radius = 4;
 Object.assign(key.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 });
@@ -294,7 +294,7 @@ const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.1
 // nub, and a triangle on top. The 50k-triangle original is simplified to ~5.6k offline (its top's shallow triangle
 // recess flattened first, and drawn back here as a white inlay). Smooth-shaded with creases kept, squashed to SQ of
 // its height, scaled so the skirt is KR + 2 across. Its pointer lies along +y, so the value-to-angle mapping is unchanged.
-const TRI_BUMP = 6;   // how deep the Yamaha's pressed-in triangle reads
+const TRI_BUMP = 6, PLASTIC_MAX = 0.5;   // how deep the Yamaha's pressed-in triangle reads
 const KNOB = await (async () => {
   const buf = await (await fetch(new URL('../../models/yamaha-knob.stl', import.meta.url))).arrayBuffer();
   const dv = new DataView(buf), n = dv.getUint32(80, true), SQ = 0.7, TRI = [[0, 3.03], [-2.02, -3.03], [2.02, -3.03]];
@@ -468,7 +468,11 @@ function makeKnob(cx, cy, o) {
   const spin = new THREE.Group(); spin.add(std); tiltG.add(spin); g.add(tiltG); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle,
     colour: () => { const c = look.knobCol[secKey] || look.knobAll;   // v0.35.8: a section's colour, else the global one
-      mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color); if (c) mTop.color.multiplyScalar(1.08);
+      // v0.35.9 (Johnny: white blew out): real plastic never reflects all the light, so a picked colour is capped at
+      // PLASTIC_MAX (linear) and its finish goes a little glossier, so the fluting and the light still read on it
+      mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color);
+      if (c) { for (const m of [mBody, mTop]) { const mx = Math.max(m.color.r, m.color.g, m.color.b); if (mx > PLASTIC_MAX) m.color.multiplyScalar(PLASTIC_MAX / mx); }
+        mTop.color.multiplyScalar(1.05); mBody.roughness = 0.55; mTop.roughness = 0.38; } else { mBody.roughness = mat.knob.roughness; mTop.roughness = mat.knobTop.roughness; }
       mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); mRec.color.copy(mTop.color); },   // a pale knob gets a black line
     clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
     mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
