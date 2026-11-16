@@ -22,15 +22,15 @@ const LOOK0 = { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', 
 const look = { ...LOOK0 };
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
 // three lights (v0.31.0): each { col, int, az (orbit round the panel, degrees, 0 = from the right, 90 = from the top),
-// el (height above the panel, degrees) }. Light 1 casts the shadows. A lighting preset sets all three; then each
+// el (height above the panel, degrees) }. All three cast shadows; 2 and 3 start low from the left and right. A lighting preset sets all three; then each
 // can be changed in OPTIONS. Older saved looks get theirs from their preset.
 const deg = (r) => Math.round(r * 180 / Math.PI);
 function presetLights(name) {
   const L = LIGHTS[name] || LIGHTS.studio, [x, y, z] = L.dir, az = deg(Math.atan2(y, x)), hex = (c) => '#' + c.toString(16).padStart(6, '0');
   return [
     { col: hex(L.col), int: L.key, az: (az + 360) % 360, el: deg(Math.atan2(z, Math.hypot(x, y))) },
-    { col: L.fill || '#cfdcff', int: 0.35, az: (az + 180) % 360, el: 30 },   // fill, from the other side
-    { col: L.rim || '#ffe2c0', int: 0.25, az: (az + 270) % 360, el: 12 },    // a low rim light
+    { col: L.fill || '#e6ecff', int: 0.4, az: 160, el: 35 },   // v0.31.4: from the left side, low, with its own shadows
+    { col: L.rim || '#fff0dc', int: 0.35, az: 20, el: 35 },      // and from the right (Johnny)
   ];
 }
 const saveLook = () => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} };
@@ -42,7 +42,7 @@ const LIGHTS = {
   raking: { name: 'LOW SUN', dir: [-1, 0.22, 0.42], col: 0xfff3e2, key: 2.4, hemi: 0.45 },
   top: { name: 'OVERHEAD', dir: [0, 1, 0.6], col: 0xffffff, key: 1.8, hemi: 0.65 },
 };
-if (!Array.isArray(look.lights) || look.lights.length !== 3) look.lights = presetLights(look.light);
+if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // lv 2: side lights
 const FINISH = { matt: { name: 'MATT', r: 0.95, m: 0, e: 0.25 }, satin: { name: 'SATIN', r: 0.55, m: 0, e: 0.6 }, metal: { name: 'METAL', r: 0.42, m: 0.7, e: 1.1, brushed: true } };
 const lensFov = (u) => 6 * Math.pow(8, Math.max(0, Math.min(1, u)));   // 6° (flat) .. 48° (wide)
 
@@ -132,7 +132,11 @@ const key = new THREE.DirectionalLight(0xffffff, 2); key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.5; key.shadow.radius = 4;
 Object.assign(key.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 });
 scene.add(key, key.target);
-const lamps = [key, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)]; scene.add(lamps[1], lamps[2]);   // light 1 is the shadow-casting key
+const lamps = [key, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)];   // all three cast shadows (v0.31.4)
+for (const l of lamps.slice(1)) {
+  l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = key.shadow.bias; l.shadow.normalBias = key.shadow.normalBias; l.shadow.radius = 5;
+  Object.assign(l.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 }); scene.add(l, l.target);
+}
 
 const P = (px, py, z = 0) => new THREE.Vector3(px - W / 2, H / 2 - py, z);   // panel px (y down) -> world
 const panelMat = new THREE.MeshStandardMaterial({ color: 0xe4e2da, roughness: 0.6 });
@@ -882,7 +886,7 @@ opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: presetLights(LOOK0.light) }); saveLook(); applyLook(); drawOpt(); };
+$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: presetLights(LOOK0.light), lv: 2 }); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
