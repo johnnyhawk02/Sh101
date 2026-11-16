@@ -23,6 +23,16 @@ const LOOK_KEY = 'shyoy.look3d';
 const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
+// saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
+// 3 and 4 start empty. SAVE then a slot stores the current look there (localStorage shyoy.looks3d).
+const copyLook = (l) => JSON.parse(JSON.stringify(l));
+const LOOK_SLOTS0 = [copyLook(LOOK0), { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4, tilt: 0, ksize: 1, lv: 2,
+  lights: [{ col: '#ffffff', int: 1.7, az: 129, el: 55 }, { col: '#cfdcff', int: 0.35, az: 309, el: 30 }, { col: '#ffe2c0', int: 0.25, az: 39, el: 12 }] }, null, null];
+const LOOKS_KEY = 'shyoy.looks3d';
+let lookSlots = LOOK_SLOTS0.map((l) => l && copyLook(l));
+try { const st = JSON.parse(localStorage.getItem(LOOKS_KEY) || 'null'); if (Array.isArray(st) && st.length === 4) lookSlots = st.map((l, i) => l || (LOOK_SLOTS0[i] && copyLook(LOOK_SLOTS0[i]))); } catch (e) {}
+const saveSlots = () => { try { localStorage.setItem(LOOKS_KEY, JSON.stringify(lookSlots)); } catch (e) {} };
+let lookSaving = false;
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
 if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
@@ -820,6 +830,7 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet button { font: 600 11px ${MONO}; letter-spacing: .06em; color: #fff; background: #0c0c0c; border: 0; border-radius: 3px; padding: 7px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .v3d-sheet button i { width: 6px; height: 6px; border-radius: 50%; background: #3a0906; display: inline-block; }
 .v3d-sheet button.lit i { background: #ff2a14; box-shadow: 0 0 6px #ff2a14; }
+.v3d-sheet button.arm { outline: 2px dashed #ff2a14; outline-offset: 1px; }
 .v3d-sheet .sw { width: 28px; height: 28px; padding: 0; border-radius: 3px; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.35); }
 .v3d-sheet .sw.lit { outline: 2px solid var(--v3d-ink); outline-offset: 2px; }
 .v3d-sheet input[type=range] { flex: 1; min-width: 120px; accent-color: var(--v3d-ink); }
@@ -864,6 +875,7 @@ function sheet(title) {
 }
 const opt = sheet('OPTIONS');
 opt.body.innerHTML = `
+  <div class="f"><span>LOOKS</span><div class="row" id="o3-looks">${[0, 1, 2, 3].map((i) => `<button data-look="${i}"><i></i>LOOK ${i + 1}</button>`).join('')}<button id="o3-lsave">SAVE…</button></div></div>
   <div class="f"><span>PANEL COLOUR</span><div class="row" id="o3-sw">${SWATCHES.map((c) => `<button class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}<input type="color" id="o3-col" aria-label="Any colour"></div></div>
   <div class="f"><span>LIGHTING</span><div class="row" id="o3-light">${Object.entries(LIGHTS).map(([k, l]) => `<button data-l="${k}"><i></i>${l.name}</button>`).join('')}</div>
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
@@ -878,6 +890,9 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
 function drawOpt() {
+  const same = (a, b) => !!a && JSON.stringify(['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights'].map((k) => a[k])) === JSON.stringify(['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights'].map((k) => b[k]));
+  opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
+  $o('#o3-lsave').classList.toggle('lit', lookSaving); $o('#o3-lsave').textContent = lookSaving ? 'PICK A SLOT' : 'SAVE…';
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
   opt.body.querySelectorAll('[data-l]').forEach((b) => b.classList.toggle('lit', b.dataset.l === look.light));
   opt.body.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('lit', b.dataset.f === look.finish));
@@ -895,6 +910,13 @@ function drawOpt() {
   sheetVars();
 }
 const setLook = (k, v) => { look[k] = v; saveLook(); applyLook(); drawOpt(); };
+opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
+  const i = +b.dataset.look;
+  if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
+  if (!lookSlots[i]) return;
+  Object.assign(look, copyLook(lookSlots[i])); saveLook(); applyLook(); drawOpt();
+});
+$o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
 $o('#o3-col').oninput = (e) => setLook('colour', e.target.value);
 opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => { look.lights = presetLights(b.dataset.l); setLook('light', b.dataset.l); });
