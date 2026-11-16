@@ -299,6 +299,20 @@ const KNOB = await (async () => {
   tri.setAttribute('position', new THREE.Float32BufferAttribute(TRI.flatMap(([x, y]) => [x, y, z]), 3)); tri.computeVertexNormals(); tri.scale(s, s, s * SQ);
   return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, h: z * s * SQ };
 })();
+// the odd one out (v0.32.3, Johnny): the filter knob is a mismatched spare, a pink standard round knob: a thin skirt,
+// a knurled grip, a bevelled, slightly domed top and a white line. Its line points along +y like the others.
+mat.pink = new THREE.MeshStandardMaterial({ color: 0xc23a74, roughness: 0.5, metalness: 0, envMapIntensity: 0.5 });
+const PINK = (() => {
+  const prof = [[0, 0], [19.5, 0], [19.5, 2.4], [17.2, 3.4], [17.2, 15.2], [16, 16.8], [14.5, 17.5], [8, 17.9], [0, 18]].map(([r, y]) => new THREE.Vector2(r, y));
+  const g = new THREE.LatheGeometry(prof, 144), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {   // knurling: 36 ridges round the grip
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = Math.hypot(x, z);
+    if (y > 3.6 && y < 15.0 && r > 16) { const a = Math.atan2(z, x), k = 1 + 0.045 * Math.max(0, Math.cos(36 * a)); p.setX(i, x * k); p.setZ(i, z * k); }
+  }
+  g.rotateX(Math.PI / 2); g.computeVertexNormals();
+  const ptr = new THREE.BoxGeometry(2, 11.5, 0.5); ptr.translate(0, 3 + 11.5 / 2, 18.05);
+  return { body: g, ptr };
+})();
 const ledGeo = new THREE.CylinderGeometry(2.2, 2.2, 1.4, 20); ledGeo.rotateX(Math.PI / 2);
 const keyGeos = {};
 function keyGeo(w, h, d) {
@@ -319,9 +333,16 @@ function makeKnob(cx, cy, o) {
   const R = rng(knobs.length * 7919 + 13), wear = knobWear[R() * knobWear.length | 0].clone();
   wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
   const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
-  const body = new THREE.Mesh(KNOB.body, mBody); body.castShadow = true; body.receiveShadow = true;
-  const top = new THREE.Mesh(KNOB.top, mTop); top.castShadow = true;
-  const ptr = new THREE.Mesh(KNOB.ptr, mat.white);
+  let body, top, ptr;
+  if (o.odd) {   // the mismatched one (v0.32.3): a pink standard knob, fitted later, see PINK below
+    const mp = mat.pink.clone(); mp.bumpMap = wear; mp.bumpScale = KNOB_BUMP * depth * 0.4;
+    body = new THREE.Mesh(PINK.body, mp); body.castShadow = true; body.receiveShadow = true;
+    top = new THREE.Group(); ptr = new THREE.Mesh(PINK.ptr, mat.white); ptr.castShadow = true;
+  } else {
+    body = new THREE.Mesh(KNOB.body, mBody); body.castShadow = true; body.receiveShadow = true;
+    top = new THREE.Mesh(KNOB.top, mTop); top.castShadow = true;
+    ptr = new THREE.Mesh(KNOB.ptr, mat.white);
+  }
   // a pot's shaft is never quite square to the panel (v0.31.5): each leans its own way, by up to look.tilt degrees
   const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
   const spin = new THREE.Group(); spin.add(body, top, ptr); tiltG.add(spin); g.add(tiltG); grp.add(g);
@@ -410,7 +431,7 @@ for (const b of BOXES) {
   for (const it of b.it) {
     const w = it.w || 1, cx = colX(b, col, w), cy = y0 + KY, ly = y0 + LY;
     if (it.t === 'knob') {
-      makeKnob(cx, cy, { cur: () => it.id, base: () => knobBase(it.id) });
+      makeKnob(cx, cy, { cur: () => it.id, base: () => knobBase(it.id), odd: it.id === 'cutoff' });   // the filter knob is a mismatched spare (Johnny)
       labelAt(() => it.label, cx, ly, { slab: () => cseqOn(it.id), dim: () => it.id === 'flgres' && (state.params.flgmode | 0) === 1 });
     } else if (it.t === 'slot') {
       const cur = () => { const d = slotItem(it.g, it.k); return d ? d.f : null; };
