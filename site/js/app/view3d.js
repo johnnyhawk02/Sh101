@@ -20,8 +20,13 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
+// v0.36.2 (Johnny: "can't get it to light evenly and naturally"): NATURAL is a photographer's set-up: a big soft bulb
+// high over the front, a quiet room fill (ROOM: sky light + reflections) so shadows never go black, and two faint
+// side lights, cool and warm, for shape. It is the default, and OPTIONS > LIGHT > NATURAL brings it back.
+const NATURAL = { room: 0.7, lv: 4, lights: [{ col: '#fff6ea', int: 1.1, az: 105, el: 62, dist: 2400, soft: 12 }, { col: '#eef3ff', int: 0.35, az: 200, el: 30, soft: 16 }, { col: '#fff1e0', int: 0.25, az: 340, el: 30, soft: 16 }] };
 const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
+Object.assign(LOOK0, JSON.parse(JSON.stringify(NATURAL)), { bright: 1 });   // v0.36.2: the default lighting is NATURAL
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
 // 3 and 4 start empty. SAVE then a slot stores the current look there (localStorage shyoy.looks3d).
@@ -181,7 +186,7 @@ const scene = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(15, 1, 10, 100000);
-const hemi = new THREE.HemisphereLight(0xffffff, 0x303030, 1); scene.add(hemi);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x303030, 1); hemi.position.set(0, 0.4, 1); scene.add(hemi);
 // v0.36.1 (Johnny: "use a point source, we aren't getting many shadows"): light 1 is a bulb at a distance, casting
 // shadows that fan out from it; no falloff with distance (decay 0), so moving it changes the shadows, not the brightness
 const amb = new THREE.PointLight(0xffffff, 0, 0, 0); amb.castShadow = true; amb.shadow.mapSize.set(512, 512); amb.shadow.bias = -0.0005; amb.shadow.normalBias = 1;
@@ -1001,7 +1006,7 @@ function applyLook() {
   const F = FINISH[look.finish] || FINISH.satin;
   panelMat.roughness = F.r; panelMat.metalness = F.m; panelMat.envMapIntensity = F.e;
   const rm = F.brushed ? brushed : null; if (panelMat.roughnessMap !== rm) { panelMat.roughnessMap = rm; panelMat.needsUpdate = true; }
-  const b = 1; hemi.intensity = 0;   // v0.35.6: only the ambient and the two side lights
+  const b = 1, room = look.room ?? 0.7; hemi.intensity = room * 0.9; hemi.color.set(0xffffff); hemi.groundColor.set(0x3c3c3c);   // v0.36.2: ROOM fill (sky light + reflections)
   look.lights.forEach((l, i) => {
     const a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, lamp = lamps[i];
     lamp.color.set(l.col); lamp.intensity = l.int * b; lamp.shadow.radius = l.soft ?? 9;   // v0.36.0: SOFTNESS
@@ -1020,7 +1025,7 @@ function applyLook() {
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
   // v0.35.7 (Johnny: "a hidden light that's always on"): the room reflection (scene.environment) lit everything whatever the
   // lights said; it now goes with light 1, the ambient: full at 100% and above, none at 0, so all lights at 0 is dark
-  const envF = Math.min(1, look.lights[0].int);
+  const envF = Math.min(1.3, room);
   scene.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) if ('envMapIntensity' in m) {
     if (m === panelMat) { m.envMapIntensity = F.e * envF; continue; }
     if (m.userData.env0 === undefined) m.userData.env0 = m.envMapIntensity; m.envMapIntensity = m.userData.env0 * envF; } });
@@ -1227,6 +1232,8 @@ opt.body.innerHTML = `
   <div class="pane" data-pane="light">
   <div class="f"><span>FROM ABOVE · FROM THE SIDE</span><div class="ldia"><canvas id="o3-ltop" width="560" height="300" aria-label="Lights seen from above: drag a light round the panel"></canvas><canvas id="o3-lside" width="560" height="300" aria-label="Lights seen from the side: drag a light up or down"></canvas></div>
     <p class="hint">DRAG A LIGHT: ROUND THE PANEL ON THE LEFT, UP AND DOWN ON THE RIGHT. LIGHT 1 IS A BULB: DRAG IT IN OR OUT FOR DISTANCE.</p></div>
+  <div class="f"><span>ROOM</span><div class="row"><input type="range" min="0" max="150" id="o3-room" aria-label="Room fill light"><b class="val" id="o3-roomv"></b><button id="o3-natural">NATURAL</button></div>
+    <p class="hint">ROOM IS THE SOFT LIGHT FROM EVERYWHERE THAT KEEPS SHADOWS FROM GOING BLACK. NATURAL SETS AN EVEN, PHOTO-STUDIO LIGHTING.</p></div>
   <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
     <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
     <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
@@ -1265,7 +1272,7 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'room', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
@@ -1280,6 +1287,7 @@ function drawOpt() {
       if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : k === 'soft' || k === 'dist' ? v : v + '°';
     });
   });
+  $o('#o3-room').value = Math.round((look.room ?? 0.7) * 100); $o('#o3-roomv').textContent = Math.round((look.room ?? 0.7) * 100) + '%';
   drawLDia();
   opt.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('lit', b.dataset.tab === optTab));
   opt.body.querySelectorAll('[data-pane]').forEach((d) => { d.hidden = d.dataset.pane !== optTab; });
@@ -1344,6 +1352,8 @@ $o('#o3-oddrnd').onclick = () => {   // a different synth-page knob each time
   look.oddOn = true; setLook('oddK', pool[Math.random() * pool.length | 0]);
 };
 $o('#o3-oddcut').onclick = () => setLook('oddK', -1);
+$o('#o3-room').oninput = (e) => setLook('room', e.target.value / 100);
+$o('#o3-natural').onclick = () => { const n = JSON.parse(JSON.stringify(NATURAL)); look.lights = n.lights; look.lv = 4; setLook('room', n.room); };
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
