@@ -155,7 +155,7 @@ const mat = {
   glow: new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,60,30,.9)'); g.addColorStop(0.35, 'rgba(255,40,20,.35)'); g.addColorStop(1, 'rgba(255,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }),
 };
 // the knob: Johnny's pot-knob5.stl (v0.29.0), a 32-sided cap with a raised pointer bar, scaled to KR. The STL's
-// triangles are sorted three ways: the pointer bar (white), the flat top (satin) and the rest (body); flat-shaded so
+// triangles are sorted three ways: the pointer bar (white), the flat top and bevel (satin) and the rest (body); flat-shaded so
 // the facets show. Its pointer lies along +y, as the old one did, so the value-to-angle mapping is unchanged.
 const KNOB = await (async () => {
   const buf = await (await fetch(new URL('../../models/pot-knob5.stl', import.meta.url))).arrayBuffer();
@@ -170,11 +170,34 @@ const KNOB = await (async () => {
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, r = (x1 - x0) / 2;
   // the body's top face is the highest z any full-radius vertex reaches; the pointer bar is what stands above it
   for (const t of tris) for (const [x, y, z] of t) if (Math.hypot(x - cx, y - cy) > r * 0.99) zTop = Math.max(zTop, z);
+  // Johnny's edits (v0.29.1): the body squashed to SQ of its height, a 45 degree bevel BEV wide round the top edge,
+  // and the pointer bar PW of its width, shortened to stay on the flat top and still standing PH proud of it
+  const SQ = 0.5, BEV = 1.1, PW = 0.5, zT = zTop * SQ, near = (v, w) => Math.abs(v - w) < 1e-3;
+  const ring = (x, y, rr) => { const h = Math.hypot(x, y); return [x * rr / h, y * rr / h]; };
+  const edges = new Map();
   for (const t of tris) {
     const p = t.map(([x, y, z]) => [x - cx, y - cy, z]);
     const isPtr = p.every(([x, y]) => Math.abs(x) < r * 0.2 && y > -r * 0.3) && p.some(([, , z]) => z > zTop + 1e-3);
-    const isTop = !isPtr && p.every(([, , z]) => Math.abs(z - zTop) < 1e-3);
-    sets[isPtr ? 'ptr' : isTop ? 'top' : 'body'].push(...p.flat());
+    const isTop = !isPtr && p.every(([, , z]) => near(z, zTop));
+    if (!isPtr && p.every(([x, y]) => Math.hypot(x, y) < r * 0.6)) continue;   // the shaft bore and its insert: never seen, and they z-fight the squashed top
+    if (isPtr) { sets.ptr.push(...p.flatMap(([x, y, z]) => [x * PW, Math.min(y, r - BEV - 0.35), z - zTop + zT])); continue; }
+    const out = p.map(([x, y, z]) => {
+      const rim = near(z, zTop) && Math.hypot(x, y) > r * 0.99;
+      if (rim && isTop) return [...ring(x, y, r - BEV), zT];         // the flat top shrinks inside the bevel
+      if (rim) return [x, y, zT - BEV];                                // the sides stop below it
+      return [x, y, z * SQ];
+    });
+    if (!isTop) {   // the side facets' top edges, to hang the bevel on
+      const top = p.filter(([x, y, z]) => near(z, zTop) && Math.hypot(x, y) > r * 0.99);
+      if (top.length === 2) edges.set(top.map(([x, y]) => x.toFixed(3) + ',' + y.toFixed(3)).sort().join('|'), top);
+    }
+    sets[isTop ? 'top' : 'body'].push(...out.flat());
+  }
+  for (const [[ax, ay], [bx, by]] of edges.values()) {
+    const lo = (x, y) => [x, y, zT - BEV], hi = (x, y) => [...ring(x, y, r - BEV), zT];
+    // wind outward: (a, b) counter-clockwise seen from outside
+    const ccw = ax * by - ay * bx > 0, [p, q] = ccw ? [[ax, ay], [bx, by]] : [[bx, by], [ax, ay]];
+    sets.top.push(...lo(...p), ...lo(...q), ...hi(...q), ...lo(...p), ...hi(...q), ...hi(...p));
   }
   const s = (KR + 1) / r, geo = (a) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.scale(s, s, s); g.computeVertexNormals(); return g; };
   return { body: geo(sets.body), top: geo(sets.top), ptr: geo(sets.ptr), h: Math.max(...sets.ptr.filter((_, i) => i % 3 === 2)) * s };
