@@ -275,6 +275,7 @@ const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.1
 // nub, and a triangle on top. The 50k-triangle original is simplified to ~5.6k offline (its top's shallow triangle
 // recess flattened first, and drawn back here as a white inlay). Smooth-shaded with creases kept, squashed to SQ of
 // its height, scaled so the skirt is KR + 2 across. Its pointer lies along +y, so the value-to-angle mapping is unchanged.
+const TRI_BUMP = 6;   // how deep the Yamaha's pressed-in triangle reads
 const KNOB = await (async () => {
   const buf = await (await fetch(new URL('../../models/yamaha-knob.stl', import.meta.url))).arrayBuffer();
   const dv = new DataView(buf), n = dv.getUint32(80, true), SQ = 0.7, TRI = [[0, 3.03], [-2.02, -3.03], [2.02, -3.03]];
@@ -317,7 +318,15 @@ const KNOB = await (async () => {
   }
   const z = zTop + 0.03, tri = new THREE.BufferGeometry();
   tri.setAttribute('position', new THREE.Float32BufferAttribute(TRI.flatMap(([x, y]) => [x, y, z]), 3)); tri.computeVertexNormals(); tri.scale(s, s, s * SQ);
-  return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, h: z * s * SQ };
+  // v0.35.3 (Johnny): the triangle is pressed into the cap (a negative bump, the knob's own colour), not inked: a
+  // square patch of top over it carries a bump map with the triangle sunk in, softened at its walls
+  const PAD = 1.2, xs = TRI.map((q) => q[0]), ys = TRI.map((q) => q[1]), bw = Math.max(...xs) - Math.min(...xs) + 2 * PAD, bh = Math.max(...ys) - Math.min(...ys) + 2 * PAD;
+  const rc = document.createElement('canvas'); rc.width = rc.height = 256; const rx = rc.getContext('2d');
+  rx.fillStyle = '#808080'; rx.fillRect(0, 0, 256, 256); rx.filter = 'blur(2.5px)'; rx.fillStyle = '#000';
+  rx.beginPath(); TRI.forEach(([x, y], i) => { const u = (x - Math.min(...xs) + PAD) / bw * 256, v = (1 - (y - Math.min(...ys) + PAD) / bh) * 256; i ? rx.lineTo(u, v) : rx.moveTo(u, v); }); rx.closePath(); rx.fill(); rx.filter = 'none';
+  const recessTex = new THREE.CanvasTexture(rc), recess = new THREE.PlaneGeometry(bw, bh);
+  recess.translate((Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2, zTop + 0.02); recess.scale(s, s, s * SQ);
+  return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, recess, recessTex, h: z * s * SQ };
 })();
 // the odd one out (v0.32.3, Johnny): the filter knob is a mismatched spare, a pink standard round knob: a thin skirt,
 // a knurled grip, a bevelled, slightly domed top and a white line. Its line points along +y like the others.
@@ -413,14 +422,17 @@ function makeKnob(cx, cy, o) {
   const R = rng(knobs.length * 7919 + 13), wear = knobWear[R() * knobWear.length | 0].clone();
   wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
   const sec = BOXR[BOXR.length - 1]; if (sec) sec.knobs = true; const secKey = sec ? boxKey(sec) : '';
-  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(), mPtr = mat.white.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
+  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(), mPtr = mat.white.clone();
+  const mRec = mat.knobTop.clone(); mRec.bumpMap = KNOB.recessTex; mRec.bumpScale = TRI_BUMP; mRec.polygonOffset = true; mRec.polygonOffsetFactor = -1; mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
   // the usual knob, and for the filter knob (o.odd) also the mismatched pink spare (v0.32.3), shown unless OCD is past 50
   const std = new THREE.Group(), styles = {};
   const styleG = (id) => {   // v0.35.0: built the first time a style is picked, then kept
     if (styles[id]) return styles[id]; const G = KSTYLES[id].g, sg = new THREE.Group();
     const body = new THREE.Mesh(G.body, mBody); body.castShadow = true; body.receiveShadow = true; sg.add(body);
     if (G.top) { const top = new THREE.Mesh(G.top, mTop); top.castShadow = true; sg.add(top); }
-    const ptr = new THREE.Mesh(G.ptr, mPtr); sg.add(ptr); return styles[id] = sg;
+    if (G.recess) { const r = new THREE.Mesh(G.recess, mRec); r.receiveShadow = true; sg.add(r); }
+    else { const ptr = new THREE.Mesh(G.ptr, mPtr); sg.add(ptr); }
+    return styles[id] = sg;
   };
   let curStyle = null; const setStyle = (id) => { if (id === curStyle) return; if (curStyle) std.remove(styles[curStyle]); std.add(styleG(id)); curStyle = id; };
   setStyle(kstyle());
@@ -435,7 +447,7 @@ function makeKnob(cx, cy, o) {
   const spin = new THREE.Group(); spin.add(std); if (oddG) spin.add(oddG); tiltG.add(spin); g.add(tiltG); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle,
     colour: () => { const c = look.knobCol[secKey]; mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color); if (c) mTop.color.multiplyScalar(1.08);
-      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); },   // a pale knob gets a black line
+      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); mRec.color.copy(mTop.color); },   // a pale knob gets a black line
     clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
     mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
     if (oddG) { oddG.visible = c < 0.5; std.visible = !oddG.visible; }
