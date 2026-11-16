@@ -496,3 +496,11 @@ function densLive() {
 }
 // v0.22.8: RND beside Density and Complexity runs Generate with both (Johnny)
 document.getElementById('sq-rnd').onclick = () => document.getElementById('p-rnd').click();
+// the scale (state.scale, read by seqMsg): set from the 2D sidebar or the 3D sequencer page, then sent to the engine
+const sqScaleSel = document.getElementById('sqScale'), sqScaleOn = document.getElementById('sqScaleOn');
+SCALE_LIST.forEach((x, i) => sqScaleSel.add(new Option(x.name, i)));
+function syncScale() { sqScaleSel.value = state.scale.i; sqScaleOn.checked = state.scale.on; }
+function setScale(p) { Object.assign(state.scale, p); syncScale(); post(seqMsg()); save(); }
+sqScaleSel.onchange = () => setScale({ i: +sqScaleSel.value });
+sqScaleOn.onchange = () => setScale({ on: sqScaleOn.checked });
+syncScale();

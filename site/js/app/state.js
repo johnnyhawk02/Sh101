@@ -43,6 +43,17 @@ state.v = 2; state.bend = { ...stockBend(), ...(state.bend || {}) }; state.br = 
 state.params = { ...defaults, ...migrateCmp(state.params) };
 state.fx = { ...FX_OFF(), ...(state.fx || {}) };
 // pattern slots (from the 303 app's banks): 8 patterns, edits save to the selected slot, ctrl/right-click or long-press chains them
+// the sequencer's scale: a played note during a run snaps the pattern's steps to it (engine qScale); label is the short name on the panel
+const SCALE_LIST = [
+  { label: 'MAJOR', name: 'Major', s: [0, 2, 4, 5, 7, 9, 11] }, { label: 'MINOR', name: 'Minor', s: [0, 2, 3, 5, 7, 8, 10] },
+  { label: 'DORIAN', name: 'Dorian', s: [0, 2, 3, 5, 7, 9, 10] }, { label: 'PHRYG', name: 'Phrygian', s: [0, 1, 3, 5, 7, 8, 10] },
+  { label: 'MIXO', name: 'Mixolydian', s: [0, 2, 4, 5, 7, 9, 10] }, { label: 'MIN PENT', name: 'Minor pentatonic', s: [0, 3, 5, 7, 10] },
+  { label: 'MAJ PENT', name: 'Major pentatonic', s: [0, 2, 4, 7, 9] }, { label: 'BLUES', name: 'Blues', s: [0, 3, 5, 6, 7, 10] },
+  { label: 'HARM MIN', name: 'Harmonic minor', s: [0, 2, 3, 5, 7, 8, 11] }, { label: 'WHOLE', name: 'Whole tone', s: [0, 2, 4, 6, 8, 10] },
+];
+state.scale = { i: 0, on: false, ...(state.scale || {}) };
+if (!(state.scale.i >= 0 && state.scale.i < SCALE_LIST.length)) state.scale.i = 0;
+state.scale.on = !!state.scale.on;
 const SLOTS = 8;
 const slotOf = st => ({ steps: JSON.parse(JSON.stringify(st.steps)), swing: st.params ? st.params.swing : 0, gateLen: st.params ? st.params.gateLen : .5 });
 if (!Array.isArray(state.slots) || state.slots.length !== SLOTS) {

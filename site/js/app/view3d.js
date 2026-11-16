@@ -403,6 +403,12 @@ const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, 
   makeKey(gn.cx(2), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('sq-rnd').click(), pad: 10, tag: 'rnd' }); labelAt(() => 'NEW', gn.cx(2), gn.y0 + LY);
   makeKey(gn.cx(3), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('p-undo').click(), pad: 10, tag: 'undo' });
   labelAt(() => 'UNDO', gn.cx(3), gn.y0 + LY, { dim: () => document.getElementById('p-undo').disabled });
+  // the scale: SCALE steps through the list (its name under the key), APPLY ticks Apply scale on MIDI note
+  const sc = box(13, 0, 5, 1, 'SCALE');
+  makeKey(sc.cx(1), sc.y0 + KEYY, 24, 14, { on: () => false, press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), pad: 10, tag: 'scale' });
+  labelAt(() => SCALE_LIST[state.scale.i].label, sc.cx(1), sc.y0 + LY);
+  makeKey(sc.cx(3), sc.y0 + KEYY, 24, 14, { on: () => state.scale.on, press: () => setScale({ on: !state.scale.on }), pad: 10, tag: 'scaleOn' });
+  labelAt(() => 'APPLY', sc.cx(3), sc.y0 + LY);
 }
 // the menus as rows of keys: [heading, [label, id]...] per column
 const keyList = (b, colsDef) => colsDef.forEach((list, ci) => {
@@ -547,7 +553,7 @@ function repaintPrint() {
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') : '');
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + '|' + state.scale.i + state.scale.on : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
