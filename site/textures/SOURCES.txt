@@ -1,0 +1,7 @@
+Bump textures for Shyoy. Both from ambientCG (https://ambientcg.com), CC0 1.0 Universal (public domain).
+Licence: https://docs.ambientcg.com/license/  (CC0: https://creativecommons.org/publicdomain/zero/1.0/)
+
+scuffs.jpg  <- SurfaceImperfections014, 1K-JPG, Displacement map (greyscale, 1024x1024)
+              https://ambientcg.com/view?id=SurfaceImperfections014
+dents.jpg   <- Metal049C, 1K-JPG, Displacement map (greyscale, 1024x1024)
+              https://ambientcg.com/view?id=Metal049C
