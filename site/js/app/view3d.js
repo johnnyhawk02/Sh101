@@ -530,11 +530,12 @@ logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); 
 // OPTIONS > STICKERS turns each on or off (look.stickers); OCD peels them off.
 const STICKER_BUMP = PANEL_BUMP * 1.6;
 const STICKERS = [
-  { id: 'smile', name: 'SMILEY', cx: W - 44, cy: 46, size: 66, rot: 12 },
-  { id: 'wink', name: 'WINK', cx: 22, cy: H - 18, size: 50, rot: -18 },
-  { id: 'dizzy', name: 'DIZZY', cx: W - 16, cy: H * 0.56, size: 46, rot: 25 },
-  { id: 'heart', name: 'HEART', cx: W * 0.43, cy: H - 8, size: 44, rot: -10 },
-  { id: 'star', name: 'STAR', cx: 14, cy: 132, size: 46, rot: 8 },
+  // v0.33.3 (Johnny): all about half as big again
+  { id: 'smile', name: 'SMILEY', cx: W - 58, cy: 58, size: 100, rot: 12 },
+  { id: 'wink', name: 'WINK', cx: 30, cy: H - 26, size: 76, rot: -18 },
+  { id: 'dizzy', name: 'DIZZY', cx: W - 22, cy: H * 0.56, size: 70, rot: 25 },
+  { id: 'heart', name: 'HEART', cx: W * 0.43, cy: H - 12, size: 66, rot: -10 },
+  { id: 'star', name: 'STAR', cx: 20, cy: 136, size: 70, rot: 8 },
 ];
 function drawSticker(x, id, n, R) {   // on an n x n canvas
   const c = n / 2, r = n * 0.40;
@@ -619,7 +620,7 @@ function stickerBump(st, own, p) {   // the page's wear under the sticker plus t
 // edge and re-samples the wear under it.
 const stkPlace = (st) => { const q = look.stk[st.id] || {}; return { cx: q.x ?? st.cx, cy: q.y ?? st.cy, size: st.size * (q.s ?? 1), rot: q.r ?? st.rot }; };
 const stickers = STICKERS.map((st, k) => {
-  const n = 256, src = document.createElement('canvas'); src.width = src.height = n; const sx = src.getContext('2d');
+  const n = 384, src = document.createElement('canvas'); src.width = src.height = n; const sx = src.getContext('2d');
   const R = rng(777 + k); drawSticker(sx, st.id, n, R); const own = stickerWear(sx, n, R);
   const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
@@ -1076,7 +1077,7 @@ opt.body.innerHTML = `
   <div class="pane" data-pane="stickers">
   <div class="f"><label class="chk"><input type="checkbox" id="o3-stkon"> SHOW STICKERS</label></div>
   <div class="f" id="o3-stklist"><span>STICKERS</span>${STICKERS.map((st) => `<div class="stk" data-sk="${st.id}"><button data-st="${st.id}"><i></i>${st.name}</button>
-    <label>SIZE<input type="range" data-k="s" min="40" max="250" aria-label="${st.name} size"><i></i></label>
+    <label>SIZE<input type="range" data-k="s" min="40" max="300" aria-label="${st.name} size"><i></i></label>
     <label>ACROSS<input type="range" data-k="x" min="0" max="${W}" aria-label="${st.name} across"><i></i></label>
     <label>HEIGHT<input type="range" data-k="y" min="0" max="${H}" aria-label="${st.name} up or down"><i></i></label>
     <label>TURN<input type="range" data-k="r" min="-180" max="180" aria-label="${st.name} turn"><i></i></label></div>`).join('')}
