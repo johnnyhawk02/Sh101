@@ -18,9 +18,10 @@ const root = document.documentElement;
 
 // ---------------------------------------------------------------- look (Options): panel colour, lighting, finish, lens
 const LOOK_KEY = 'shyoy.look3d';
-const LOOK0 = { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4 };   // + lights (v0.31.0), filled from the preset
+const LOOK0 = { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4, tilt: 3 };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0 };
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
+if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 // three lights (v0.31.0): each { col, int, az (orbit round the panel, degrees, 0 = from the right, 90 = from the top),
 // el (height above the panel, degrees) }. All three cast shadows; 2 and 3 start low from the left and right. A lighting preset sets all three; then each
 // can be changed in OPTIONS. Older saved looks get theirs from their preset.
@@ -296,14 +297,16 @@ function makeKnob(cx, cy, o) {
   const body = new THREE.Mesh(KNOB.body, mBody); body.castShadow = true; body.receiveShadow = true;
   const top = new THREE.Mesh(KNOB.top, mTop); top.castShadow = true;
   const ptr = new THREE.Mesh(KNOB.ptr, mat.white);
-  const spin = new THREE.Group(); spin.add(body, top, ptr); g.add(spin); grp.add(g);
-  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
+  // a pot's shaft is never quite square to the panel (v0.31.5): each leans its own way, by up to look.tilt degrees
+  const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
+  const spin = new THREE.Group(); spin.add(body, top, ptr); tiltG.add(spin); g.add(tiltG); grp.add(g);
+  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); },  ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
     const v = knobVal(id); if (v === k.shown) return false;
     k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; return true;
   };
-  addCtl(k); knobs.push(k); return k;
+  k.tilt(look.tilt); addCtl(k); knobs.push(k); return k;
 }
 function makeKey(cx, cy, w, h, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
@@ -681,6 +684,7 @@ function applyLook() {
     lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
   });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
+  for (const k of knobs) k.tilt(look.tilt);
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
@@ -856,6 +860,7 @@ opt.body.innerHTML = `
     <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
     <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
+  <div class="f"><span>KNOB TILT</span><div class="row"><input type="range" min="0" max="80" id="o3-tilt" aria-label="Knob tilt"><b class="val" id="o3-tiltv"></b></div></div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
@@ -871,6 +876,7 @@ function drawOpt() {
       if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
     });
   });
+  $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
   sheetVars();
 }
@@ -885,6 +891,7 @@ opt.body.querySelectorAll('.lamp [data-k]').forEach((inp) => inp.oninput = () =>
 opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
+$o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: presetLights(LOOK0.light), lv: 2 }); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
