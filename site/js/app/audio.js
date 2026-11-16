@@ -33,7 +33,8 @@ function seqMsg() {
     for (const k of state.chain) { chainOffs.push(steps.length); steps = steps.concat(k === state.slot ? state.steps : slotSteps(k)); }
     chainOffs.push(steps.length);
   }
-  return { type: 'seq', seq: { steps, length: steps.length, bpm: state.bpm, swing: p.swing, gateLen: 0.1 + p.gateLen * 0.85 } };
+  const scale = state.scale.on ? SCALE_LIST[state.scale.i].s : null;
+  return { type: 'seq', seq: { steps, length: steps.length, bpm: state.bpm, swing: p.swing, gateLen: 0.1 + p.gateLen * 0.85, scale } };
 }
 function pushFx() { post({ type: 'fxknobs', k: fxKnobs(state.params) }); for (const n of FX_UNITS) post({ type: 'fx', name: n, on: !!state.fx[n] }); }
 function pushAll() { pushFx(); post({ type: 'seq101', steps: state.s101 || [] }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); post(seqMsg()); }

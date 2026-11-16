@@ -83,7 +83,7 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
-### Sequencer page tidy-up (v0.27.1)
+### Sequencer page tidy-up (v0.27.1, merged as v0.28.3)
 
 The 3D sequencer page lines up with the grid: the roll is 13 columns and the Randomise and Tools boxes sit under the
 logo (5 columns), each menu group in its own column with the keys spread evenly down the box; the pattern keys have

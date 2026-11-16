@@ -111,6 +111,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.arp = 0; this.seqMode = 0; this.hold = false; this.arpNotes = []; this.arpIdx = -1; this.arpDir = 1; this.allUp = true;
     this.s101 = []; this.s101Idx = 0; this.s101Tr = 0;
     this.running = false; this.stepIdx = 0; this.n16 = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.transpose = 0;
+    this.keyed = false; // a note has been played during the run (the scale applies)
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
@@ -152,7 +153,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'seq101': this.s101 = m.steps || []; if (this.s101Idx >= this.s101.length) this.s101Idx = 0; break;
       case 'run':
         if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.n16 = 0; this.nextStepAt = this.t; this.lastSlide = false; }
-        else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.transpose = 0; }
+        else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.transpose = 0; this.keyed = false; }
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
       case 'reset': this.vc = 0; this.s.fill(0); this.tl.fill(1); this.ve = 0; this.ltri = 0; break;
@@ -202,9 +203,16 @@ class KestrelProcessor extends AudioWorkletProcessor {
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
   lfoReset() { this.ltri = -this.C.hys * this.rail; this.lsq = -1; this.clockPending = true; }
   clockedMode() { return this.arp > 0 || this.seqMode === 2; }
+  // the nearest degree of the scale (semitones above the played note) to a step's pitch, in the same octave; ties go down
+  qScale(s) {
+    const sc = this.seq.scale, o = Math.floor(s / 12), pc = s - 12 * o;
+    let best = sc[0], bd = 99;
+    for (const d of sc) if (Math.abs(pc - d) < bd) { bd = Math.abs(pc - d); best = d; }
+    return 12 * o + best;
+  }
   keyOn(n, acc) {
     n += this.P.transpose * 12;
-    if (this.running) { this.transpose = n - 60; return; }
+    if (this.running) { this.transpose = n - 60; this.keyed = true; return; }
     if (this.seqMode === 2) { this.s101Tr = n - 60; return; }
     if (this.arp) {
       if (this.hold && this.keys.length === 0) this.arpNotes = [];
@@ -283,7 +291,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
     if (st.m === 'R' || (st.m === 'T' && !this.gate)) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else if (st.m === 'T') { this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen; this.lastSlide = !!st.s; }
     else {
-      const n = 48 + st.n + 12 * st.o + this.transpose;
+      // a note played during the run transposes the pattern; with Apply scale ticked, each step snaps to the chosen scale first
+      const s = st.n + 12 * st.o;
+      const n = 48 + (this.keyed && this.seq.scale ? this.qScale(s) : s) + this.transpose;
       if (this.lastSlide && this.gate) { this.setPitch(n, this.P.slide); this.accOn = st.a ? 1 : 0; }
       else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(st.a); }
       this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen;

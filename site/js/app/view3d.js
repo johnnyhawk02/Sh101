@@ -402,20 +402,24 @@ const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, 
   makeKey(gn.cx(3), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('p-undo').click(), pad: 10, tag: 'undo' });
   labelAt(() => 'UNDO', gn.cx(3), gn.y0 + LY, { dim: () => document.getElementById('p-undo').disabled });
 }
-// the menus as rows of keys: [heading, [label, id]...] per column
-// the menus as rows of keys: one column per group, [heading, [label, id]...]; the rows spread evenly down the box,
-// every column on the same row lines (v0.27.1 tidy)
-const keyList = (b, colsDef) => {
-  const n = Math.max(...colsDef.map((l) => l.length - 1)), cw = (b.bw - 28) / colsDef.length;
+// the menus as rows of keys: one column per group, [heading, entry...]; an entry is [label, id of the 2D button it clicks] or
+// { t: label or () => label, press, on, tag }. The rows spread evenly down the box, every column on the same row lines
+// (v0.27.1 tidy); ws: the columns' widths as shares of the box
+const keyList = (b, colsDef, ws) => {
+  const n = Math.max(...colsDef.map((l) => l.length - 1)), inner = b.bw - 28;
+  const W = ws || colsDef.map(() => 1), sum = W.reduce((p, q) => p + q, 0);
   const top = b.by + 30, pitch = Math.min(30, (b.by + b.bh - 18 - top) / n);
+  let x0 = b.bx + 22;
   colsDef.forEach(([head, ...list], ci) => {
-    const kx = b.bx + 14 + 8 + ci * cw;
+    const kx = x0, cw = inner * W[ci] / sum; x0 += cw;
     prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, head, kx - 8, top, 9.5, 'left'); x.globalAlpha = 1; });
-    list.forEach(([t, id], ri) => {
-      const ky = top + pitch * (ri + 1), el = () => document.getElementById(id);
-      const k = makeKey(kx, ky, 15, 10, { on: () => k.down, press: () => { const e = el(); if (e && !e.disabled) e.click(); }, pad: 2, tag: 'm:' + id });
+    list.forEach((en, ri) => {
+      const ky = top + pitch * (ri + 1);
+      const e = Array.isArray(en) ? { t: en[0], el: () => document.getElementById(en[1]), tag: 'm:' + en[1] } : en;
+      const press = e.press || (() => { const d = e.el(); if (d && !d.disabled) d.click(); });
+      const k = makeKey(kx, ky, 15, 10, { on: e.on || (() => k.down), press, pad: 2, tag: e.tag });
       k.rect = [kx - 12, ky - pitch / 2, cw - 4, pitch];
-      prints.push((x, ink) => { x.globalAlpha = el() && el().disabled ? 0.35 : 1; x.fillStyle = ink; text(x, t, kx + 13, ky + 0.5, 10.5, 'left'); x.globalAlpha = 1; });
+      prints.push((x, ink) => { x.globalAlpha = e.el && e.el() && e.el().disabled ? 0.35 : 1; x.fillStyle = ink; text(x, typeof e.t === 'function' ? e.t() : e.t, kx + 13, ky + 0.5, 10.5, 'left'); x.globalAlpha = 1; });
     });
   });
 };
@@ -423,10 +427,13 @@ keyList(box(13, 1, 5, 2, 'RANDOMISE'), [
   ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie']],
   ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']],
   ['PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']]]);
+// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, the second
+// ticks Apply scale on MIDI note
 keyList(box(13, 3, 5, 2, 'TOOLS'), [
   ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN', 'p-join']],
-  ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn']],
-  ['SHIFT', ['LEFT', 'rot-l'], ['RIGHT', 'rot-r']]]);
+  ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn'], ['SHIFT L', 'rot-l'], ['SHIFT R', 'rot-r']],
+  ['SCALE', { t: () => SCALE_LIST[state.scale.i].name.toUpperCase(), press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), on: () => false, tag: 'scale0' },
+    { t: 'ON MIDI NOTE', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' }]], [0.85, 0.95, 1.4]);
 // ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
 const RB = box(0, 1, 13, 4, 'PATTERN EDIT');
 const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
@@ -552,7 +559,7 @@ function repaintPrint() {
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot : ''); + state.slot;
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
@@ -696,7 +703,7 @@ opt.body.innerHTML = `
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
-  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-2d">2D VIEW</button><button id="o3-reset">RESET LOOK</button></div></div>`;
+  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
 function drawOpt() {
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
@@ -714,13 +721,16 @@ opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-$o('#o3-2d').onclick = () => { opt.close(); window.shyoyView('2d'); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
 const pb = sheet('PRESETS');
-pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-save">SAVE</button></div></div><div class="list" id="pb-list"></div>`;
+pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-roll" aria-label="Suggest another name">🎲</button><button id="pb-save">SAVE</button></div></div><div class="list" id="pb-list"></div>`;
+pb.body.querySelector('#pb-roll').onclick = () => {
+  prjBar.suggest(true);
+  pb.body.querySelector('#pb-name').value = document.getElementById('prj-name').value || '';
+};
 const prjSel = document.getElementById('prj-preset');
 function drawBrowser() {
   let h = '';
@@ -739,7 +749,15 @@ pb.body.querySelector('#pb-save').onclick = () => {
   const n = pb.body.querySelector('#pb-name').value.trim(); const ne = document.getElementById('prj-name');
   if (n) ne.value = n; document.getElementById('prj-save').click(); pb.body.querySelector('#pb-name').value = ''; drawBrowser(); dirty = true;
 };
-function openBrowser() { drawBrowser(); pb.body.querySelector('#pb-name').placeholder = 'SAVE AS… ' + (document.getElementById('prj-name').value || ''); pb.open(); }
+// the auto-namer (prjBar, from sounds.js) suggests a name in the save box, as the 2D preset bar does
+function openBrowser() {
+  drawBrowser();
+  const pn = pb.body.querySelector('#pb-name');
+  if (typeof prjBar !== 'undefined') prjBar.suggest(false);
+  pn.value = document.getElementById('prj-name').value || '';
+  pn.placeholder = 'SAVE AS…';
+  pb.open();
+}
 
 // ---------------------------------------------------------------- frame loop: draw only when something changed
 let live = true, drawn = 0;

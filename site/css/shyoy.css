@@ -457,6 +457,7 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu, .sq-bank > .sq-side + .rmenu { margin-left: 0; }
 .sq-bank > .sq-side { margin-left: auto; margin-right: calc(var(--gap) * 2); }
 .sq-side .sld { grid-template-columns: auto 120px 2.4em; }
+.sq-side .sq-tick { display: inline-flex; align-items: center; gap: .4em; white-space: nowrap; }
 .sq-side .sld output { text-align: left; }   /* v0.23.0: the value right by its bar, not a gap away */
 .sq-bank > .rmenu + .rmenu { margin-left: 0; }   /* v0.20.0: randomise depth moved into the pattern row */
 .rm-btn { text-transform: none; }   /* Johnny: the menu buttons read "Randomise ▾" and "Tools ▾" */
