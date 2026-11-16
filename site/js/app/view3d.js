@@ -20,13 +20,8 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
-// v0.36.2 (Johnny: "can't get it to light evenly and naturally"): NATURAL is a photographer's set-up: a big soft bulb
-// high over the front, a quiet room fill (ROOM: sky light + reflections) so shadows never go black, and two faint
-// side lights, cool and warm, for shape. It is the default, and OPTIONS > LIGHT > NATURAL brings it back.
-const NATURAL = { room: 0.7, lv: 4, lights: [{ col: '#fff6ea', int: 1.1, az: 105, el: 62, dist: 2400, soft: 12 }, { col: '#eef3ff', int: 0.35, az: 200, el: 30, soft: 16 }, { col: '#fff1e0', int: 0.25, az: 340, el: 30, soft: 16 }] };
 const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
-Object.assign(LOOK0, JSON.parse(JSON.stringify(NATURAL)), { bright: 1 });   // v0.36.2: the default lighting is NATURAL
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
 // 3 and 4 start empty. SAVE then a slot stores the current look there (localStorage shyoy.looks3d).
@@ -70,23 +65,10 @@ const deg = (r) => Math.round(r * 180 / Math.PI);
 function presetLights(name) {
   const L = LIGHTS[name] || LIGHTS.studio, [x, y, z] = L.dir, az = deg(Math.atan2(y, x)), hex = (c) => '#' + c.toString(16).padStart(6, '0');
   return [
-    { col: hex(L.col), int: 1.2, az: 100, el: 55, dist: 1400, soft: 6 },   // v0.36.1: light 1 is a point light (a bulb), with a distance
-    { col: L.fill || '#e6ecff', int: L.key * 0.7, az: 180, el: 32 },   // 2 and 3: very diffuse, from the left
-    { col: L.rim || '#fff0dc', int: L.key * 0.6, az: 0, el: 32 },      // and the right (Johnny)
+    { col: hex(L.col), int: L.key, az: (az + 360) % 360, el: deg(Math.atan2(z, Math.hypot(x, y))) },
+    { col: L.fill || '#e6ecff', int: 0.4, az: 160, el: 35 },   // v0.31.4: from the left side, low, with its own shadows
+    { col: L.rim || '#fff0dc', int: 0.35, az: 20, el: 35 },      // and from the right (Johnny)
   ];
-}
-// v0.35.5 (Johnny): "one ambient and two very diffuse left and right". Older rigs (lv 2) keep their colours and levels;
-// light 1 becomes the ambient (half its level), 2 and 3 move to the left and right sides
-function migLights(o) {
-  if (o.lv === 4) return o;
-  if (o.lv === 3 && Array.isArray(o.lights) && o.lights.length === 3) {   // v0.35.6 (Johnny): no lighting presets or brightness any more;
-    const L = LIGHTS[o.light] || LIGHTS.studio, b = typeof o.bright === 'number' ? o.bright : 1;   // the preset's sky light and the brightness go into the levels
-    o.lights[0].int = +Math.min(3, o.lights[0].int * b + L.hemi * b * 0.8).toFixed(2); o.lights[1].int = +Math.min(3, o.lights[1].int * b).toFixed(2); o.lights[2].int = +Math.min(3, o.lights[2].int * b).toFixed(2);
-    o.bright = 1; o.lv = 4; return o;
-  }
-  const l = Array.isArray(o.lights) && o.lights.length === 3 ? o.lights : presetLights(o.light);
-  o.lights = [{ col: l[0].col, int: Math.min(1, l[0].int * 0.45), az: 0, el: 90 }, { col: l[1].col, int: Math.max(0.8, l[1].int), az: 180, el: 32 }, { col: l[2].col, int: Math.max(0.8, l[2].int), az: 0, el: 32 }];
-  o.lv = 3; return migLights(o);
 }
 const saveLook = () => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} };
 const SWATCHES = ['#e4e2da', '#f4f3ef', '#b9bbb8', '#6c6e70', '#202122', '#c4352b', '#df7a2c', '#e6c24a', '#4e7b56', '#2f5c88', '#ef9fbf'];
@@ -97,11 +79,7 @@ const LIGHTS = {
   raking: { name: 'LOW SUN', dir: [-1, 0.22, 0.42], col: 0xfff3e2, key: 2.4, hemi: 0.45 },
   top: { name: 'OVERHEAD', dir: [0, 1, 0.6], col: 0xffffff, key: 1.8, hemi: 0.65 },
 };
-if (!Array.isArray(look.lights) || look.lights.length !== 3) { look.lights = presetLights(look.light); look.lv = 3; }
-const bulb = (l) => { if (l && Array.isArray(l.lights) && l.lights[0] && typeof l.lights[0].dist !== 'number') Object.assign(l.lights[0], { int: 1.2, az: 100, el: 55, dist: 1400, soft: 6 }); return l; };   // v0.36.1: light 1 becomes a bulb
-migLights(look);   // lv 3: ambient + two diffuse sides
-migLights(LOOK0); for (const l of [...LOOK_SLOTS0, ...lookSlots]) if (l) migLights(l);
-for (const l of [look, LOOK0, ...LOOK_SLOTS0, ...lookSlots]) bulb(l);
+if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // lv 2: side lights
 const FINISH = { matt: { name: 'MATT', r: 0.95, m: 0, e: 0.25 }, satin: { name: 'SATIN', r: 0.55, m: 0, e: 0.6 }, metal: { name: 'METAL', r: 0.42, m: 0.7, e: 1.1, brushed: true } };
 const lensFov = (u) => 6 * Math.pow(8, Math.max(0, Math.min(1, u)));   // 6° (flat) .. 48° (wide)
 
@@ -177,8 +155,8 @@ await Promise.race([logo.decode().catch(() => {}), new Promise((r) => setTimeout
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;   // v0.35.9: bright colours roll off like a camera instead of clipping to flat white
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;   // v0.35.5: plain PCF so shadow.radius blurs (very diffuse side lights) renderer.shadowMap.autoUpdate = false;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
 const cv = renderer.domElement; cv.id = 'v3d';
 document.body.appendChild(cv);
 
@@ -186,18 +164,14 @@ const scene = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(15, 1, 10, 100000);
-const hemi = new THREE.HemisphereLight(0xffffff, 0x303030, 1); hemi.position.set(0, 0.4, 1); scene.add(hemi);
-// v0.36.1 (Johnny: "use a point source, we aren't getting many shadows"): light 1 is a bulb at a distance, casting
-// shadows that fan out from it; no falloff with distance (decay 0), so moving it changes the shadows, not the brightness
-const amb = new THREE.PointLight(0xffffff, 0, 0, 0); amb.castShadow = true; amb.shadow.mapSize.set(512, 512); amb.shadow.bias = -0.0005; amb.shadow.normalBias = 1;
-amb.shadow.camera.near = 20; amb.shadow.camera.far = 9000; scene.add(amb);
-const key = new THREE.DirectionalLight(0xffffff, 0); key.castShadow = false;   // the old key light, now unused
+const hemi = new THREE.HemisphereLight(0xffffff, 0x303030, 1); scene.add(hemi);
+const key = new THREE.DirectionalLight(0xffffff, 2); key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.5; key.shadow.radius = 4;
 Object.assign(key.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 });
 scene.add(key, key.target);
-const lamps = [amb, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)];   // 1 a point light, 2 and 3 directional; all cast soft shadows
+const lamps = [key, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)];   // all three cast shadows (v0.31.4)
 for (const l of lamps.slice(1)) {
-  l.castShadow = true; l.shadow.mapSize.set(512, 512); l.shadow.bias = key.shadow.bias; l.shadow.normalBias = 1; l.shadow.radius = 9; l.shadow.blurSamples = 16;
+  l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = key.shadow.bias; l.shadow.normalBias = key.shadow.normalBias; l.shadow.radius = 5;
   Object.assign(l.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 }); scene.add(l, l.target);
 }
 
@@ -1006,11 +980,11 @@ function applyLook() {
   const F = FINISH[look.finish] || FINISH.satin;
   panelMat.roughness = F.r; panelMat.metalness = F.m; panelMat.envMapIntensity = F.e;
   const rm = F.brushed ? brushed : null; if (panelMat.roughnessMap !== rm) { panelMat.roughnessMap = rm; panelMat.needsUpdate = true; }
-  const b = 1, room = look.room ?? 0.7; hemi.intensity = room * 0.9; hemi.color.set(0xffffff); hemi.groundColor.set(0x3c3c3c);   // v0.36.2: ROOM fill (sky light + reflections)
+  const L = LIGHTS[look.light] || LIGHTS.studio, b = look.bright;
+  hemi.intensity = L.hemi * b; hemi.color.set(L.hemiCol || 0xffffff); hemi.groundColor.set(0x404040);
   look.lights.forEach((l, i) => {
     const a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, lamp = lamps[i];
-    lamp.color.set(l.col); lamp.intensity = l.int * b; lamp.shadow.radius = l.soft ?? 9;   // v0.36.0: SOFTNESS
-    if (!i) { const d = l.dist || 1400; lamp.position.set(Math.cos(a) * Math.cos(e) * d, Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d); return; }
+    lamp.color.set(l.col); lamp.intensity = l.int * b;
     lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
   });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
@@ -1023,12 +997,6 @@ function applyLook() {
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
-  // v0.35.7 (Johnny: "a hidden light that's always on"): the room reflection (scene.environment) lit everything whatever the
-  // lights said; it now goes with light 1, the ambient: full at 100% and above, none at 0, so all lights at 0 is dark
-  const envF = Math.min(1.3, room);
-  scene.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) if ('envMapIntensity' in m) {
-    if (m === panelMat) { m.envMapIntensity = F.e * envF; continue; }
-    if (m.userData.env0 === undefined) m.userData.env0 = m.envMapIntensity; m.envMapIntensity = m.userData.env0 * envF; } });
   printDirty = shadowDirty = dirty = true;
 }
 const pMasks = {};
@@ -1150,12 +1118,10 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
   box-shadow: inset 0 0 0 2px var(--v3d-ink), 0 20px 60px rgba(0,0,0,.55); padding: 34px 22px 16px; box-sizing: border-box; }
 .v3d-sheet h2 { position: absolute; top: 8px; left: 14px; margin: 0; font: 400 15px/1 ${DISPLAY}; letter-spacing: .04em; color: var(--v3d-paper); background: var(--v3d-ink); padding: 4px 9px 3px; }
 .v3d-sheet .x { position: absolute; top: 6px; right: 10px; width: 30px; height: 26px; }
-.v3d-sheet .lamp { display: grid; grid-template-columns: 16px 34px repeat(5, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 8px; font-size: 10px; letter-spacing: .06em; }
+.v3d-sheet .lamp { display: grid; grid-template-columns: 16px 34px repeat(3, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 8px; font-size: 10px; letter-spacing: .06em; }
 .v3d-sheet .lamp input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
 .v3d-sheet .lamp label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .lamp label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
 .v3d-sheet .lamp label i { font-style: normal; grid-row: 1; grid-column: 2; }
-.v3d-sheet .ldia { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .v3d-sheet .ldia canvas { width: 100%; height: auto; box-shadow: inset 0 0 0 1.5px var(--v3d-ink); border-radius: 3px; cursor: grab; }
-.v3d-sheet .lamp .amb { font-weight: 600; opacity: .55; grid-column: span 2; }
 .v3d-sheet .otab3 { display: flex; flex-wrap: wrap; gap: 0; margin: 4px 0 16px; border-bottom: 2px solid var(--v3d-ink); }
 .v3d-sheet .otab3 button { background: none; color: var(--v3d-ink); border-radius: 3px 3px 0 0; padding: 8px 12px 7px; opacity: .6; }
 .v3d-sheet .otab3 button.lit { background: var(--v3d-ink); color: var(--v3d-paper); opacity: 1; }
@@ -1230,16 +1196,12 @@ opt.body.innerHTML = `
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   </div>
   <div class="pane" data-pane="light">
-  <div class="f"><span>FROM ABOVE · FROM THE SIDE</span><div class="ldia"><canvas id="o3-ltop" width="560" height="300" aria-label="Lights seen from above: drag a light round the panel"></canvas><canvas id="o3-lside" width="560" height="300" aria-label="Lights seen from the side: drag a light up or down"></canvas></div>
-    <p class="hint">DRAG A LIGHT: ROUND THE PANEL ON THE LEFT, UP AND DOWN ON THE RIGHT. LIGHT 1 IS A BULB: DRAG IT IN OR OUT FOR DISTANCE.</p></div>
-  <div class="f"><span>ROOM</span><div class="row"><input type="range" min="0" max="150" id="o3-room" aria-label="Room fill light"><b class="val" id="o3-roomv"></b><button id="o3-natural">NATURAL</button></div>
-    <p class="hint">ROOM IS THE SOFT LIGHT FROM EVERYWHERE THAT KEEPS SHADOWS FROM GOING BLACK. NATURAL SETS AN EVEN, PHOTO-STUDIO LIGHTING.</p></div>
+  <div class="f"><span>LIGHTING</span><div class="row" id="o3-light">${Object.entries(LIGHTS).map(([k, l]) => `<button data-l="${k}"><i></i>${l.name}</button>`).join('')}</div>
+    <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
     <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
     <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
-    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label>
-    <label>SOFTNESS<input type="range" data-k="soft" min="0" max="24" aria-label="Light ${i + 1} shadow softness"><i></i></label>
-    ${i ? '' : `<label>DISTANCE<input type="range" data-k="dist" min="250" max="3000" step="10" aria-label="Light 1 distance"><i></i></label>`}</div>`).join('')}</div>
+    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
@@ -1272,23 +1234,22 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'room', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
   $o('#o3-lsave').classList.toggle('lit', lookSaving); $o('#o3-lsave').textContent = lookSaving ? 'PICK A SLOT' : 'SAVE…';
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
+  opt.body.querySelectorAll('[data-l]').forEach((b) => b.classList.toggle('lit', b.dataset.l === look.light));
   opt.body.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('lit', b.dataset.f === look.finish));
-  $o('#o3-col').value = look.colour;
+  $o('#o3-col').value = look.colour; $o('#o3-bright').value = Math.round(look.bright * 100); $o('#o3-brightv').textContent = Math.round(look.bright * 100) + '%';
   opt.body.querySelectorAll('.lamp').forEach((d) => {
     const l = look.lights[+d.dataset.i];
     d.querySelectorAll('[data-k]').forEach((inp) => {
-      const k = inp.dataset.k, v = k === 'soft' ? (l.soft ?? 9) : l[k]; inp.value = k === 'int' ? Math.round(l.int * 100) : v;
-      if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : k === 'soft' || k === 'dist' ? v : v + '°';
+      const k = inp.dataset.k; inp.value = k === 'int' ? Math.round(l.int * 100) : l[k];
+      if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
     });
   });
-  $o('#o3-room').value = Math.round((look.room ?? 0.7) * 100); $o('#o3-roomv').textContent = Math.round((look.room ?? 0.7) * 100) + '%';
-  drawLDia();
   opt.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('lit', b.dataset.tab === optTab));
   opt.body.querySelectorAll('[data-pane]').forEach((d) => { d.hidden = d.dataset.pane !== optTab; });
   opt.body.querySelectorAll('[data-st]').forEach((b) => b.classList.toggle('lit', look.stickers.includes(b.dataset.st)));
@@ -1315,16 +1276,20 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
   // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look); migLights(look); bulb(look); saveLook(); applyLook(); drawOpt();
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look);
+  if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // looks saved with the v0.35.5-0.36.2 lights
+  saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
 $o('#o3-col').oninput = (e) => setLook('colour', e.target.value);
+opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => { look.lights = presetLights(b.dataset.l); setLook('light', b.dataset.l); });
 opt.body.querySelectorAll('.lamp [data-k]').forEach((inp) => inp.oninput = () => {
   const l = look.lights[+inp.closest('.lamp').dataset.i], k = inp.dataset.k;
   l[k] = k === 'col' ? inp.value : k === 'int' ? inp.value / 100 : +inp.value; setLook('lights', look.lights);
 });
 opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
+$o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 opt.body.querySelectorAll('[data-st]').forEach((b) => b.onclick = () => setLook('stickers', [b.dataset.st]));
 opt.body.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => { optTab = b.dataset.tab; try { localStorage.setItem('shyoy.opttab3d', optTab); } catch (e) {} drawOpt(); });
@@ -1352,64 +1317,9 @@ $o('#o3-oddrnd').onclick = () => {   // a different synth-page knob each time
   look.oddOn = true; setLook('oddK', pool[Math.random() * pool.length | 0]);
 };
 $o('#o3-oddcut').onclick = () => setLook('oddK', -1);
-$o('#o3-room').oninput = (e) => setLook('room', e.target.value / 100);
-$o('#o3-natural').onclick = () => { const n = JSON.parse(JSON.stringify(NATURAL)); look.lights = n.lights; look.lv = 4; setLook('room', n.room); };
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
-// v0.36.0 (Johnny): the lights as diagrams. Left, the panel from above (it lies flat, its top edge away from you) with
-// lights 2 and 3 round it at their ORBIT; right, from the side, each light at its HEIGHT over the panel's edge on its side.
-// Drag a light on either to move it. The ambient (light 1) has no direction, so it isn't drawn.
-const LD = { top: $o('#o3-ltop'), side: $o('#o3-lside') };
-function ldGeom(cv) { const w = cv.width, h = cv.height; return cv === LD.top ? { cx: w / 2, cy: h / 2, R: Math.min(w, h) * 0.44, pw: Math.min(w * 0.5, h * 0.62 * W / H), ph: Math.min(w * 0.5, h * 0.62 * W / H) * H / W } : { cx: w / 2, cy: h - 34, R: Math.min(w / 2 - 24, h - 56) }; }
-const DMAX = 3000;   // light 1's distance at the diagrams' rim
-function ldPos(cv, l) {
-  const g = ldGeom(cv), a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, r = l.dist ? g.R * l.dist / DMAX : g.R;
-  if (cv === LD.top) { const h = l.dist ? r * Math.cos(e) : r; return [g.cx + Math.cos(a) * h, g.cy - Math.sin(a) * h]; }
-  const sd = Math.cos(a) >= 0 ? 1 : -1; return [g.cx + sd * Math.cos(e) * r, g.cy - Math.sin(e) * r];
-}
-function drawLDia() {
-  const ink = curInk, faint = ink === '#000000' ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.3)';
-  for (const cv of [LD.top, LD.side]) {
-    const x = cv.getContext('2d'), g = ldGeom(cv); x.clearRect(0, 0, cv.width, cv.height); x.lineWidth = 2; x.font = `600 18px ${MONO}`; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.strokeStyle = faint; x.setLineDash([4, 6]); x.beginPath();
-    if (cv === LD.top) x.arc(g.cx, g.cy, g.R, 0, 7); else x.arc(g.cx, g.cy, g.R, Math.PI, 2 * Math.PI);
-    x.stroke(); x.setLineDash([]);
-    x.fillStyle = look.colour; x.strokeStyle = ink;
-    if (cv === LD.top) { x.fillRect(g.cx - g.pw / 2, g.cy - g.ph / 2, g.pw, g.ph); x.strokeRect(g.cx - g.pw / 2, g.cy - g.ph / 2, g.pw, g.ph);
-      x.fillStyle = ink; x.font = `600 14px ${MONO}`; x.fillText('PANEL', g.cx, g.cy); x.fillText('FRONT', g.cx, g.cy + g.ph / 2 + 16); x.font = `600 18px ${MONO}`; }
-    else { x.fillRect(g.cx - g.R * 0.75, g.cy, g.R * 1.5, 12); x.strokeRect(g.cx - g.R * 0.75, g.cy, g.R * 1.5, 12); x.fillStyle = ink; x.font = `600 14px ${MONO}`; x.fillText('LEFT', g.cx - g.R * 0.75, g.cy + 26); x.fillText('RIGHT', g.cx + g.R * 0.75, g.cy + 26); x.font = `600 18px ${MONO}`; }
-    look.lights.forEach((l, i) => {
-      const [px, py] = ldPos(cv, l), tx = cv === LD.top ? g.cx : g.cx + (px > g.cx ? 1 : -1) * g.R * 0.2, ty = cv === LD.top ? g.cy : g.cy;
-      const grd = x.createLinearGradient(px, py, tx, ty); grd.addColorStop(0, l.col); grd.addColorStop(1, 'rgba(0,0,0,0)');
-      x.strokeStyle = grd; x.lineWidth = 6 + (l.soft ?? 9) * 0.8; x.globalAlpha = 0.55; x.beginPath(); x.moveTo(px, py); x.lineTo(tx, ty); x.stroke(); x.globalAlpha = 1;
-      x.fillStyle = l.col; x.strokeStyle = ink; x.lineWidth = 2; x.beginPath(); x.arc(px, py, 15, 0, 7); x.fill(); x.stroke();
-      x.fillStyle = lum(l.col) > 0.35 ? '#000' : '#fff'; x.fillText(String(i + 1), px, py + 1);
-    });
-  }
-}
-for (const cv of [LD.top, LD.side]) {
-  let drag = -1;
-  const at = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
-  cv.style.touchAction = 'none';
-  cv.addEventListener('pointerdown', (e) => {
-    const [mx, my] = at(e); let best = 40, bi = -1;
-    look.lights.forEach((l, i) => { const [px, py] = ldPos(cv, l), d = Math.hypot(px - mx, py - my); if (d < best) { best = d; bi = i; } });
-    if (bi < 0) return; drag = bi; cv.setPointerCapture(e.pointerId); e.preventDefault();
-  });
-  cv.addEventListener('pointermove', (e) => {
-    if (drag < 0) return; const [mx, my] = at(e), g = ldGeom(cv), l = look.lights[drag];
-    if (cv === LD.top) { l.az = (Math.round(Math.atan2(g.cy - my, mx - g.cx) * 180 / Math.PI) + 360) % 360;
-      if (l.dist) { const h = Math.hypot(mx - g.cx, my - g.cy) / g.R * DMAX; l.dist = Math.round(Math.max(250, Math.min(DMAX, h / Math.max(0.05, Math.cos(l.el * Math.PI / 180))))); } }
-    else {
-      const dx = mx - g.cx, el = Math.round(Math.atan2(Math.max(0, g.cy - my), Math.abs(dx)) * 180 / Math.PI); l.el = Math.max(3, Math.min(90, el));
-      if (l.dist) l.dist = Math.round(Math.max(250, Math.min(DMAX, Math.hypot(dx, g.cy - my) / g.R * DMAX)));
-      const right = Math.cos(l.az * Math.PI / 180) >= 0; if ((dx >= 0) !== right) l.az = (540 - l.az) % 360;   // dragged over the top: the other side
-    }
-    setLook('lights', look.lights);
-  });
-  for (const ev of ['pointerup', 'pointercancel']) cv.addEventListener(ev, () => { drag = -1; });
-}
 function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
