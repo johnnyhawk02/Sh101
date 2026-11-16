@@ -20,7 +20,7 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, lv: 2,
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, ocd: 0, stickers: ['smile'], lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
@@ -36,6 +36,8 @@ let lookSaving = false;
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
 if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
+if (typeof look.ocd !== 'number') look.ocd = 0;
+if (!Array.isArray(look.stickers)) look.stickers = ['smile'];
 // three lights (v0.31.0): each { col, int, az (orbit round the panel, degrees, 0 = from the right, 90 = from the top),
 // el (height above the panel, degrees) }. All three cast shadows; 2 and 3 start low from the left and right. A lighting preset sets all three; then each
 // can be changed in OPTIONS. Older saved looks get theirs from their preset.
@@ -126,7 +128,7 @@ const domLabel = (id) => { const l = document.querySelector(`label[for="f-${id}"
 const progOf = () => RV_PROG[REV_IDS[Math.max(0, Math.min(3, state.params.revtype | 0))]];
 
 // ---------------------------------------------------------------- renderer, scene
-await Promise.race([Promise.all([document.fonts.load(`600 12px ${MONO}`), document.fonts.load(`400 14px ${DISPLAY}`), document.fonts.load(`14px "Permanent Marker"`)]), new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
+await Promise.race([Promise.all([document.fonts.load(`600 12px ${MONO}`), document.fonts.load(`400 14px ${DISPLAY}`)]), new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
 const logo = new Image(); logo.src = 'icons/logo.png';
 await Promise.race([logo.decode().catch(() => {}), new Promise((r) => setTimeout(r, 2500))]);
 
@@ -333,26 +335,30 @@ function makeKnob(cx, cy, o) {
   const R = rng(knobs.length * 7919 + 13), wear = knobWear[R() * knobWear.length | 0].clone();
   wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
   const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
-  let body, top, ptr;
-  if (o.odd) {   // the mismatched one (v0.32.3): a pink standard knob, fitted later, see PINK below
-    const mp = mat.pink.clone(); mp.bumpMap = wear; mp.bumpScale = KNOB_BUMP * depth * 0.4;
-    body = new THREE.Mesh(PINK.body, mp); body.castShadow = true; body.receiveShadow = true;
-    top = new THREE.Group(); ptr = new THREE.Mesh(PINK.ptr, mat.white); ptr.castShadow = true;
-  } else {
-    body = new THREE.Mesh(KNOB.body, mBody); body.castShadow = true; body.receiveShadow = true;
-    top = new THREE.Mesh(KNOB.top, mTop); top.castShadow = true;
-    ptr = new THREE.Mesh(KNOB.ptr, mat.white);
+  // the usual knob, and for the filter knob (o.odd) also the mismatched pink spare (v0.32.3), shown unless OCD is past 50
+  const body = new THREE.Mesh(KNOB.body, mBody); body.castShadow = true; body.receiveShadow = true;
+  const top = new THREE.Mesh(KNOB.top, mTop); top.castShadow = true;
+  const ptr = new THREE.Mesh(KNOB.ptr, mat.white);
+  const std = new THREE.Group(); std.add(body, top, ptr);
+  let oddG = null, mp = null;
+  if (o.odd) {
+    mp = mat.pink.clone(); mp.bumpMap = wear; mp.bumpScale = KNOB_BUMP * depth * 0.4;
+    const pb = new THREE.Mesh(PINK.body, mp); pb.castShadow = true; pb.receiveShadow = true;
+    const pp = new THREE.Mesh(PINK.ptr, mat.white); pp.castShadow = true; oddG = new THREE.Group(); oddG.add(pb, pp);
   }
   // a pot's shaft is never quite square to the panel (v0.31.5): each leans its own way, by up to look.tilt degrees
   const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
-  const spin = new THREE.Group(); spin.add(body, top, ptr); tiltG.add(spin); g.add(tiltG); grp.add(g);
-  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u),  ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
+  const spin = new THREE.Group(); spin.add(std); if (oddG) spin.add(oddG); tiltG.add(spin); g.add(tiltG); grp.add(g);
+  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
+    mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
+    if (oddG) { oddG.visible = c < 0.5; std.visible = !oddG.visible; }
+  },  ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
     const v = knobVal(id); if (v === k.shown) return false;
     k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; shadowDirty = true; return true;   // the skirt's nub turns, so its shadow must too
   };
-  k.tilt(look.tilt); k.size(look.ksize); addCtl(k); knobs.push(k); return k;
+  k.tilt(look.tilt * (1 - look.ocd)); k.size(look.ksize); k.clean(look.ocd); addCtl(k); knobs.push(k); return k;
 }
 function makeKey(cx, cy, w, h, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
@@ -514,46 +520,53 @@ const logoWear = logoWears[page];
 const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
 logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
-// a strip of torn masking tape stuck on the panel (v0.32.2, Johnny): drawn on a canvas, crepe lines across it, ragged
-// torn ends and wavy edges, a little see-through; lit, with its own crinkle bump, on both pages
-// v0.32.4: across the top-right corner, wider, written on in marker (Johnny); clipped where it runs off the panel's edge
-const TAPE = { cx: W - 38, cy: 38, w: 156, h: 44, rot: -40, text: ['PROPERTY OF', 'GLOBAL GOON'] };
-const tape = (() => {
-  const S = 4, cw = TAPE.w * S, ch = TAPE.h * S, R = rng(4242);
-  const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d');
-  const b = document.createElement('canvas'); b.width = cw; b.height = ch; const bx = b.getContext('2d');
-  // outline: torn ends (jagged, fibrous), slightly wavy long edges
-  const pts = [], tear = (x0, dir) => { const out = []; for (let y = 0; y <= ch; y += 3 + R() * 5) out.push([x0 + dir * (R() * 14 + (R() < 0.15 ? R() * 18 : 0)), y]); return out; };
-  for (let xx = 10; xx < cw - 10; xx += 20) pts.push([xx, 2 + R() * 2]);
-  pts.push(...tear(cw - 18, 1)); for (let xx = cw - 10; xx > 10; xx -= 20) pts.push([xx, ch - 2 - R() * 2]);
-  pts.push(...tear(18, -1).reverse());
-  x.beginPath(); pts.forEach(([a, bb], i) => i ? x.lineTo(a, bb) : x.moveTo(a, bb)); x.closePath();
-  x.fillStyle = 'rgba(200,184,138,0.9)'; x.fill(); x.save(); x.clip();
-  bx.fillStyle = '#808080'; bx.fillRect(0, 0, cw, ch);
-  for (let i = 0; i < cw; i += 2 + R() * 4) {   // crepe: fine creases across the tape
-    const a = 0.03 + R() * 0.06; x.strokeStyle = `rgba(120,100,60,${a})`; x.lineWidth = 1; x.beginPath(); x.moveTo(i, 0); x.lineTo(i + (R() - 0.5) * 6, ch); x.stroke();
-    bx.strokeStyle = R() < 0.5 ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.3)'; bx.lineWidth = 1 + R() * 2; bx.beginPath(); bx.moveTo(i, 0); bx.lineTo(i + (R() - 0.5) * 6, ch); bx.stroke();
+// stickers (v0.32.7, Johnny: the tape came off, a yellow smiley went on): vinyl stickers with a white die-cut border,
+// a bit glossy and a bit scuffed, each with its own spot on the panel, cut off where they run over an edge.
+// OPTIONS > STICKERS turns each on or off (look.stickers); OCD peels them off.
+const STICKERS = [
+  { id: 'smile', name: 'SMILEY', cx: W - 44, cy: 46, size: 66, rot: 12 },
+  { id: 'wink', name: 'WINK', cx: 22, cy: H - 18, size: 50, rot: -18 },
+  { id: 'dizzy', name: 'DIZZY', cx: W - 16, cy: H * 0.56, size: 46, rot: 25 },
+  { id: 'heart', name: 'HEART', cx: W * 0.43, cy: H - 8, size: 44, rot: -10 },
+  { id: 'star', name: 'STAR', cx: 14, cy: 132, size: 46, rot: 8 },
+];
+function drawSticker(x, id, n, R) {   // on an n x n canvas
+  const c = n / 2, r = n * 0.40;
+  const face = (fill) => { x.fillStyle = '#ffffff'; x.beginPath(); x.arc(c, c, r + n * 0.055, 0, 7); x.fill(); x.fillStyle = fill; x.beginPath(); x.arc(c, c, r, 0, 7); x.fill(); x.strokeStyle = 'rgba(0,0,0,.85)'; x.lineWidth = n * 0.012; x.stroke(); };
+  const ink = () => { x.fillStyle = x.strokeStyle = '#111'; x.lineWidth = n * 0.035; x.lineCap = 'round'; };
+  const smile = () => { x.beginPath(); x.arc(c, c + r * 0.05, r * 0.6, 0.18 * Math.PI, 0.82 * Math.PI); x.stroke(); };
+  const eye = (ex) => { x.beginPath(); x.ellipse(ex, c - r * 0.25, r * 0.09, r * 0.2, 0, 0, 7); x.fill(); };
+  if (id === 'smile') { face('#ffd400'); ink(); eye(c - r * 0.32); eye(c + r * 0.32); smile(); }
+  if (id === 'wink') { face('#ffd400'); ink(); eye(c - r * 0.32); x.beginPath(); x.arc(c + r * 0.32, c - r * 0.18, r * 0.16, 1.1 * Math.PI, 1.9 * Math.PI); x.stroke(); smile(); }
+  if (id === 'dizzy') {
+    face('#ffd400'); ink();
+    for (const ex of [c - r * 0.32, c + r * 0.32]) { const ey = c - r * 0.25, d = r * 0.13; x.beginPath(); x.moveTo(ex - d, ey - d); x.lineTo(ex + d, ey + d); x.moveTo(ex + d, ey - d); x.lineTo(ex - d, ey + d); x.stroke(); }
+    x.beginPath(); x.moveTo(c - r * 0.45, c + r * 0.38); for (let i = 0; i <= 12; i++) x.lineTo(c - r * 0.45 + i * r * 0.075, c + r * 0.38 + (i % 2 ? -1 : 1) * r * 0.07); x.stroke();
   }
-  for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${R() < 0.5 ? '255,250,235' : '110,90,50'},${0.05 + R() * 0.08})`; x.fillRect(R() * cw, R() * ch, 1 + R() * 3, 1); }   // paper fleck
-  const g = x.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, 'rgba(90,70,30,.18)'); g.addColorStop(0.12, 'rgba(0,0,0,0)'); g.addColorStop(0.88, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(90,70,30,.18)');
-  x.fillStyle = g; x.fillRect(0, 0, cw, ch); x.restore();
-  // marker writing
-  x.save(); x.translate(cw / 2, ch / 2); x.rotate(-0.02); x.fillStyle = 'rgba(22,22,26,.88)'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.font = `${10 * S}px "Permanent Marker", "Marker Felt", "Chalkboard SE", "Comic Sans MS", cursive`;
-  TAPE.text.forEach((t, i) => x.fillText(t, (-16 + (i - 0.5) * 3) * S, (i - (TAPE.text.length - 1) / 2) * 15 * S));
+  const shape = (path, fill) => { path(); x.strokeStyle = '#fff'; x.lineWidth = n * 0.11; x.lineJoin = 'round'; x.stroke(); path(); x.fillStyle = fill; x.fill(); x.strokeStyle = 'rgba(0,0,0,.8)'; x.lineWidth = n * 0.012; x.stroke(); };
+  if (id === 'heart') shape(() => { x.beginPath(); x.moveTo(c, c + r * 0.85); x.bezierCurveTo(c - r * 1.25, c + r * 0.05, c - r * 0.75, c - r * 0.95, c, c - r * 0.35); x.bezierCurveTo(c + r * 0.75, c - r * 0.95, c + r * 1.25, c + r * 0.05, c, c + r * 0.85); x.closePath(); }, '#ff4f9a');
+  if (id === 'star') shape(() => { x.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; x.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr); } x.closePath(); }, '#ff7a1a');
+  // a shine and some scuffing
+  x.save(); x.globalCompositeOperation = 'source-atop';
+  const g = x.createLinearGradient(0, 0, n, n); g.addColorStop(0, 'rgba(255,255,255,.28)'); g.addColorStop(0.4, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, n, n);
+  for (let i = 0; i < 14; i++) { x.strokeStyle = `rgba(255,255,255,${0.15 + R() * 0.25})`; x.lineWidth = 1 + R() * 1.5; const px = R() * n, py = R() * n, a = R() * Math.PI, l = n * (0.05 + R() * 0.2); x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke(); }
+  for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(0,0,0,${R() * 0.08})`; x.fillRect(R() * n, R() * n, 2, 2); }
   x.restore();
-  // cut off where the tape runs past the panel (as if it wraps round the edge)
-  const a = -TAPE.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, cw, ch), d = img.data;
-  for (let v = 0, i = 0; v < ch; v++) for (let u = 0; u < cw; u++, i += 4) {
-    const lx = u / S - TAPE.w / 2, ly = v / S - TAPE.h / 2, px2 = TAPE.cx + lx * ca + ly * sa, py2 = TAPE.cy - (lx * sa - ly * ca);
+}
+const stickers = STICKERS.map((st, k) => {
+  const n = 256, c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
+  drawSticker(x, st.id, n, rng(777 + k));
+  const a = -st.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, n, n), d = img.data, S = n / st.size;
+  for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {   // cut off past the panel's edge
+    const lx = u / S - st.size / 2, ly = v / S - st.size / 2, px2 = st.cx + lx * ca + ly * sa, py2 = st.cy - (lx * sa - ly * ca);
     if (px2 < 0.5 || py2 < 0.5 || px2 > W - 0.5 || py2 > H - 0.5) d[i + 3] = 0;
   }
   x.putImageData(img, 0, 0);
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  const bump = new THREE.CanvasTexture(b);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(TAPE.w, TAPE.h), new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.2, transparent: true, depthWrite: false, roughness: 0.85, metalness: 0, envMapIntensity: 0.4 }));
-  m.position.copy(P(TAPE.cx, TAPE.cy, 0.25)); m.rotation.z = -TAPE.rot * Math.PI / 180; m.renderOrder = 3; m.receiveShadow = true; scene.add(m); return m;
-})();
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(st.size, st.size), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9 }));
+  m.position.copy(P(st.cx, st.cy, 0.25 + k * 0.01)); m.rotation.z = -st.rot * Math.PI / 180; m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
+  return { id: st.id, m };
+});
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
     const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;
@@ -565,7 +578,7 @@ prints.push((x, ink) => {
     const patch = document.createElement('canvas'); patch.width = logoCv.width; patch.height = logoCv.height;
     const pc2 = patch.getContext('2d'); pc2.drawImage(wc, TITLE.x * sx, TITLE.y * sy, pw, ph, 0, 0, patch.width, patch.height);
     const wv = pc2.getImageData(0, 0, patch.width, patch.height).data, img = lx2.getImageData(0, 0, logoCv.width, logoCv.height), d = img.data;
-    for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const v = wv[i]; d[i + 3] *= Math.max(0, Math.min(1, (v - LOGO_WEAR[0]) / LOGO_WEAR[1])); }
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const v = wv[i]; const f = Math.max(0, Math.min(1, (v - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i + 3] *= f + (1 - f) * look.ocd; }
     lx2.putImageData(img, 0, 0);
     logoTex.needsUpdate = true;
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
@@ -772,7 +785,12 @@ function applyLook() {
     lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
   });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
-  for (const k of knobs) { k.tilt(look.tilt); k.size(look.ksize); }
+  // OCD (v0.32.6): 0 keeps every defect, 1 is spotless: wear depths, worn ink, tilt, the stickers and the odd knob
+  const cl = look.ocd, w = 1 - cl;
+  panelMat.bumpScale = PANEL_BUMP * w; edgeMat.bumpScale = EDGE_BUMP * w; print.material.bumpScale = logoMat.bumpScale = PANEL_BUMP * 1.6 * w;
+  const peel = Math.max(0, Math.min(1, w * 2 - 1));   // stickers fade off by OCD 50
+  for (const st of stickers) { st.m.material.opacity = peel; st.m.visible = peel > 0 && look.stickers.includes(st.id); }
+  for (const k of knobs) { k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
@@ -786,12 +804,19 @@ function printMask() {   // alpha: 1 where the ink holds, fading to 0 where the 
   for (let i = 0; i < d.length; i += 4) { d[i + 3] = 255 * Math.max(0, Math.min(1, (d[i] - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i] = d[i + 1] = d[i + 2] = 0; }
   m.putImageData(img, 0, 0); return pMask;
 }
+let inkSig = '', inkCv = null;
+function inkMask() {   // the worn-ink mask, lifted towards solid ink by OCD
+  const sig = page + '|' + look.ocd; if (sig === inkSig) return inkCv;
+  const m = printMask(); inkCv = inkCv || document.createElement('canvas'); inkCv.width = m.width; inkCv.height = m.height;
+  const x = inkCv.getContext('2d'); x.clearRect(0, 0, m.width, m.height); x.drawImage(m, 0, 0); x.fillStyle = `rgba(0,0,0,${look.ocd})`; x.fillRect(0, 0, m.width, m.height);
+  inkSig = sig; return inkCv;
+}
 function repaintPrint() {
   const ink = curInk, paper = inkOf(ink);
   px.clearRect(0, 0, W, H);
   for (const f of [...printsBy.all, ...printsBy[page]]) f(px, ink, paper);
   // worn ink (v0.31.3): the whole print is rubbed through where the panel's wear map dips, like the logo
-  px.save(); px.setTransform(1, 0, 0, 1, 0, 0); px.globalCompositeOperation = 'destination-in'; px.drawImage(printMask(), 0, 0); px.restore();
+  px.save(); px.setTransform(1, 0, 0, 1, 0, 0); px.globalCompositeOperation = 'destination-in'; px.drawImage(inkMask(), 0, 0); px.restore();
   printTex.needsUpdate = true;
 }
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
@@ -950,6 +975,8 @@ opt.body.innerHTML = `
     <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
     <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
+  <div class="f"><span>STICKERS</span><div class="row">${STICKERS.map((st) => `<button data-st="${st.id}"><i></i>${st.name}</button>`).join('')}</div></div>
+  <div class="f"><span>OCD</span><div class="row"><input type="range" min="0" max="100" id="o3-ocd" aria-label="OCD: 0 every defect, 100 spotless"><b class="val" id="o3-ocdv"></b></div></div>
   <div class="f"><span>KNOB SIZE</span><div class="row"><input type="range" min="60" max="135" id="o3-ksize" aria-label="Knob size"><b class="val" id="o3-ksizev"></b></div></div>
   <div class="f"><span>KNOB TILT</span><div class="row"><input type="range" min="0" max="80" id="o3-tilt" aria-label="Knob tilt"><b class="val" id="o3-tiltv"></b></div></div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
@@ -970,6 +997,8 @@ function drawOpt() {
       if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
     });
   });
+  opt.body.querySelectorAll('[data-st]').forEach((b) => b.classList.toggle('lit', look.stickers.includes(b.dataset.st)));
+  $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-ksize').value = Math.round(look.ksize * 100); $o('#o3-ksizev').textContent = Math.round(look.ksize * 100) + '%';
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
@@ -993,6 +1022,8 @@ opt.body.querySelectorAll('.lamp [data-k]').forEach((inp) => inp.oninput = () =>
 opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
+opt.body.querySelectorAll('[data-st]').forEach((b) => b.onclick = () => { const id = b.dataset.st, on = look.stickers.includes(id); setLook('stickers', on ? look.stickers.filter((x) => x !== id) : [...look.stickers, id]); });
+$o('#o3-ocd').oninput = (e) => setLook('ocd', e.target.value / 100);
 $o('#o3-ksize').oninput = (e) => setLook('ksize', e.target.value / 100);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
