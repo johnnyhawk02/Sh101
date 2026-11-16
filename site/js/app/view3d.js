@@ -1006,6 +1006,12 @@ function applyLook() {
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
+  // v0.35.7 (Johnny: "a hidden light that's always on"): the room reflection (scene.environment) lit everything whatever the
+  // lights said; it now goes with light 1, the ambient: full at 100% and above, none at 0, so all lights at 0 is dark
+  const envF = Math.min(1, look.lights[0].int);
+  scene.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) if ('envMapIntensity' in m) {
+    if (m === panelMat) { m.envMapIntensity = F.e * envF; continue; }
+    if (m.userData.env0 === undefined) m.userData.env0 = m.envMapIntensity; m.envMapIntensity = m.userData.env0 * envF; } });
   printDirty = shadowDirty = dirty = true;
 }
 const pMasks = {};
