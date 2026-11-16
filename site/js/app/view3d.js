@@ -999,7 +999,7 @@ function applyLook() {
   const b = 1; hemi.intensity = 0;   // v0.35.6: only the ambient and the two side lights
   look.lights.forEach((l, i) => {
     const a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, lamp = lamps[i];
-    lamp.color.set(l.col); lamp.intensity = l.int * b; if (!i) return;
+    lamp.color.set(l.col); lamp.intensity = l.int * b; if (!i) return; lamp.shadow.radius = l.soft ?? 9;   // v0.36.0: SOFTNESS
     lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
   });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
@@ -1139,10 +1139,11 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
   box-shadow: inset 0 0 0 2px var(--v3d-ink), 0 20px 60px rgba(0,0,0,.55); padding: 34px 22px 16px; box-sizing: border-box; }
 .v3d-sheet h2 { position: absolute; top: 8px; left: 14px; margin: 0; font: 400 15px/1 ${DISPLAY}; letter-spacing: .04em; color: var(--v3d-paper); background: var(--v3d-ink); padding: 4px 9px 3px; }
 .v3d-sheet .x { position: absolute; top: 6px; right: 10px; width: 30px; height: 26px; }
-.v3d-sheet .lamp { display: grid; grid-template-columns: 16px 34px repeat(3, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 8px; font-size: 10px; letter-spacing: .06em; }
+.v3d-sheet .lamp { display: grid; grid-template-columns: 16px 34px repeat(4, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 8px; font-size: 10px; letter-spacing: .06em; }
 .v3d-sheet .lamp input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
 .v3d-sheet .lamp label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .lamp label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
 .v3d-sheet .lamp label i { font-style: normal; grid-row: 1; grid-column: 2; }
+.v3d-sheet .ldia { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .v3d-sheet .ldia canvas { width: 100%; height: auto; box-shadow: inset 0 0 0 1.5px var(--v3d-ink); border-radius: 3px; cursor: grab; }
 .v3d-sheet .lamp .amb { font-weight: 600; opacity: .55; grid-column: span 2; }
 .v3d-sheet .otab3 { display: flex; flex-wrap: wrap; gap: 0; margin: 4px 0 16px; border-bottom: 2px solid var(--v3d-ink); }
 .v3d-sheet .otab3 button { background: none; color: var(--v3d-ink); border-radius: 3px 3px 0 0; padding: 8px 12px 7px; opacity: .6; }
@@ -1218,10 +1219,13 @@ opt.body.innerHTML = `
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   </div>
   <div class="pane" data-pane="light">
+  <div class="f"><span>FROM ABOVE · FROM THE SIDE</span><div class="ldia"><canvas id="o3-ltop" width="560" height="300" aria-label="Lights seen from above: drag a light round the panel"></canvas><canvas id="o3-lside" width="560" height="300" aria-label="Lights seen from the side: drag a light up or down"></canvas></div>
+    <p class="hint">DRAG LIGHT 2 OR 3: ROUND THE PANEL ON THE LEFT, UP AND DOWN ON THE RIGHT.</p></div>
   <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
     <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
     ${i ? `<label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
-    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label>` : '<b class="amb">AMBIENT</b>'}</div>`).join('')}</div>
+    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label>
+    <label>SOFTNESS<input type="range" data-k="soft" min="0" max="24" aria-label="Light ${i + 1} shadow softness"><i></i></label>` : '<b class="amb">AMBIENT</b>'}</div>`).join('')}</div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
@@ -1265,10 +1269,11 @@ function drawOpt() {
   opt.body.querySelectorAll('.lamp').forEach((d) => {
     const l = look.lights[+d.dataset.i];
     d.querySelectorAll('[data-k]').forEach((inp) => {
-      const k = inp.dataset.k; inp.value = k === 'int' ? Math.round(l.int * 100) : l[k];
-      if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
+      const k = inp.dataset.k, v = k === 'soft' ? (l.soft ?? 9) : l[k]; inp.value = k === 'int' ? Math.round(l.int * 100) : v;
+      if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : k === 'soft' ? v : v + '°';
     });
   });
+  drawLDia();
   opt.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('lit', b.dataset.tab === optTab));
   opt.body.querySelectorAll('[data-pane]').forEach((d) => { d.hidden = d.dataset.pane !== optTab; });
   opt.body.querySelectorAll('[data-st]').forEach((b) => b.classList.toggle('lit', look.stickers.includes(b.dataset.st)));
@@ -1335,6 +1340,56 @@ $o('#o3-oddcut').onclick = () => setLook('oddK', -1);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
+// v0.36.0 (Johnny): the lights as diagrams. Left, the panel from above (it lies flat, its top edge away from you) with
+// lights 2 and 3 round it at their ORBIT; right, from the side, each light at its HEIGHT over the panel's edge on its side.
+// Drag a light on either to move it. The ambient (light 1) has no direction, so it isn't drawn.
+const LD = { top: $o('#o3-ltop'), side: $o('#o3-lside') };
+function ldGeom(cv) { const w = cv.width, h = cv.height; return cv === LD.top ? { cx: w / 2, cy: h / 2, R: Math.min(w, h) * 0.44, pw: Math.min(w * 0.5, h * 0.62 * W / H), ph: Math.min(w * 0.5, h * 0.62 * W / H) * H / W } : { cx: w / 2, cy: h - 34, R: Math.min(w / 2 - 24, h - 56) }; }
+function ldPos(cv, l) {
+  const g = ldGeom(cv), a = l.az * Math.PI / 180, e = l.el * Math.PI / 180;
+  if (cv === LD.top) return [g.cx + Math.cos(a) * g.R, g.cy - Math.sin(a) * g.R];
+  const sd = Math.cos(a) >= 0 ? 1 : -1; return [g.cx + sd * Math.cos(e) * g.R, g.cy - Math.sin(e) * g.R];
+}
+function drawLDia() {
+  const ink = curInk, faint = ink === '#000000' ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.3)';
+  for (const cv of [LD.top, LD.side]) {
+    const x = cv.getContext('2d'), g = ldGeom(cv); x.clearRect(0, 0, cv.width, cv.height); x.lineWidth = 2; x.font = `600 18px ${MONO}`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.strokeStyle = faint; x.setLineDash([4, 6]); x.beginPath();
+    if (cv === LD.top) x.arc(g.cx, g.cy, g.R, 0, 7); else x.arc(g.cx, g.cy, g.R, Math.PI, 2 * Math.PI);
+    x.stroke(); x.setLineDash([]);
+    x.fillStyle = look.colour; x.strokeStyle = ink;
+    if (cv === LD.top) { x.fillRect(g.cx - g.pw / 2, g.cy - g.ph / 2, g.pw, g.ph); x.strokeRect(g.cx - g.pw / 2, g.cy - g.ph / 2, g.pw, g.ph);
+      x.fillStyle = ink; x.font = `600 14px ${MONO}`; x.fillText('PANEL', g.cx, g.cy); x.fillText('FRONT', g.cx, g.cy + g.ph / 2 + 16); x.font = `600 18px ${MONO}`; }
+    else { x.fillRect(g.cx - g.R * 0.75, g.cy, g.R * 1.5, 12); x.strokeRect(g.cx - g.R * 0.75, g.cy, g.R * 1.5, 12); x.fillStyle = ink; x.font = `600 14px ${MONO}`; x.fillText('LEFT', g.cx - g.R * 0.75, g.cy + 26); x.fillText('RIGHT', g.cx + g.R * 0.75, g.cy + 26); x.font = `600 18px ${MONO}`; }
+    look.lights.forEach((l, i) => {
+      if (!i) return; const [px, py] = ldPos(cv, l), tx = cv === LD.top ? g.cx : g.cx + (px > g.cx ? 1 : -1) * g.R * 0.2, ty = cv === LD.top ? g.cy : g.cy;
+      const grd = x.createLinearGradient(px, py, tx, ty); grd.addColorStop(0, l.col); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      x.strokeStyle = grd; x.lineWidth = 6 + (l.soft ?? 9) * 0.8; x.globalAlpha = 0.55; x.beginPath(); x.moveTo(px, py); x.lineTo(tx, ty); x.stroke(); x.globalAlpha = 1;
+      x.fillStyle = l.col; x.strokeStyle = ink; x.lineWidth = 2; x.beginPath(); x.arc(px, py, 15, 0, 7); x.fill(); x.stroke();
+      x.fillStyle = lum(l.col) > 0.35 ? '#000' : '#fff'; x.fillText(String(i + 1), px, py + 1);
+    });
+  }
+}
+for (const cv of [LD.top, LD.side]) {
+  let drag = -1;
+  const at = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+  cv.style.touchAction = 'none';
+  cv.addEventListener('pointerdown', (e) => {
+    const [mx, my] = at(e); let best = 40, bi = -1;
+    look.lights.forEach((l, i) => { if (!i) return; const [px, py] = ldPos(cv, l), d = Math.hypot(px - mx, py - my); if (d < best) { best = d; bi = i; } });
+    if (bi < 0) return; drag = bi; cv.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (drag < 0) return; const [mx, my] = at(e), g = ldGeom(cv), l = look.lights[drag];
+    if (cv === LD.top) l.az = (Math.round(Math.atan2(g.cy - my, mx - g.cx) * 180 / Math.PI) + 360) % 360;
+    else {
+      const dx = mx - g.cx, el = Math.round(Math.atan2(Math.max(0, g.cy - my), Math.abs(dx)) * 180 / Math.PI); l.el = Math.max(3, Math.min(90, el));
+      const right = Math.cos(l.az * Math.PI / 180) >= 0; if ((dx >= 0) !== right) l.az = (540 - l.az) % 360;   // dragged over the top: the other side
+    }
+    setLook('lights', look.lights);
+  });
+  for (const ev of ['pointerup', 'pointercancel']) cv.addEventListener(ev, () => { drag = -1; });
+}
 function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
