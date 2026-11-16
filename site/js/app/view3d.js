@@ -18,8 +18,11 @@ const root = document.documentElement;
 
 // ---------------------------------------------------------------- look (Options): panel colour, lighting, finish, lens
 const LOOK_KEY = 'shyoy.look3d';
-const LOOK0 = { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4, tilt: 3, ksize: 1 };   // + lights (v0.31.0), filled from the preset
-const look = { ...LOOK0 };
+// defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
+// aqua lights, bigger knobs, longer lens
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, lv: 2,
+  lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
+const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
 if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
@@ -905,7 +908,7 @@ $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 $o('#o3-ksize').oninput = (e) => setLook('ksize', e.target.value / 100);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: presetLights(LOOK0.light), lv: 2 }); saveLook(); applyLook(); drawOpt(); };
+$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
