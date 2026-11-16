@@ -526,6 +526,7 @@ logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); 
 // stickers (v0.32.7, Johnny: the tape came off, a yellow smiley went on): vinyl stickers with a white die-cut border,
 // a bit glossy and a bit scuffed, each with its own spot on the panel, cut off where they run over an edge.
 // OPTIONS > STICKERS turns each on or off (look.stickers); OCD peels them off.
+const STICKER_BUMP = PANEL_BUMP * 1.6;
 const STICKERS = [
   { id: 'smile', name: 'SMILEY', cx: W - 44, cy: 46, size: 66, rot: 12 },
   { id: 'wink', name: 'WINK', cx: 22, cy: H - 18, size: 50, rot: -18 },
@@ -556,9 +557,65 @@ function drawSticker(x, id, n, R) {   // on an n x n canvas
   for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(0,0,0,${R() * 0.08})`; x.fillRect(R() * n, R() * n, 2, 2); }
   x.restore();
 }
+// v0.32.9 (Johnny): stickers wear too. The panel's own dents and scratches show through the vinyl (each sticker's
+// bump map is the page's wear map sampled under it, so it changes with the page), and each sticker has its own
+// wear and tear: nicked edges, sun-faded patches, ink rubbed thin, a crease and one edge lifting off the panel.
+const panelWearData = {};
+const wearData = (p) => panelWearData[p] || (panelWearData[p] = (() => { const c = wearOf(p).image; return { w: c.width, h: c.height, d: c.getContext('2d').getImageData(0, 0, c.width, c.height).data }; })());
+function stickerWear(x, n, R) {   // own wear on the colour canvas x; returns the sticker's own bump canvas
+  const c = n / 2, img0 = x.getImageData(0, 0, n, n).data, A = (u, v) => (u < 0 || v < 0 || u >= n || v >= n) ? 0 : img0[((v | 0) * n + (u | 0)) * 4 + 3];
+  const rim = (a) => { let r = 0; while (r < c && A(c + Math.cos(a) * r, c + Math.sin(a) * r) > 8) r++; return r; };   // distance to the die-cut edge
+  const b = document.createElement('canvas'); b.width = b.height = n; const bx = b.getContext('2d');
+  bx.fillStyle = '#808080'; bx.fillRect(0, 0, n, n);
+  if (scuffImg) { bx.globalAlpha = 0.45; bx.drawImage(scuffImg, R() * 600, R() * 600, 420, 420, 0, 0, n, n); bx.globalAlpha = 1; }
+  // nicks: little bites out of the edge
+  x.save(); x.globalCompositeOperation = 'destination-out';
+  for (let i = 0, k = 2 + (R() * 4 | 0); i < k; i++) {
+    const a = R() * 7, r = rim(a), s = n * (0.012 + R() * 0.025); x.beginPath();
+    for (let j = 0; j < 7; j++) { const t = j / 7 * 7, rr = s * (0.6 + R() * 0.7); x.lineTo(c + Math.cos(a) * r + Math.cos(t) * rr, c + Math.sin(a) * r + Math.sin(t) * rr); }
+    x.fill();
+  }
+  x.restore();
+  x.save(); x.globalCompositeOperation = 'source-atop';
+  // sun-faded patches
+  for (let i = 0, k = 2 + (R() * 3 | 0); i < k; i++) {
+    const px = c + (R() - 0.5) * n * 0.7, py = c + (R() - 0.5) * n * 0.7, r = n * (0.12 + R() * 0.2), g = x.createRadialGradient(px, py, 0, px, py, r);
+    g.addColorStop(0, `rgba(255,250,235,${0.18 + R() * 0.2})`); g.addColorStop(1, 'rgba(255,250,235,0)'); x.fillStyle = g; x.fillRect(0, 0, n, n);
+  }
+  // ink rubbed thin by fingers, mostly round the edge
+  for (let i = 0; i < 40; i++) {
+    const a = R() * 7, r = rim(a) * (0.55 + R() * 0.45), px = c + Math.cos(a) * r, py = c + Math.sin(a) * r, s = n * (0.008 + R() * 0.03);
+    x.fillStyle = `rgba(255,255,255,${0.12 + R() * 0.3})`; x.beginPath(); x.ellipse(px, py, s, s * (0.3 + R() * 0.5), R() * 3, 0, 7); x.fill();
+  }
+  // grime along the edge
+  const gr = x.createRadialGradient(c, c, n * 0.3, c, c, n * 0.5); gr.addColorStop(0, 'rgba(60,50,30,0)'); gr.addColorStop(1, 'rgba(60,50,30,.22)'); x.fillStyle = gr; x.fillRect(0, 0, n, n);
+  // a crease: a dark/light pair in the bump, a faint pale line in the colour
+  { const a = R() * 3, px = c + (R() - 0.5) * n * 0.4, py = c + (R() - 0.5) * n * 0.4, l = n * (0.25 + R() * 0.3), dx = Math.cos(a) * l / 2, dy = Math.sin(a) * l / 2;
+    bx.lineCap = 'round'; bx.lineWidth = n * 0.008;
+    for (const [o, col] of [[-1, 'rgba(255,255,255,.6)'], [1, 'rgba(0,0,0,.6)']]) { bx.strokeStyle = col; bx.beginPath(); bx.moveTo(px - dx - o * dy * 0.02, py - dy + o * dx * 0.02); bx.lineTo(px + dx - o * dy * 0.02, py + dy + o * dx * 0.02); bx.stroke(); }
+    x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = n * 0.006; x.beginPath(); x.moveTo(px - dx, py - dy); x.lineTo(px + dx, py + dy); x.stroke(); }
+  // one edge lifting: a raised ramp in the bump, and dirt caught under it
+  { const a = R() * 7, r = rim(a), px = c + Math.cos(a) * r, py = c + Math.sin(a) * r, s = n * (0.12 + R() * 0.08);
+    const g = bx.createRadialGradient(px, py, 0, px, py, s); g.addColorStop(0, 'rgba(255,255,255,.75)'); g.addColorStop(1, 'rgba(255,255,255,0)'); bx.fillStyle = g; bx.fillRect(0, 0, n, n);
+    const g2 = x.createRadialGradient(px, py, 0, px, py, s * 0.55); g2.addColorStop(0, 'rgba(40,32,20,.45)'); g2.addColorStop(1, 'rgba(40,32,20,0)'); x.fillStyle = g2; x.fillRect(0, 0, n, n); }
+  x.restore();
+  return b;
+}
+function stickerBump(st, own, p) {   // the page's wear under the sticker plus the sticker's own
+  const n = own.width, a = -st.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), S = n / st.size, wd = wearData(p);
+  const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
+  const o = own.getContext('2d').getImageData(0, 0, n, n).data, img = x.createImageData(n, n), d = img.data;
+  for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {
+    const lx = u / S - st.size / 2, ly = v / S - st.size / 2, px = st.cx + lx * ca + ly * sa, py = st.cy - (lx * sa - ly * ca);
+    const wx = Math.max(0, Math.min(wd.w - 1, px / W * wd.w | 0)), wy = Math.max(0, Math.min(wd.h - 1, py / H * wd.h | 0));
+    const val = Math.max(0, Math.min(255, wd.d[(wy * wd.w + wx) * 4] + (o[i] - 128) * 0.9));
+    d[i] = d[i + 1] = d[i + 2] = val; d[i + 3] = 255;
+  }
+  x.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
 const stickers = STICKERS.map((st, k) => {
   const n = 256, c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
-  drawSticker(x, st.id, n, rng(777 + k));
+  const R = rng(777 + k); drawSticker(x, st.id, n, R); const own = stickerWear(x, n, R);
   const a = -st.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, n, n), d = img.data, S = n / st.size;
   for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {   // cut off past the panel's edge
     const lx = u / S - st.size / 2, ly = v / S - st.size / 2, px2 = st.cx + lx * ca + ly * sa, py2 = st.cy - (lx * sa - ly * ca);
@@ -566,9 +623,10 @@ const stickers = STICKERS.map((st, k) => {
   }
   x.putImageData(img, 0, 0);
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(st.size, st.size), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9 }));
+  const bumps = { synth: stickerBump(st, own, 'synth'), seq: stickerBump(st, own, 'seq') };
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(st.size, st.size), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpMap: bumps[page], bumpScale: STICKER_BUMP }));
   m.position.copy(P(st.cx, st.cy, 0.25 + k * 0.01)); m.rotation.z = -st.rot * Math.PI / 180; m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
-  return { id: st.id, m };
+  return { id: st.id, m, bumps };
 });
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
@@ -599,6 +657,7 @@ function setPage(k) {
   page = k; try { localStorage.setItem('shyoy.page3d', k); } catch (e) {}
   pages.synth.visible = k === 'synth'; pages.seq.visible = k === 'seq'; ro.hide();
   panelMat.bumpMap = print.material.bumpMap = wearOf(k); logoMat.bumpMap = logoWears[k];   // each page its own wear
+  for (const st of stickers) st.m.material.bumpMap = st.bumps[k];
   printDirty = shadowDirty = dirty = true;
 }
 
@@ -792,7 +851,7 @@ function applyLook() {
   const cl = look.ocd, w = 1 - cl;
   panelMat.bumpScale = PANEL_BUMP * w; edgeMat.bumpScale = EDGE_BUMP * w; print.material.bumpScale = logoMat.bumpScale = PANEL_BUMP * 1.6 * w;
   const peel = Math.max(0, Math.min(1, w * 2 - 1));   // stickers fade off by OCD 50
-  for (const st of stickers) { st.m.material.opacity = peel; st.m.visible = peel > 0 && look.stickers.includes(st.id); }
+  for (const st of stickers) { st.m.material.opacity = peel; st.m.material.bumpScale = STICKER_BUMP * w; st.m.visible = peel > 0 && look.stickers.includes(st.id); }
   for (const k of knobs) { k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
