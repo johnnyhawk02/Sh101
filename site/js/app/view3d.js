@@ -39,6 +39,9 @@ let lookSaving = false;
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
 if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
+// v0.33.4 (Johnny): KNOB SIZE runs 0-100 over the real scale 0.9-1.5 (was 60-135%)
+const KSIZE = [0.9, 1.5], ksizeToUI = (k) => Math.max(0, Math.min(100, (k - KSIZE[0]) / (KSIZE[1] - KSIZE[0]) * 100));
+look.ksize = Math.max(KSIZE[0], Math.min(KSIZE[1], look.ksize));
 if (typeof look.ocd !== 'number') look.ocd = 0;
 if (!Array.isArray(look.stickers)) look.stickers = ['smile'];
 if (!look.stk || typeof look.stk !== 'object') look.stk = {};
@@ -1071,7 +1074,7 @@ opt.body.innerHTML = `
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="knobs">
-  <div class="f"><span>KNOB SIZE</span><div class="row"><input type="range" min="60" max="135" id="o3-ksize" aria-label="Knob size"><b class="val" id="o3-ksizev"></b></div></div>
+  <div class="f"><span>KNOB SIZE</span><div class="row"><input type="range" min="0" max="100" id="o3-ksize" aria-label="Knob size"><b class="val" id="o3-ksizev"></b></div></div>
   <div class="f"><span>KNOB TILT</span><div class="row"><input type="range" min="0" max="80" id="o3-tilt" aria-label="Knob tilt"><b class="val" id="o3-tiltv"></b></div></div>
   </div>
   <div class="pane" data-pane="stickers">
@@ -1116,7 +1119,7 @@ function drawOpt() {
     d.querySelectorAll('[data-k]').forEach((inp) => { inp.value = vals[inp.dataset.k]; inp.nextElementSibling.textContent = inp.dataset.k === 's' ? vals.s + '%' : inp.dataset.k === 'r' ? vals.r + '°' : vals[inp.dataset.k]; });
   });
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
-  $o('#o3-ksize').value = Math.round(look.ksize * 100); $o('#o3-ksizev').textContent = Math.round(look.ksize * 100) + '%';
+  $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
   sheetVars();
@@ -1151,7 +1154,7 @@ opt.body.querySelectorAll('.stk [data-k]').forEach((inp) => inp.oninput = () => 
 $o('#o3-stkon').onchange = (e) => setLook('stkOn', e.target.checked);
 $o('#o3-stkreset').onclick = () => setLook('stk', {});
 $o('#o3-ocd').oninput = (e) => setLook('ocd', e.target.value / 100);
-$o('#o3-ksize').oninput = (e) => setLook('ksize', e.target.value / 100);
+$o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
