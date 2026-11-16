@@ -384,11 +384,9 @@ const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, 
   for (let n = 0; n < 8; n++) {
     const kx = x0 + kp * (n + 0.5);
     makeKey(kx, pt.y0 + KEYY, kp - 16, 14, { on: () => state.slot === n, press: () => slotsEl.querySelector(`[data-n="${n}"]`).click(), pad: 4, tag: 'pat2:' + n });
-    prints.push((x, ink) => { x.fillStyle = ink; text(x, String(n + 1), kx, pt.y0 + KEYY + 18, 10); });
-    // a used slot: a small mark over its key
-    prints.push((x, ink) => { const u = state.slots[n] && state.slots[n].steps && state.slots[n].steps.some((st) => st.m !== 'R'); if (u) { x.fillStyle = ink; x.fillRect(kx - 6, pt.y0 + 44, 12, 2); } });
+    // its number on the label line, dimmed while the slot is empty
+    prints.push((x, ink) => { const u = state.slots[n] && state.slots[n].steps && state.slots[n].steps.some((st) => st.m !== 'R'); x.globalAlpha = u || state.slot === n ? 1 : 0.4; x.fillStyle = ink; text(x, String(n + 1), kx, pt.y0 + LY, 11); x.globalAlpha = 1; });
   }
-  labelAt(() => 'PATTERN', pt.cx(0, 5), pt.y0 + LY);
   const lg = box(7, 0, 2, 1, 'STEPS');
   makeKnob(lg.cx(0), lg.y0 + KY, { cur: () => 'len' }); labelAt(() => 'LENGTH', lg.cx(0), lg.y0 + LY);
   const GATES = [10, 25, 50, 75, 95], gNow = () => Math.round((0.1 + state.params.gateLen * 0.85) * 100);
@@ -404,37 +402,40 @@ const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, 
   makeKey(gn.cx(3), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('p-undo').click(), pad: 10, tag: 'undo' });
   labelAt(() => 'UNDO', gn.cx(3), gn.y0 + LY, { dim: () => document.getElementById('p-undo').disabled });
 }
-// the menus as rows of keys: [heading, [label, id]...] per column
-const keyList = (b, colsDef) => colsDef.forEach((list, ci) => {
-  let y = b.by + 26; const kx = b.bx + 18 + ci * (b.bw / 2);
-  for (const row of list) {
-    if (typeof row === 'string') { const yy = y; prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, row, kx - 7, yy + 4, 9.5, 'left'); x.globalAlpha = 1; }); y += 17; continue; }
-    const [t, id] = row, ky = y + 4, el = () => document.getElementById(id);
-    const k = makeKey(kx, ky, 15, 10, { on: () => k.down, press: () => { const b = el(); if (b && !b.disabled) b.click(); }, pad: 2, tag: 'm:' + id });
-    k.rect = [kx - 12, ky - 8, b.bw / 2 - 12, 16];
-    prints.push((x, ink) => { x.globalAlpha = el() && el().disabled ? 0.35 : 1; x.fillStyle = ink; text(x, t, kx + 12, ky + 0.5, 10.5, 'left'); x.globalAlpha = 1; });
-    y += 18;
-  }
-});
-keyList(box(14, 1, 4, 2, 'RANDOMISE'), [
-  ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie'], 'PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']],
-  ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']]]);
-const tools = box(14, 3, 4, 2, 'TOOLS');
-keyList(tools, [
-  ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN CHAIN', 'p-join']],
-  ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DOWN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DOWN', 'nu-odn'], ['SHIFT LEFT', 'rot-l'], ['SHIFT RIGHT', 'rot-r']]]);
-// the scale, under the lists in the TOOLS box: the first key steps the scale, the second ticks Apply scale on MIDI note
-{ const kx = tools.bx + 18, y0 = tools.by + 26 + 125 + 8;
-  prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, 'SCALE', kx - 7, y0 + 4, 9.5, 'left'); x.globalAlpha = 1; });
-  [[() => SCALE_LIST[state.scale.i].name.toUpperCase(), () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), () => false],
-    ['APPLY ON MIDI NOTE', () => setScale({ on: !state.scale.on }), () => state.scale.on]].forEach(([t, press, on], i) => {
-    const ky = y0 + 21 + i * 18 + 4, k = makeKey(kx, ky, 15, 10, { on, press, pad: 2, tag: 'scale' + i });
-    k.rect = [kx - 12, ky - 8, tools.bw / 2 - 12, 16];
-    prints.push((x, ink) => { x.fillStyle = ink; text(x, typeof t === 'function' ? t() : t, kx + 12, ky + 0.5, 10.5, 'left'); });
+// the menus as rows of keys: one column per group, [heading, entry...]; an entry is [label, id of the 2D button it clicks] or
+// { t: label or () => label, press, on, tag }. The rows spread evenly down the box, every column on the same row lines
+// (v0.27.1 tidy); ws: the columns' widths as shares of the box
+const keyList = (b, colsDef, ws) => {
+  const n = Math.max(...colsDef.map((l) => l.length - 1)), inner = b.bw - 28;
+  const W = ws || colsDef.map(() => 1), sum = W.reduce((p, q) => p + q, 0);
+  const top = b.by + 30, pitch = Math.min(30, (b.by + b.bh - 18 - top) / n);
+  let x0 = b.bx + 22;
+  colsDef.forEach(([head, ...list], ci) => {
+    const kx = x0, cw = inner * W[ci] / sum; x0 += cw;
+    prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, head, kx - 8, top, 9.5, 'left'); x.globalAlpha = 1; });
+    list.forEach((en, ri) => {
+      const ky = top + pitch * (ri + 1);
+      const e = Array.isArray(en) ? { t: en[0], el: () => document.getElementById(en[1]), tag: 'm:' + en[1] } : en;
+      const press = e.press || (() => { const d = e.el(); if (d && !d.disabled) d.click(); });
+      const k = makeKey(kx, ky, 15, 10, { on: e.on || (() => k.down), press, pad: 2, tag: e.tag });
+      k.rect = [kx - 12, ky - pitch / 2, cw - 4, pitch];
+      prints.push((x, ink) => { x.globalAlpha = e.el && e.el() && e.el().disabled ? 0.35 : 1; x.fillStyle = ink; text(x, typeof e.t === 'function' ? e.t() : e.t, kx + 13, ky + 0.5, 10.5, 'left'); x.globalAlpha = 1; });
+    });
   });
-}
+};
+keyList(box(13, 1, 5, 2, 'RANDOMISE'), [
+  ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie']],
+  ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']],
+  ['PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']]]);
+// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, the second
+// ticks Apply scale on MIDI note
+keyList(box(13, 3, 5, 2, 'TOOLS'), [
+  ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN', 'p-join']],
+  ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn'], ['SHIFT L', 'rot-l'], ['SHIFT R', 'rot-r']],
+  ['SCALE', { t: () => SCALE_LIST[state.scale.i].name.toUpperCase(), press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), on: () => false, tag: 'scale0' },
+    { t: 'ON MIDI NOTE', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' }]], [0.85, 0.95, 1.4]);
 // ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
-const RB = box(0, 1, 14, 4, 'PATTERN EDIT');
+const RB = box(0, 1, 13, 4, 'PATTERN EDIT');
 const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
 const ROWS_DEF = [['h'], ...[2, 1, -1, -2].map((o) => ['o', o, (o > 0 ? '+' : '-') + Math.abs(o)]), ['gap'],
   ...[11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((k) => ['k', k, NOTE[k]]), ['gap'], ['t', 0, 'TIE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
@@ -558,7 +559,7 @@ function repaintPrint() {
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + '|' + state.scale.i + state.scale.on : '');
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {

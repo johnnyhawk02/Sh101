@@ -83,6 +83,12 @@ npm run deploy   # npx wrangler pages deploy site --project-name shyoy --branch 
 npx wrangler pages deploy site --project-name shyoy --branch main
 ```
 
+### Sequencer page tidy-up (v0.27.1, merged as v0.28.3)
+
+The 3D sequencer page lines up with the grid: the roll is 13 columns and the Randomise and Tools boxes sit under the
+logo (5 columns), each menu group in its own column with the keys spread evenly down the box; the pattern keys have
+their numbers on the label line (dimmed for an empty slot) instead of the marks and the extra PATTERN label.
+
 ### Drive mix (v0.26.0)
 
 The drive slot has a Mix knob, from fully dry to fully wet (smoothed), on the 3D panel and the 2D FX page. It defaults
