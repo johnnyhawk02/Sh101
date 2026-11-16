@@ -27,7 +27,10 @@ const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // 3 and 4 start empty. SAVE then a slot stores the current look there (localStorage shyoy.looks3d).
 const copyLook = (l) => JSON.parse(JSON.stringify(l));
 const LOOK_SLOTS0 = [copyLook(LOOK0), { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4, tilt: 0, ksize: 1, lv: 2,
-  lights: [{ col: '#ffffff', int: 1.7, az: 129, el: 55 }, { col: '#cfdcff', int: 0.35, az: 309, el: 30 }, { col: '#ffe2c0', int: 0.25, az: 39, el: 12 }] }, null, null];
+  lights: [{ col: '#ffffff', int: 1.7, az: 129, el: 55 }, { col: '#cfdcff', int: 0.35, az: 309, el: 30 }, { col: '#ffe2c0', int: 0.25, az: 39, el: 12 }] },
+  // factory LOOK 3 (v0.32.8, Johnny's screenshot): black panel, metal, warm peach side light
+  { colour: '#202122', light: 'studio', bright: 0.8, finish: 'metal', lens: Math.log(14 / 6) / Math.log(8), tilt: 2.1, ksize: 1.12, ocd: 0, stickers: ['smile'], lv: 2,
+    lights: [{ col: '#ffffff', int: 1.2, az: 129, el: 68 }, { col: '#d0dcfe', int: 0.2, az: 309, el: 55 }, { col: '#fee2c2', int: 1.38, az: 39, el: 43 }] }, null];
 const LOOKS_KEY = 'shyoy.looks3d';
 let lookSlots = LOOK_SLOTS0.map((l) => l && copyLook(l));
 try { const st = JSON.parse(localStorage.getItem(LOOKS_KEY) || 'null'); if (Array.isArray(st) && st.length === 4) lookSlots = st.map((l, i) => l || (LOOK_SLOTS0[i] && copyLook(LOOK_SLOTS0[i]))); } catch (e) {}
