@@ -214,10 +214,18 @@ function wearTex(w, h, seed, o) {
     x.strokeStyle = `rgba(0,0,0,${0.25 + 0.4 * R()})`; x.lineWidth = 0.6 + R() * 1.4;
     wrap((dx, dy) => { x.beginPath(); x.moveTo(px + dx, py + dy); x.quadraticCurveTo(px + dx + Math.cos(a) * l / 2 - Math.sin(a) * bend, py + dy + Math.sin(a) * l / 2 + Math.cos(a) * bend, px + dx + Math.cos(a) * l, py + dy + Math.sin(a) * l); x.stroke(); });
   }
+  if (o.edge) {   // [middle, at the edge, reach px]: the wear's depth, from barely there in the middle to deep at the edges
+    const [mid, rim, reach] = o.edge, img = x.getImageData(0, 0, w, h), d = img.data;
+    for (let y = 0, i = 0; y < h; y++) for (let xx = 0; xx < w; xx++, i += 4) {
+      const t = Math.min(1, Math.min(xx, y, w - 1 - xx, h - 1 - y) / reach), f = mid + (rim - mid) * Math.pow(1 - t, 1.6);
+      const v = Math.max(0, Math.min(255, 128 + (d[i] - 128) * f)); d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    x.putImageData(img, 0, 0);
+  }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
 }
 // the case: the face, and the black edges round it
-const panelWear = wearTex(2048, 1024, 101, { scuff: 0.35, dent: 0.35, tile: 4, big: [26, 22, 0.35], knocks: [16, 26], scratches: [90, 120] });
+const panelWear = wearTex(2048, 1024, 101, { scuff: 0.35, dent: 0.35, tile: 4, big: [26, 22, 0.35], knocks: [22, 30], scratches: [90, 120], edge: [0.12, 1.6, 260] });   // v0.31.6: faint round the knobs, deep at the edges (Johnny)
 const edgeWear = wearTex(1024, 128, 202, { scuff: 0.5, dent: 0.3, tile: 8, big: [10, 10, 0.5], knocks: [22, 16], scratches: [30, 50] });
 // knobs: four worn sets; each knob takes one, turned and shifted its own way, and a wear depth from barely to well used
 panelMat.bumpMap = panelWear; panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
