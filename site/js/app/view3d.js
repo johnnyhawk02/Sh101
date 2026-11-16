@@ -493,6 +493,33 @@ const logoWear = logoWears[page];
 const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
 logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
+// a strip of torn masking tape stuck on the panel (v0.32.2, Johnny): drawn on a canvas, crepe lines across it, ragged
+// torn ends and wavy edges, a little see-through; lit, with its own crinkle bump, on both pages
+const TAPE = { cx: W - M - 92, cy: H - M - 2, w: 168, h: 32, rot: 9 };
+const tape = (() => {
+  const S = 4, cw = TAPE.w * S, ch = TAPE.h * S, R = rng(4242);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d');
+  const b = document.createElement('canvas'); b.width = cw; b.height = ch; const bx = b.getContext('2d');
+  // outline: torn ends (jagged, fibrous), slightly wavy long edges
+  const pts = [], tear = (x0, dir) => { const out = []; for (let y = 0; y <= ch; y += 3 + R() * 5) out.push([x0 + dir * (R() * 14 + (R() < 0.15 ? R() * 18 : 0)), y]); return out; };
+  for (let xx = 10; xx < cw - 10; xx += 20) pts.push([xx, 2 + R() * 2]);
+  pts.push(...tear(cw - 18, 1)); for (let xx = cw - 10; xx > 10; xx -= 20) pts.push([xx, ch - 2 - R() * 2]);
+  pts.push(...tear(18, -1).reverse());
+  x.beginPath(); pts.forEach(([a, bb], i) => i ? x.lineTo(a, bb) : x.moveTo(a, bb)); x.closePath();
+  x.fillStyle = 'rgba(200,184,138,0.9)'; x.fill(); x.save(); x.clip();
+  bx.fillStyle = '#808080'; bx.fillRect(0, 0, cw, ch);
+  for (let i = 0; i < cw; i += 2 + R() * 4) {   // crepe: fine creases across the tape
+    const a = 0.03 + R() * 0.06; x.strokeStyle = `rgba(120,100,60,${a})`; x.lineWidth = 1; x.beginPath(); x.moveTo(i, 0); x.lineTo(i + (R() - 0.5) * 6, ch); x.stroke();
+    bx.strokeStyle = R() < 0.5 ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.3)'; bx.lineWidth = 1 + R() * 2; bx.beginPath(); bx.moveTo(i, 0); bx.lineTo(i + (R() - 0.5) * 6, ch); bx.stroke();
+  }
+  for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${R() < 0.5 ? '255,250,235' : '110,90,50'},${0.05 + R() * 0.08})`; x.fillRect(R() * cw, R() * ch, 1 + R() * 3, 1); }   // paper fleck
+  const g = x.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, 'rgba(90,70,30,.18)'); g.addColorStop(0.12, 'rgba(0,0,0,0)'); g.addColorStop(0.88, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(90,70,30,.18)');
+  x.fillStyle = g; x.fillRect(0, 0, cw, ch); x.restore();
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  const bump = new THREE.CanvasTexture(b);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(TAPE.w, TAPE.h), new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.2, transparent: true, depthWrite: false, roughness: 0.85, metalness: 0, envMapIntensity: 0.4 }));
+  m.position.copy(P(TAPE.cx, TAPE.cy, 0.25)); m.rotation.z = -TAPE.rot * Math.PI / 180; m.renderOrder = 3; m.receiveShadow = true; scene.add(m); return m;
+})();
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
     const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;
