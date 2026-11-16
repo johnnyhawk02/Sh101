@@ -20,7 +20,7 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, ocd: 0, stickers: ['smile'], lv: 2,
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, ocd: 0, stickers: ['smile'], stk: {}, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
@@ -41,6 +41,7 @@ if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
 if (typeof look.ocd !== 'number') look.ocd = 0;
 if (!Array.isArray(look.stickers)) look.stickers = ['smile'];
+if (!look.stk || typeof look.stk !== 'object') look.stk = {};   // v0.33.0: per-sticker { x, y (panel units), s (scale), r (degrees) }
 // three lights (v0.31.0): each { col, int, az (orbit round the panel, degrees, 0 = from the right, 90 = from the top),
 // el (height above the panel, degrees) }. All three cast shadows; 2 and 3 start low from the left and right. A lighting preset sets all three; then each
 // can be changed in OPTIONS. Older saved looks get theirs from their preset.
@@ -601,7 +602,7 @@ function stickerWear(x, n, R) {   // own wear on the colour canvas x; returns th
   x.restore();
   return b;
 }
-function stickerBump(st, own, p) {   // the page's wear under the sticker plus the sticker's own
+function stickerBump(st, own, p) {   // the page's wear under the sticker plus the sticker's own; st = placement { cx, cy, size, rot }
   const n = own.width, a = -st.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), S = n / st.size, wd = wearData(p);
   const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
   const o = own.getContext('2d').getImageData(0, 0, n, n).data, img = x.createImageData(n, n), d = img.data;
@@ -613,20 +614,31 @@ function stickerBump(st, own, p) {   // the page's wear under the sticker plus t
   }
   x.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
 }
+// v0.33.0: each sticker can be resized, moved and turned in OPTIONS > STICKERS (look.stk); a move re-cuts it at the panel
+// edge and re-samples the wear under it.
+const stkPlace = (st) => { const q = look.stk[st.id] || {}; return { cx: q.x ?? st.cx, cy: q.y ?? st.cy, size: st.size * (q.s ?? 1), rot: q.r ?? st.rot }; };
 const stickers = STICKERS.map((st, k) => {
-  const n = 256, c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
-  const R = rng(777 + k); drawSticker(x, st.id, n, R); const own = stickerWear(x, n, R);
-  const a = -st.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, n, n), d = img.data, S = n / st.size;
-  for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {   // cut off past the panel's edge
-    const lx = u / S - st.size / 2, ly = v / S - st.size / 2, px2 = st.cx + lx * ca + ly * sa, py2 = st.cy - (lx * sa - ly * ca);
-    if (px2 < 0.5 || py2 < 0.5 || px2 > W - 0.5 || py2 > H - 0.5) d[i + 3] = 0;
-  }
-  x.putImageData(img, 0, 0);
+  const n = 256, src = document.createElement('canvas'); src.width = src.height = n; const sx = src.getContext('2d');
+  const R = rng(777 + k); drawSticker(sx, st.id, n, R); const own = stickerWear(sx, n, R);
+  const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  const bumps = { synth: stickerBump(st, own, 'synth'), seq: stickerBump(st, own, 'seq') };
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(st.size, st.size), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpMap: bumps[page], bumpScale: STICKER_BUMP }));
-  m.position.copy(P(st.cx, st.cy, 0.25 + k * 0.01)); m.rotation.z = -st.rot * Math.PI / 180; m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
-  return { id: st.id, m, bumps };
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpScale: STICKER_BUMP }));
+  m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
+  const o = { id: st.id, m, bumps: null, key: '' };
+  o.place = () => {
+    const q = stkPlace(st), key = JSON.stringify(q); if (key === o.key) return; o.key = key;
+    x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0);
+    const a = -q.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, n, n), d = img.data, S = n / q.size;
+    for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {   // cut off past the panel's edge
+      const lx = u / S - q.size / 2, ly = v / S - q.size / 2, px2 = q.cx + lx * ca + ly * sa, py2 = q.cy - (lx * sa - ly * ca);
+      if (px2 < 0.5 || py2 < 0.5 || px2 > W - 0.5 || py2 > H - 0.5) d[i + 3] = 0;
+    }
+    x.putImageData(img, 0, 0); map.needsUpdate = true;
+    if (o.bumps) { o.bumps.synth.dispose(); o.bumps.seq.dispose(); }
+    o.bumps = { synth: stickerBump(q, own, 'synth'), seq: stickerBump(q, own, 'seq') }; m.material.bumpMap = o.bumps[page]; m.material.needsUpdate = true;
+    m.position.copy(P(q.cx, q.cy, 0.25 + k * 0.01)); m.rotation.z = -q.rot * Math.PI / 180; m.scale.set(q.size, q.size, 1);
+  };
+  o.place(); return o;
 });
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
@@ -850,8 +862,8 @@ function applyLook() {
   // OCD (v0.32.6): 0 keeps every defect, 1 is spotless: wear depths, worn ink, tilt, the stickers and the odd knob
   const cl = look.ocd, w = 1 - cl;
   panelMat.bumpScale = PANEL_BUMP * w; edgeMat.bumpScale = EDGE_BUMP * w; print.material.bumpScale = logoMat.bumpScale = PANEL_BUMP * 1.6 * w;
-  const peel = Math.max(0, Math.min(1, w * 2 - 1));   // stickers fade off by OCD 50
-  for (const st of stickers) { st.m.material.opacity = peel; st.m.material.bumpScale = STICKER_BUMP * w; st.m.visible = peel > 0 && look.stickers.includes(st.id); }
+  // v0.33.0 (Johnny): the odd bits, the stickers and the mismatched knob, just vanish from OCD 50, no fading
+  for (const st of stickers) { st.place(); st.m.material.bumpScale = STICKER_BUMP * w; st.m.visible = cl < 0.5 && look.stickers.includes(st.id); }
   for (const k of knobs) { k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
@@ -978,6 +990,14 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet .lamp input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
 .v3d-sheet .lamp label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .lamp label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
 .v3d-sheet .lamp label i { font-style: normal; grid-row: 1; grid-column: 2; }
+.v3d-sheet .otab3 { display: flex; flex-wrap: wrap; gap: 0; margin: 4px 0 16px; border-bottom: 2px solid var(--v3d-ink); }
+.v3d-sheet .otab3 button { background: none; color: var(--v3d-ink); border-radius: 3px 3px 0 0; padding: 8px 12px 7px; opacity: .6; }
+.v3d-sheet .otab3 button.lit { background: var(--v3d-ink); color: var(--v3d-paper); opacity: 1; }
+.v3d-sheet .stk { display: grid; grid-template-columns: 96px repeat(4, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 10px; font-size: 10px; letter-spacing: .06em; }
+.v3d-sheet .stk.off label { opacity: .4; }
+.v3d-sheet .stk label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .stk label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
+.v3d-sheet .stk label i { font-style: normal; grid-row: 1; grid-column: 2; }
+.v3d-sheet [hidden] { display: none !important; }
 .v3d-sheet .f { margin: 0 0 14px; } .v3d-sheet .f > span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .08em; margin-bottom: 6px; }
 .v3d-sheet .row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .v3d-sheet button { font: 600 11px ${MONO}; letter-spacing: .06em; color: #fff; background: #0c0c0c; border: 0; border-radius: 3px; padding: 7px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -1027,22 +1047,43 @@ function sheet(title) {
   return { el, body: el.querySelector('.body'), open() { sheetVars(); el.classList.add('open'); }, close };
 }
 const opt = sheet('OPTIONS');
+// v0.33.0 (Johnny): OPTIONS in tabs
+const OPT_TABS = [['look', 'LOOK'], ['light', 'LIGHT'], ['knobs', 'KNOBS'], ['stickers', 'STICKERS'], ['wear', 'WEAR'], ['more', 'MORE']];
+let optTab = 'look'; try { optTab = localStorage.getItem('shyoy.opttab3d') || 'look'; } catch (e) {}
 opt.body.innerHTML = `
+  <div class="otab3">${OPT_TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}</div>
+  <div class="pane" data-pane="look">
   <div class="f"><span>LOOKS</span><div class="row" id="o3-looks">${[0, 1, 2, 3].map((i) => `<button data-look="${i}"><i></i>LOOK ${i + 1}</button>`).join('')}<button id="o3-lsave">SAVE…</button></div></div>
   <div class="f"><span>PANEL COLOUR</span><div class="row" id="o3-sw">${SWATCHES.map((c) => `<button class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}<input type="color" id="o3-col" aria-label="Any colour"></div></div>
+  <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
+  </div>
+  <div class="pane" data-pane="light">
   <div class="f"><span>LIGHTING</span><div class="row" id="o3-light">${Object.entries(LIGHTS).map(([k, l]) => `<button data-l="${k}"><i></i>${l.name}</button>`).join('')}</div>
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
     <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
     <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
     <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
-  <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
-  <div class="f"><span>STICKERS</span><div class="row">${STICKERS.map((st) => `<button data-st="${st.id}"><i></i>${st.name}</button>`).join('')}</div></div>
-  <div class="f"><span>OCD</span><div class="row"><input type="range" min="0" max="100" id="o3-ocd" aria-label="OCD: 0 every defect, 100 spotless"><b class="val" id="o3-ocdv"></b></div></div>
+  <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
+  </div>
+  <div class="pane" data-pane="knobs">
   <div class="f"><span>KNOB SIZE</span><div class="row"><input type="range" min="60" max="135" id="o3-ksize" aria-label="Knob size"><b class="val" id="o3-ksizev"></b></div></div>
   <div class="f"><span>KNOB TILT</span><div class="row"><input type="range" min="0" max="80" id="o3-tilt" aria-label="Knob tilt"><b class="val" id="o3-tiltv"></b></div></div>
-  <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
-  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>`;
+  </div>
+  <div class="pane" data-pane="stickers">
+  <div class="f"><span>STICKERS</span>${STICKERS.map((st) => `<div class="stk" data-sk="${st.id}"><button data-st="${st.id}"><i></i>${st.name}</button>
+    <label>SIZE<input type="range" data-k="s" min="40" max="250" aria-label="${st.name} size"><i></i></label>
+    <label>ACROSS<input type="range" data-k="x" min="0" max="${W}" aria-label="${st.name} across"><i></i></label>
+    <label>HEIGHT<input type="range" data-k="y" min="0" max="${H}" aria-label="${st.name} up or down"><i></i></label>
+    <label>TURN<input type="range" data-k="r" min="-180" max="180" aria-label="${st.name} turn"><i></i></label></div>`).join('')}
+    <div class="row"><button id="o3-stkreset">RESET PLACES</button></div></div>
+  </div>
+  <div class="pane" data-pane="wear">
+  <div class="f"><span>OCD</span><div class="row"><input type="range" min="0" max="100" id="o3-ocd" aria-label="OCD: 0 every defect, 100 spotless"><b class="val" id="o3-ocdv"></b></div></div>
+  </div>
+  <div class="pane" data-pane="more">
+  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
+  </div>`;
 const $o = (s) => opt.body.querySelector(s);
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights'].map((k) => a[k])) === JSON.stringify(['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'lights'].map((k) => b[k]));
@@ -1059,7 +1100,14 @@ function drawOpt() {
       if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
     });
   });
+  opt.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('lit', b.dataset.tab === optTab));
+  opt.body.querySelectorAll('[data-pane]').forEach((d) => { d.hidden = d.dataset.pane !== optTab; });
   opt.body.querySelectorAll('[data-st]').forEach((b) => b.classList.toggle('lit', look.stickers.includes(b.dataset.st)));
+  opt.body.querySelectorAll('.stk').forEach((d) => {
+    const st = STICKERS.find((t) => t.id === d.dataset.sk), q = stkPlace(st), on = look.stickers.includes(st.id); d.classList.toggle('off', !on);
+    const vals = { s: Math.round(q.size / st.size * 100), x: Math.round(q.cx), y: Math.round(H - q.cy), r: Math.round(q.rot) };
+    d.querySelectorAll('[data-k]').forEach((inp) => { inp.value = vals[inp.dataset.k]; inp.nextElementSibling.textContent = inp.dataset.k === 's' ? vals.s + '%' : inp.dataset.k === 'r' ? vals.r + '°' : vals[inp.dataset.k]; });
+  });
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-ksize').value = Math.round(look.ksize * 100); $o('#o3-ksizev').textContent = Math.round(look.ksize * 100) + '%';
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
@@ -1085,6 +1133,14 @@ opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 opt.body.querySelectorAll('[data-st]').forEach((b) => b.onclick = () => { const id = b.dataset.st, on = look.stickers.includes(id); setLook('stickers', on ? look.stickers.filter((x) => x !== id) : [...look.stickers, id]); });
+opt.body.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => { optTab = b.dataset.tab; try { localStorage.setItem('shyoy.opttab3d', optTab); } catch (e) {} drawOpt(); });
+opt.body.querySelectorAll('.stk [data-k]').forEach((inp) => inp.oninput = () => {
+  const id = inp.closest('.stk').dataset.sk, k = inp.dataset.k, q = { ...(look.stk[id] || {}) };
+  q[k] = k === 's' ? inp.value / 100 : k === 'y' ? H - inp.value : +inp.value; look.stk = { ...look.stk, [id]: q };
+  if (!look.stickers.includes(id)) look.stickers = [...look.stickers, id];
+  setLook('stk', look.stk);
+});
+$o('#o3-stkreset').onclick = () => setLook('stk', {});
 $o('#o3-ocd').oninput = (e) => setLook('ocd', e.target.value / 100);
 $o('#o3-ksize').oninput = (e) => setLook('ksize', e.target.value / 100);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
