@@ -22,10 +22,11 @@ const shyoyRand = (() => {
     f.cutoff = U(0.2, 0.85); f.reso = U(0, 0.9); f.vcfEnv = U(0.15, 0.85); f.kybd = U(0.2, 0.8); f.drive = U(0.2, 0.75);
     f.accVcf = chance(0.5) ? U(0, 0.5) : 0;
     // envelope, VCA, glide: a sequenced bass synth, so attack is mostly 0 and the tails lean short
-    f.attack = chance(0.75) ? 0 : U(0, 0.35); f.decay = U(0.15, 0.65); f.sustain = chance(0.5) ? 0 : U(0.1, 0.7); f.release = U(0.25, 0.55);
-    // v0.36.7 (Johnny: the releases were all very short): 3 in 10 get a long tail, about 0.3-3 s, held at a level it can
+    f.attack = chance(0.75) ? 0 : U(0, 0.35); f.decay = U(0.35, 0.75); f.sustain = chance(0.35) ? 0 : U(0.15, 0.7); f.release = U(0.3, 0.6);
+    // v0.37.2 (Johnny: a lot of sounds are very blippy): decay 40 ms-1.2 s (was 7-500 ms), sustain on about 2 in 3,
+    // release 26-330 ms; v0.36.7 (Johnny: the releases were all very short): 4 in 10 get a long tail, about 0.3-3 s, held at a level it can
     // be heard from (a release only sounds if the note is still up when the gate closes)
-    if (chance(0.3)) { f.release = U(0.6, 0.87); if (f.sustain < 0.2) f.sustain = U(0.2, 0.6); }
+    if (chance(0.4)) { f.release = U(0.6, 0.87); if (f.sustain < 0.2) f.sustain = U(0.2, 0.6); }
     s.trig = pick([6, 3, 1]); s.vcaMode = pick([8, 2]);
     f.glide = U(0, 0.4); s.glideMode = pick([2, 6, 2]); f.slide = U(0.1, 0.5);
     // a little movement now and then (1 in 4): vibrato or a filter wobble

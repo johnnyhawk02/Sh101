@@ -25,12 +25,19 @@ html.pocket #pocket { display: block; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 46px; box-shadow: inset 0 2px 6px rgba(0,0,0,.6); }
 #pocket .pk-box { border: 2px solid #141414; border-radius: 6px; padding: 20px 14px 14px; position: relative; display: flex; flex-direction: column; gap: 14px; }
 #pocket .pk-box > h2 { position: absolute; top: -11px; left: 12px; margin: 0; background: #141414; color: #b9bbb8; font: 400 13px "Archivo Black", "Arial Black", sans-serif; letter-spacing: .1em; padding: 2px 8px; border-radius: 3px; }
-#pocket .pk-rnd { align-self: center; width: min(42vw, 30vh, 190px); aspect-ratio: 1; border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+#pocket .pk-rnd { align-self: center; width: min(38vw, 23vh, 165px); aspect-ratio: 1; border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 #pocket .pk-rnd svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); transition: transform .12s; }
 #pocket .pk-rnd:active svg { transform: scale(.94); }
 #pocket .pk-rnd.spin svg { animation: pk-spin .55s linear infinite; }
 @keyframes pk-spin { to { transform: rotate(-360deg); } }
-#pocket .pk-cap { text-align: center; font-size: 11px; opacity: .7; margin-top: -6px; }
+#pocket .pk-cap { text-align: center; font-size: 11px; opacity: .7; margin-top: 6px; }
+#pocket .pk-pair { display: flex; justify-content: space-evenly; align-items: flex-start; gap: 12px; }
+#pocket .pk-pair > div { display: flex; flex-direction: column; align-items: center; }
+#pocket .pk-gen { width: min(32vw, 19vh, 140px); aspect-ratio: 1; margin: 6%; border: 0; border-radius: 14px; background: #1c1c1c; padding: 10px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 0 #000, inset 0 1px 0 rgba(255,255,255,.12); }
+#pocket .pk-gen svg { width: 100%; height: 100%; display: block; }
+#pocket .pk-gen:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+#pocket .pk-row .pk-key { font-size: 11px; letter-spacing: .04em; padding: 0 6px; }
 #pocket .pk-row { display: flex; gap: 10px; align-items: center; }
 #pocket .pk-key { flex: 1; min-height: 48px; border: 0; border-radius: 5px; background: #1c1c1c; color: #eee; font: inherit; font-size: 14px; letter-spacing: .1em;
   box-shadow: 0 3px 0 #000, inset 0 1px 0 rgba(255,255,255,.12); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -39,7 +46,9 @@ html.pocket #pocket { display: block; }
 #pocket .pk-key i { width: 9px; height: 9px; border-radius: 50%; background: #4a1810; box-shadow: inset 0 1px 1px rgba(0,0,0,.6); }
 #pocket .pk-key.on i { background: #ff4a2a; box-shadow: 0 0 8px #ff4a2a; }
 #pocket .pk-name { flex: 1; min-width: 0; height: 48px; border: 2px solid #141414; border-radius: 5px; background: #d6d7d4; color: #141414; font: inherit; font-size: 16px; padding: 0 12px; letter-spacing: .04em; }
-#pocket .pk-sld { display: grid; grid-template-columns: auto 1fr 52px; gap: 12px; align-items: center; }
+#pocket .pk-key.run { width: 104px; }
+#pocket .pk-box.pat .pk-row { flex-wrap: wrap; }
+#pocket .pk-sld { flex: 1 1 170px; min-width: 0; display: grid; grid-template-columns: auto 1fr 40px; font-size: 11px; gap: 12px; align-items: center; }
 #pocket .pk-sld input { width: 100%; accent-color: #141414; height: 32px; }
 #pocket .pk-sld b { text-align: right; font-weight: 600; }
 #pocket .pk-full { margin-top: auto; align-self: center; background: none; border: 0; color: #141414; font: inherit; font-size: 12px; text-decoration: underline; opacity: .7; padding: 10px; cursor: pointer; }
@@ -50,15 +59,16 @@ html.pocket-able:not(.pocket) #pk-back { display: block; }
    the right, sized to the short height */
 @media (orientation: landscape) {
   #pocket { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-top: 12px; padding-bottom: 12px; }
-  #pocket .pk-in { max-width: 900px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr auto; gap: 12px 18px; align-content: start; }
+  #pocket .pk-in { max-width: 900px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; gap: 12px 18px; align-content: start; }
   #pocket .pk-top { grid-column: 1; grid-row: 1; }
   #pocket .pk-logo { width: 96px; }
   #pocket .pk-lcd { grid-column: 2; grid-row: 1; align-self: end; min-height: 40px; padding: 9px 12px; font-size: 15px; }
-  #pocket .pk-box.snd { grid-column: 1; grid-row: 2 / 5; gap: 10px; }
-  #pocket .pk-box.pat { grid-column: 2; grid-row: 2; }
+  #pocket .pk-box.rz { grid-column: 1; grid-row: 2 / 5; gap: 12px; }
+  #pocket .pk-box.snd { grid-column: 2; grid-row: 2; gap: 10px; }
+  #pocket .pk-box.pat { grid-column: 2; grid-row: 3; }
   #pocket .pk-full { grid-column: 2; grid-row: 4; margin: 0; align-self: end; justify-self: end; }
-  #pocket .pk-rnd { width: min(34vh, 160px); }
-  #pocket .pk-cap { display: none; }
+  #pocket .pk-rnd { width: min(30vh, 140px); }
+  #pocket .pk-gen { width: min(25vh, 118px); }
   #pocket .pk-key { min-height: 42px; }
   #pocket .pk-name { height: 42px; }
 }`;
@@ -68,19 +78,26 @@ html.pocket-able:not(.pocket) #pk-back { display: block; }
 <ellipse cx="37" cy="40" rx="3.8" ry="8" fill="#151515"/><ellipse cx="63" cy="40" rx="3.8" ry="8" fill="#151515"/>
 <path d="M27 57 A24 24 0 0 0 73 57" fill="none" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
 <path d="M18 30 A38 38 0 0 1 40 13" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="4" stroke-linecap="round"/></svg>`;
+  // a little piano roll for GENERATE
+  const ROLL = `<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#ff4a2a">${[[8, 62], [20, 62], [32, 38], [44, 62], [56, 50], [68, 26], [80, 50]].map(([x, y]) => `<rect x="${x}" y="${y}" width="10" height="9" rx="1.5"/>`).join('')}</g>
+<g stroke="rgba(255,255,255,.18)" stroke-width="1">${[20, 32, 44, 56, 68, 80].map((x) => `<line x1="${x - 1}" y1="18" x2="${x - 1}" y2="80"/>`).join('')}</g></svg>`;
   const el = document.createElement('div'); el.id = 'pocket'; el.setAttribute('role', 'main');
   el.innerHTML = `<div class="pk-in">
   <div class="pk-top"><span class="pk-logo" role="img" aria-label="Shyoy"></span><span class="pk-ver"></span></div>
   <div class="pk-lcd" aria-live="polite"></div>
-  <section class="pk-box snd"><h2>SOUND</h2>
-    <button class="pk-rnd" aria-label="Randomise the sound">${SMILE}</button>
-    <div class="pk-cap">TAP FOR A NEW SOUND</div>
-    <div class="pk-row"><button class="pk-key small" data-k="undo">UNDO</button><input class="pk-name" type="text" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="NAME…" aria-label="Preset name"><button class="pk-key small" data-k="name" aria-label="Another name">🎲</button></div>
-    <div class="pk-row"><button class="pk-key" data-k="save">SAVE</button></div>
+  <section class="pk-box rz"><h2>RANDOMISE</h2>
+    <div class="pk-pair">
+      <div><button class="pk-rnd" aria-label="Randomise the sound">${SMILE}</button><div class="pk-cap">SOUND</div></div>
+      <div><button class="pk-gen" data-k="gen" aria-label="Generate a new pattern">${ROLL}</button><div class="pk-cap">PATTERN</div></div>
+    </div>
+    <div class="pk-row"><button class="pk-key" data-k="undo">UNDO</button><button class="pk-key" data-k="r-acc">ACCENTS</button><button class="pk-key" data-k="r-slide">SLIDES</button><button class="pk-key" data-k="r-oct">OCTAVES</button></div>
+  </section>
+  <section class="pk-box snd"><h2>SAVE</h2>
+    <div class="pk-row"><input class="pk-name" type="text" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="NAME…" aria-label="Preset name"><button class="pk-key small" data-k="name" aria-label="Another name">🎲</button><button class="pk-key small" data-k="save">SAVE</button></div>
   </section>
   <section class="pk-box pat"><h2>PATTERN</h2>
-    <div class="pk-row"><button class="pk-key" data-k="run"><i></i><span>RUN</span></button><button class="pk-key" data-k="gen">GENERATE</button></div>
-    <label class="pk-sld"><span>DENSITY</span><input type="range" min="10" max="100" step="1" aria-label="Pattern density"><b></b></label>
+    <div class="pk-row"><button class="pk-key small run" data-k="run"><i></i><span>RUN</span></button>
+    <label class="pk-sld"><span>DENSITY</span><input type="range" min="10" max="100" step="1" aria-label="Pattern density"><b></b></label></div>
   </section>
   <button class="pk-full">FULL PANEL</button>
 </div>`;
@@ -102,6 +119,8 @@ html.pocket-able:not(.pocket) #pk-back { display: block; }
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-k=save]').click(); });
   runK.onclick = () => setRun(!running);
   $('[data-k=gen]').onclick = () => { boot(); document.getElementById('sq-rnd').click(); };
+  // v0.37.2 (Johnny): the sequencer's own Randomise > Accents / Slides / Octaves
+  for (const id of ['r-acc', 'r-slide', 'r-oct']) $(`[data-k=${id}]`).onclick = () => { boot(); document.getElementById(id).click(); };
   dens.oninput = () => { sqDens.value = dens.value; sqDens.dispatchEvent(new Event('input', { bubbles: true })); sqDens.dispatchEvent(new Event('change', { bubbles: true })); };
   // keeps the page in step with the app (randomise, a save, a preset loaded elsewhere)
   function sync() {
