@@ -403,12 +403,6 @@ const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, 
   makeKey(gn.cx(2), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('sq-rnd').click(), pad: 10, tag: 'rnd' }); labelAt(() => 'NEW', gn.cx(2), gn.y0 + LY);
   makeKey(gn.cx(3), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('p-undo').click(), pad: 10, tag: 'undo' });
   labelAt(() => 'UNDO', gn.cx(3), gn.y0 + LY, { dim: () => document.getElementById('p-undo').disabled });
-  // the scale: SCALE steps through the list (its name under the key), APPLY ticks Apply scale on MIDI note
-  const sc = box(13, 0, 5, 1, 'SCALE');
-  makeKey(sc.cx(1), sc.y0 + KEYY, 24, 14, { on: () => false, press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), pad: 10, tag: 'scale' });
-  labelAt(() => SCALE_LIST[state.scale.i].label, sc.cx(1), sc.y0 + LY);
-  makeKey(sc.cx(3), sc.y0 + KEYY, 24, 14, { on: () => state.scale.on, press: () => setScale({ on: !state.scale.on }), pad: 10, tag: 'scaleOn' });
-  labelAt(() => 'APPLY', sc.cx(3), sc.y0 + LY);
 }
 // the menus as rows of keys: [heading, [label, id]...] per column
 const keyList = (b, colsDef) => colsDef.forEach((list, ci) => {
@@ -425,9 +419,20 @@ const keyList = (b, colsDef) => colsDef.forEach((list, ci) => {
 keyList(box(14, 1, 4, 2, 'RANDOMISE'), [
   ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie'], 'PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']],
   ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']]]);
-keyList(box(14, 3, 4, 2, 'TOOLS'), [
+const tools = box(14, 3, 4, 2, 'TOOLS');
+keyList(tools, [
   ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN CHAIN', 'p-join']],
   ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DOWN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DOWN', 'nu-odn'], ['SHIFT LEFT', 'rot-l'], ['SHIFT RIGHT', 'rot-r']]]);
+// the scale, under the lists in the TOOLS box: the first key steps the scale, the second ticks Apply scale on MIDI note
+{ const kx = tools.bx + 18, y0 = tools.by + 26 + 125 + 8;
+  prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, 'SCALE', kx - 7, y0 + 4, 9.5, 'left'); x.globalAlpha = 1; });
+  [[() => SCALE_LIST[state.scale.i].name.toUpperCase(), () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), () => false],
+    ['APPLY ON MIDI NOTE', () => setScale({ on: !state.scale.on }), () => state.scale.on]].forEach(([t, press, on], i) => {
+    const ky = y0 + 21 + i * 18 + 4, k = makeKey(kx, ky, 15, 10, { on, press, pad: 2, tag: 'scale' + i });
+    k.rect = [kx - 12, ky - 8, tools.bw / 2 - 12, 16];
+    prints.push((x, ink) => { x.fillStyle = ink; text(x, typeof t === 'function' ? t() : t, kx + 12, ky + 0.5, 10.5, 'left'); });
+  });
+}
 // ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
 const RB = box(0, 1, 14, 4, 'PATTERN EDIT');
 const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
