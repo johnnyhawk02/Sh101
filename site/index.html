@@ -47,7 +47,7 @@ setTimeout(() => window.shyoySplash.done(), 20000);
 <div class="unit" id="unit">
   <header class="top">
     <!-- v0.22.11: logo is Johnny's shyoy.psd artwork, used as a mask filled with the LCD ink and multiplied onto the glass -->
-    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.35.3</i></b></div>
+    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.35.4</i></b></div>
     <!-- v0.22.10: battery readout and Bend board tab taken off the page (Johnny); both stay in the HTML, hidden -->
     <span class="psu" id="psu" hidden>Battery 9.0 V · rail 100%</span>
     <div class="transport">
@@ -233,7 +233,7 @@ setTimeout(() => window.shyoySplash.done(), 20000);
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.35.3</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.35.4</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
@@ -308,7 +308,7 @@ window.shyoyView = (v, tab) => {
   try { localStorage.setItem('shyoy.view', v); } catch (e) {}
   if (v === '3d') {
     if (window.shyoy3d) window.shyoy3d.show();
-    else import('./js/app/view3d.js?v=0.35.3').catch((e) => { console.warn('3D view', e); root.dataset.view = '2d'; window.shyoySplash.done(); });
+    else import('./js/app/view3d.js?v=0.35.4').catch((e) => { console.warn('3D view', e); root.dataset.view = '2d'; window.shyoySplash.done(); });
   } else { if (window.shyoy3d) window.shyoy3d.hide(); if (tab) showTab(tab); window.shyoySplash.done(); }
 };
 if (document.documentElement.dataset.view === '3d') window.shyoyView('3d'); else window.shyoySplash.done();
