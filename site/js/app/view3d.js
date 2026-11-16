@@ -18,9 +18,21 @@ const root = document.documentElement;
 
 // ---------------------------------------------------------------- look (Options): panel colour, lighting, finish, lens
 const LOOK_KEY = 'shyoy.look3d';
-const LOOK0 = { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4 };
+const LOOK0 = { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4 };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0 };
 try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
+// three lights (v0.31.0): each { col, int, az (orbit round the panel, degrees, 0 = from the right, 90 = from the top),
+// el (height above the panel, degrees) }. Light 1 casts the shadows. A lighting preset sets all three; then each
+// can be changed in OPTIONS. Older saved looks get theirs from their preset.
+const deg = (r) => Math.round(r * 180 / Math.PI);
+function presetLights(name) {
+  const L = LIGHTS[name] || LIGHTS.studio, [x, y, z] = L.dir, az = deg(Math.atan2(y, x)), hex = (c) => '#' + c.toString(16).padStart(6, '0');
+  return [
+    { col: hex(L.col), int: L.key, az: (az + 360) % 360, el: deg(Math.atan2(z, Math.hypot(x, y))) },
+    { col: L.fill || '#cfdcff', int: 0.35, az: (az + 180) % 360, el: 30 },   // fill, from the other side
+    { col: L.rim || '#ffe2c0', int: 0.25, az: (az + 270) % 360, el: 12 },    // a low rim light
+  ];
+}
 const saveLook = () => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} };
 const SWATCHES = ['#e4e2da', '#f4f3ef', '#b9bbb8', '#6c6e70', '#202122', '#c4352b', '#df7a2c', '#e6c24a', '#4e7b56', '#2f5c88', '#ef9fbf'];
 const LIGHTS = {
@@ -30,6 +42,7 @@ const LIGHTS = {
   raking: { name: 'LOW SUN', dir: [-1, 0.22, 0.42], col: 0xfff3e2, key: 2.4, hemi: 0.45 },
   top: { name: 'OVERHEAD', dir: [0, 1, 0.6], col: 0xffffff, key: 1.8, hemi: 0.65 },
 };
+if (!Array.isArray(look.lights) || look.lights.length !== 3) look.lights = presetLights(look.light);
 const FINISH = { matt: { name: 'MATT', r: 0.95, m: 0, e: 0.25 }, satin: { name: 'SATIN', r: 0.55, m: 0, e: 0.6 }, metal: { name: 'METAL', r: 0.42, m: 0.7, e: 1.1, brushed: true } };
 const lensFov = (u) => 6 * Math.pow(8, Math.max(0, Math.min(1, u)));   // 6° (flat) .. 48° (wide)
 
@@ -119,6 +132,7 @@ const key = new THREE.DirectionalLight(0xffffff, 2); key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.5; key.shadow.radius = 4;
 Object.assign(key.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 });
 scene.add(key, key.target);
+const lamps = [key, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)]; scene.add(lamps[1], lamps[2]);   // light 1 is the shadow-casting key
 
 const P = (px, py, z = 0) => new THREE.Vector3(px - W / 2, H / 2 - py, z);   // panel px (y down) -> world
 const panelMat = new THREE.MeshStandardMaterial({ color: 0xe4e2da, roughness: 0.6 });
@@ -202,6 +216,7 @@ const panelWear = wearTex(2048, 1024, 101, { scuff: 0.35, dent: 0.35, tile: 4, b
 const edgeWear = wearTex(1024, 128, 202, { scuff: 0.5, dent: 0.3, tile: 8, big: [10, 10, 0.5], knocks: [22, 16], scratches: [30, 50] });
 // knobs: four worn sets; each knob takes one, turned and shifted its own way, and a wear depth from barely to well used
 panelMat.bumpMap = panelWear; panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
+window.shyoyWearMaps = () => ({ panel: panelWear.image, edges: edgeWear.image, knobs: knobWear.map((t) => t.image) });   // to look at the bump maps (console)
 const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.12 + 0.06 * i, dent: 0.25 + 0.1 * i, tile: 1, big: [2 + 2 * i, 14, 0.3 + 0.08 * i], scratches: [6 + 5 * i, 70] }));
 
 // the knob (v0.30.0): Johnny's Yamaha CS1x/CS2x/AN1x knob STL: a fluted, tapered cap on a flared skirt with a pointed
@@ -636,8 +651,12 @@ function applyLook() {
   panelMat.roughness = F.r; panelMat.metalness = F.m; panelMat.envMapIntensity = F.e;
   const rm = F.brushed ? brushed : null; if (panelMat.roughnessMap !== rm) { panelMat.roughnessMap = rm; panelMat.needsUpdate = true; }
   const L = LIGHTS[look.light] || LIGHTS.studio, b = look.bright;
-  key.color.set(L.col); key.intensity = L.key * b; hemi.intensity = L.hemi * b; hemi.color.set(L.hemiCol || 0xffffff); hemi.groundColor.set(0x404040);
-  key.position.set(L.dir[0] * 2500, L.dir[1] * 2500, L.dir[2] * 2500); key.target.position.set(0, 0, 0);
+  hemi.intensity = L.hemi * b; hemi.color.set(L.hemiCol || 0xffffff); hemi.groundColor.set(0x404040);
+  look.lights.forEach((l, i) => {
+    const a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, lamp = lamps[i];
+    lamp.color.set(l.col); lamp.intensity = l.int * b;
+    lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
+  });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
@@ -743,6 +762,10 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
   box-shadow: inset 0 0 0 2px var(--v3d-ink), 0 20px 60px rgba(0,0,0,.55); padding: 34px 22px 16px; box-sizing: border-box; }
 .v3d-sheet h2 { position: absolute; top: 8px; left: 14px; margin: 0; font: 400 15px/1 ${DISPLAY}; letter-spacing: .04em; color: var(--v3d-paper); background: var(--v3d-ink); padding: 4px 9px 3px; }
 .v3d-sheet .x { position: absolute; top: 6px; right: 10px; width: 30px; height: 26px; }
+.v3d-sheet .lamp { display: grid; grid-template-columns: 16px 34px repeat(3, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 8px; font-size: 10px; letter-spacing: .06em; }
+.v3d-sheet .lamp input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
+.v3d-sheet .lamp label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .lamp label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
+.v3d-sheet .lamp label i { font-style: normal; grid-row: 1; grid-column: 2; }
 .v3d-sheet .f { margin: 0 0 14px; } .v3d-sheet .f > span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .08em; margin-bottom: 6px; }
 .v3d-sheet .row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .v3d-sheet button { font: 600 11px ${MONO}; letter-spacing: .06em; color: #fff; background: #0c0c0c; border: 0; border-radius: 3px; padding: 7px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -795,6 +818,10 @@ opt.body.innerHTML = `
   <div class="f"><span>PANEL COLOUR</span><div class="row" id="o3-sw">${SWATCHES.map((c) => `<button class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}<input type="color" id="o3-col" aria-label="Any colour"></div></div>
   <div class="f"><span>LIGHTING</span><div class="row" id="o3-light">${Object.entries(LIGHTS).map(([k, l]) => `<button data-l="${k}"><i></i>${l.name}</button>`).join('')}</div>
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
+  <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
+    <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
+    <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
+    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>`;
@@ -804,18 +831,29 @@ function drawOpt() {
   opt.body.querySelectorAll('[data-l]').forEach((b) => b.classList.toggle('lit', b.dataset.l === look.light));
   opt.body.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('lit', b.dataset.f === look.finish));
   $o('#o3-col').value = look.colour; $o('#o3-bright').value = Math.round(look.bright * 100); $o('#o3-brightv').textContent = Math.round(look.bright * 100) + '%';
+  opt.body.querySelectorAll('.lamp').forEach((d) => {
+    const l = look.lights[+d.dataset.i];
+    d.querySelectorAll('[data-k]').forEach((inp) => {
+      const k = inp.dataset.k; inp.value = k === 'int' ? Math.round(l.int * 100) : l[k];
+      if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
+    });
+  });
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
   sheetVars();
 }
 const setLook = (k, v) => { look[k] = v; saveLook(); applyLook(); drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
 $o('#o3-col').oninput = (e) => setLook('colour', e.target.value);
-opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => setLook('light', b.dataset.l));
+opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => { look.lights = presetLights(b.dataset.l); setLook('light', b.dataset.l); });
+opt.body.querySelectorAll('.lamp [data-k]').forEach((inp) => inp.oninput = () => {
+  const l = look.lights[+inp.closest('.lamp').dataset.i], k = inp.dataset.k;
+  l[k] = k === 'col' ? inp.value : k === 'int' ? inp.value / 100 : +inp.value; setLook('lights', look.lights);
+});
 opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0); saveLook(); applyLook(); drawOpt(); };
+$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: presetLights(LOOK0.light) }); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
