@@ -47,16 +47,17 @@ const shyoyRand = (() => {
       else if (it.f) f[it.f] = /mix$/.test(it.f) ? U(0.15, 0.45) : U(0.2, 0.8);
     }
     s.fxorder = pick([1, 1]); s.fxret = pick([5, 3, 2]);
+    // the output trims start from noon each time (levelled sets them after)
+    f.level = 0.7; f.fldlevel = 0.5; f.ratvol = 0.5; f.dslevel = 0.5; f.tslevel = 0.5;
     return { f, s, fx };
   }
   // ---- loudness (v0.34.1, Johnny: randomised sounds came out very loud) ----
   // Before a new sound goes on, a copy of the engine (the same worklet code, run in a Web Worker, so the page doesn't
   // stall and nothing is heard) plays the current pattern with it for 2 s, and with a plain reference sound. The VCA
-  // Level is then set so the new sound is as loud as the reference (Level 0.1-1). The drive pedals sit after the VCA,
-  // so where a pedal is on a second pass checks it, and if Level alone can't bring it down the pedal's own output
-  // knob comes down too. The live engine is not changed; it only gets the finished sound, as from a preset.
+  // sound's output is then trimmed to match the reference (see levelled). The live engine is not changed; it only gets
+  // the finished sound, as from a preset.
   const REF = { saw: 0.8, pulse: 0, sub: 0.4, noise: 0, range: 1, cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, drive: 0.4, decay: 0.4, sustain: 0, release: 0.3, attack: 0, level: 0.7 };
-  const PEDAL_OUT = ['ratvol', 'dslevel', 'tslevel'];
+  const PEDAL_OUT = ['ratvol', 'dslevel', 'tslevel'], TRIMS = ['level', 'fldlevel', ...PEDAL_OUT];
   let worker = null, jobs = 0; const waiting = new Map();
   async function meterWorker() {
     if (worker) return worker;
@@ -89,33 +90,44 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
   // the reference: a plain saw + sub patch, no FX, played with the same pattern, tempo, transpose and accent
   const refSnap = () => { const q = state.params, p = { ...defaults, ...REF, transpose: q.transpose, tune: q.tune, accent: q.accent, swing: q.swing, gateLen: q.gateLen }; return { params: p, bend: stockBend(), br: {}, fx: FX_OFF() }; };
   const dB = (r) => 20 * Math.log10(Math.max(1e-6, r));
-  // up to four passes: Level towards the reference (0.1-1); where Level is pinned and a drive pedal is on, its output knob
+  // (Johnny: it's mainly the distortion, so turn its post level down) with a drive pedal on, its output knob moves (the
+  // folder's Level when only the folder is on), so the drive itself sounds as drawn; with neither, or when that knob
+  // can't get there, the VCA Level (0.1-1) moves. Each knob is found by halving (six tries at most, stopping within
+  // 1 dB): the output knobs are audio taper, so a straight ratio overshoots.
+  const postOf = (snap) => snap.fx.rat ? PEDAL_OUT[Math.max(0, Math.min(2, snap.params.drvtype | 0))] : snap.fx.fold ? 'fldlevel' : null;
+  async function trim(snap, knob, lo, hi, ref, m) {
+    const p = snap.params; let best = { e: dB(ref.rms / m.rms), v: p[knob], m };
+    if (Math.abs(best.e) < 1) return best;
+    let L = lo, H = hi; if (best.e < 0) H = p[knob]; else L = p[knob];
+    for (let i = 0; i < 6; i++) {
+      const v = (L + H) / 2; p[knob] = v; const [r] = await meter([snap]); const e = dB(ref.rms / Math.max(1e-9, r.rms));
+      if (Math.abs(e) < Math.abs(best.e)) best = { e, v, m: r };
+      if (Math.abs(e) < 1) break; if (e < 0) H = v; else L = v;
+    }
+    p[knob] = best.v; return best;
+  }
   async function levelled(snap) {
-    const p = snap.params, k = PEDAL_OUT[Math.max(0, Math.min(2, p.drvtype | 0))];
+    const post1 = postOf(snap);
     try {
-      const [ref, first] = await meter([refSnap(), snap]); let a = first;
-      if (ref.rms < 1e-4) return snap;
-      for (let pass = 0; pass < 4 && a.rms > 1e-4; pass++) {
-        const err = ref.rms / a.rms; if (Math.abs(dB(err)) < 1) break;
-        const lv = Math.max(0.1, Math.min(1, p.level * err));
-        if (Math.abs(lv - p.level) > 1e-3) p.level = lv;
-        else if (snap.fx.rat) p[k] = Math.max(0.05, Math.min(1, p[k] * err));
-        else break;
-        [a] = await meter([snap]);
-      }
-      last = { ref: dB(ref.rms), got: dB(first.rms), now: dB(a.rms), level: p.level };
+      const [ref, first] = await meter([refSnap(), snap]);
+      if (ref.rms < 1e-4 || first.rms < 1e-5) return snap;
+      let r = { e: dB(ref.rms / first.rms), m: first };
+      if (post1) r = await trim(snap, post1, 0.02, 1, ref, first);
+      if (Math.abs(r.e) >= 1.5) r = await trim(snap, 'level', 0.1, 1, ref, r.m);
+      last = { ref: dB(ref.rms), got: dB(first.rms), now: dB(r.m.rms), level: snap.params.level, post: post1 && snap.params[post1] };
     } catch (e) { console.warn('sticker loudness', e); }
     return snap;
   }
-  // the fade: the new sound goes on at Level 0 while it is measured, then Level rises to the matched value
+  // the fade (Johnny: fade low, then bring it up): the new sound goes on with its trim knob (the pedal's output, else
+  // Level) at 0 while it is measured, then that knob rises to the matched value
   let fadeTok = 0, curP = null;
-  function fadeTo(tok, to) {
-    const from = state.params.level, t0 = performance.now(), T = 700;
+  function fadeTo(tok, id, to) {
+    const from = state.params[id], t0 = performance.now(), T = 700;
     const step = () => {
       if (tok !== fadeTok) return;
       const u = Math.min(1, (performance.now() - t0) / T), v = from + (to - from) * u * u;
-      state.params.level = v; post({ type: 'param', id: 'level', v });
-      if (u < 1) setTimeout(step, 25); else { ui.level(to); save(); }
+      state.params[id] = v; post({ type: 'param', id, v });
+      if (u < 1) setTimeout(step, 25); else { if (ui[id]) ui[id](to); save(); }
     };
     step();
   }
@@ -132,7 +144,7 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
   async function roll1() {
     const before = soundSnap(), entry = { snap: before, name, sel: prjSel.value }; undo.push(entry); if (undo.length > 20) undo.shift();
     // clicked again before the last sound finished fading in: its undo copy gets the level it was heading for
-    if (curP) curP.then((f) => { for (const q of ['level', ...PEDAL_OUT]) before.params[q] = f.params[q]; });
+    if (curP) curP.then((f) => { for (const q of TRIMS) before.params[q] = f.params[q]; });
     const a = amount, t = draw(), p = clone(state.params);
     for (const k in t.f) p[k] = clamp(p[k] + (t.f[k] - p[k]) * a);
     for (const k in t.s) if (chance(a)) p[k] = t.s[k];
@@ -141,14 +153,14 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     if (p.reso > 0.75) p.cutoff = Math.min(p.cutoff, 0.7);
     const m = Math.max(p.saw, p.pulse, p.sub); if (m < 0.5) { const k = ['saw', 'pulse', 'sub'].find((k) => p[k] === m); p[k] = 0.5; }
     const snap = { params: p, bend: clone(state.bend), br: clone(state.br), fx, strip: clone(state.strip) }, tok = ++fadeTok;
-    load({ ...snap, params: { ...p, level: 0 } });
+    const trim = postOf(snap) || 'level'; load({ ...snap, params: { ...p, [trim]: 0 } });
     // a new name from the namer, shown unsaved; SAVE stores it under that name
     name = NAMER(prjBar.user); nameEl.value = name;
     prjSel.value = ''; prjSel.dispatchEvent(new Event('sync')); const c = curEl(); if (c) c.textContent = name + ' *';
     busy = false;   // a new click may start now; this one's fade is dropped if so
     const P = curP = levelled(clone(snap)), fin = await P; if (curP === P) curP = null; if (tok !== fadeTok) return;
-    for (const q of PEDAL_OUT) if (fin.params[q] !== state.params[q]) { state.params[q] = fin.params[q]; post({ type: 'param', id: q, v: fin.params[q] }); if (ui[q]) ui[q](fin.params[q]); }
-    fadeTo(tok, fin.params.level);
+    for (const q of TRIMS) if (q !== trim && fin.params[q] !== state.params[q]) { state.params[q] = fin.params[q]; post({ type: 'param', id: q, v: fin.params[q] }); if (ui[q]) ui[q](fin.params[q]); }
+    fadeTo(tok, trim, fin.params[trim]);
   }
   function back() {
     const u = undo.pop(); if (!u) return false;
@@ -165,5 +177,8 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     set amount(v) { amount = clamp(v); store.set('rndAmount', amount); },
     get depth() { return undo.length; },
     get last() { return last; }, meter,
+    // for tests: a whole new sound, drawn but not played
+    sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), fx: t.fx, strip: clone(state.strip) }; },
+    refSnap,
   };
 })();
