@@ -239,12 +239,15 @@ function wearTex(w, h, seed, o) {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
 }
 // the case: the face, and the black edges round it
-const panelWear = wearTex(2048, 1024, 101, { scuff: 0.35, dent: 0.35, tile: 4, big: [26, 22, 0.35], knocks: [22, 30], scratches: [90, 120], edge: [0.12, 1.6, 260] });   // v0.31.6: faint round the knobs, deep at the edges (Johnny)
+const PANEL_WEAR = { scuff: 0.35, dent: 0.35, tile: 4, big: [26, 22, 0.35], knocks: [22, 30], scratches: [90, 120], edge: [0.12, 1.6, 260] };   // v0.31.6: faint round the knobs, deep at the edges (Johnny)
+const panelWear = wearTex(2048, 1024, 101, PANEL_WEAR);
+const seqWear = wearTex(2048, 1024, 909, PANEL_WEAR);   // v0.32.1: the sequencer page has its own marks (Johnny)
+const wearOf = (p) => p === 'seq' ? seqWear : panelWear;
 const edgeWear = wearTex(1024, 128, 202, { scuff: 0.5, dent: 0.3, tile: 8, big: [10, 10, 0.5], knocks: [22, 16], scratches: [30, 50] });
 // knobs: four worn sets; each knob takes one, turned and shifted its own way, and a wear depth from barely to well used
-panelMat.bumpMap = panelWear; panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
-window.shyoyWearMaps = () => ({ panel: panelWear.image, edges: edgeWear.image, knobs: knobWear.map((t) => t.image) });   // to look at the bump maps (console)
-print.material = new THREE.MeshStandardMaterial({ map: printTex, transparent: true, depthWrite: false, roughness: 0.45, metalness: 0, envMapIntensity: 0.7, bumpMap: panelWear, bumpScale: PANEL_BUMP * 1.6 });   // v0.31.3: the print is lit and carries the dents
+panelMat.bumpMap = wearOf(page); panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
+window.shyoyWearMaps = () => ({ panel: panelWear.image, seq: seqWear.image, edges: edgeWear.image, knobs: knobWear.map((t) => t.image) });   // to look at the bump maps (console)
+print.material = new THREE.MeshStandardMaterial({ map: printTex, transparent: true, depthWrite: false, roughness: 0.45, metalness: 0, envMapIntensity: 0.7, bumpMap: wearOf(page), bumpScale: PANEL_BUMP * 1.6 });   // v0.31.3: the print is lit and carries the dents
 print.receiveShadow = true;
 const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.12 + 0.06 * i, dent: 0.25 + 0.1 * i, tile: 1, big: [2 + 2 * i, 14, 0.3 + 0.08 * i], scratches: [6 + 5 * i, 70] }));
 
@@ -485,7 +488,8 @@ buildPage = 'all'; grp = scene; prints = printsBy.all;
 const LOGO_WEAR = [78, 26];   // wear-map level where the ink is gone, and the span over which it fades back to full
 const logoCv = document.createElement('canvas'); logoCv.width = TITLE.w * S2; logoCv.height = TITLE.h * S2;
 const logoTex = new THREE.CanvasTexture(logoCv); logoTex.colorSpace = THREE.SRGBColorSpace; logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const logoWear = panelWear.clone(); logoWear.repeat.set(TITLE.w / W, TITLE.h / H); logoWear.offset.set(TITLE.x / W, 1 - (TITLE.y + TITLE.h) / H);
+const logoWears = Object.fromEntries(['synth', 'seq'].map((p) => { const t = wearOf(p).clone(); t.repeat.set(TITLE.w / W, TITLE.h / H); t.offset.set(TITLE.x / W, 1 - (TITLE.y + TITLE.h) / H); return [p, t]; }));
+const logoWear = logoWears[page];
 const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
 logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
@@ -496,7 +500,7 @@ prints.push((x, ink) => {
     lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
     // worn ink (v0.31.2): where the wear map dips (scuffs, scratches, dents) the ink is rubbed thin or through to the
     // panel, so the wear reads on a black logo too
-    const wc = panelWear.image, sx = wc.width / W, sy = wc.height / H, pw = TITLE.w * sx | 0, ph = TITLE.h * sy | 0;
+    const wc = wearOf(page).image, sx = wc.width / W, sy = wc.height / H, pw = TITLE.w * sx | 0, ph = TITLE.h * sy | 0;
     const patch = document.createElement('canvas'); patch.width = logoCv.width; patch.height = logoCv.height;
     const pc2 = patch.getContext('2d'); pc2.drawImage(wc, TITLE.x * sx, TITLE.y * sy, pw, ph, 0, 0, patch.width, patch.height);
     const wv = pc2.getImageData(0, 0, patch.width, patch.height).data, img = lx2.getImageData(0, 0, logoCv.width, logoCv.height), d = img.data;
@@ -517,6 +521,7 @@ addCtl({ kind: 'title', rect: [TITLE.x + 60, TITLE.y + 4, TITLE.w - 120, 78], pr
 function setPage(k) {
   page = k; try { localStorage.setItem('shyoy.page3d', k); } catch (e) {}
   pages.synth.visible = k === 'synth'; pages.seq.visible = k === 'seq'; ro.hide();
+  panelMat.bumpMap = print.material.bumpMap = wearOf(k); logoMat.bumpMap = logoWears[k];   // each page its own wear
   printDirty = shadowDirty = dirty = true;
 }
 
@@ -712,11 +717,11 @@ function applyLook() {
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
   printDirty = shadowDirty = dirty = true;
 }
-let pMask = null;
+const pMasks = {};
 function printMask() {   // alpha: 1 where the ink holds, fading to 0 where the wear map is lowest (same thresholds as the logo)
-  if (pMask) return pMask;
-  pMask = document.createElement('canvas'); pMask.width = pc.width; pMask.height = pc.height; const m = pMask.getContext('2d');
-  m.drawImage(panelWear.image, 0, 0, pc.width, pc.height); const img = m.getImageData(0, 0, pc.width, pc.height), d = img.data;
+  if (pMasks[page]) return pMasks[page];
+  const pMask = pMasks[page] = document.createElement('canvas'); pMask.width = pc.width; pMask.height = pc.height; const m = pMask.getContext('2d');
+  m.drawImage(wearOf(page).image, 0, 0, pc.width, pc.height); const img = m.getImageData(0, 0, pc.width, pc.height), d = img.data;
   for (let i = 0; i < d.length; i += 4) { d[i + 3] = 255 * Math.max(0, Math.min(1, (d[i] - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i] = d[i + 1] = d[i + 2] = 0; }
   m.putImageData(img, 0, 0); return pMask;
 }
