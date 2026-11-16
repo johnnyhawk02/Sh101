@@ -702,7 +702,7 @@ opt.body.innerHTML = `
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
-  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-2d">2D VIEW</button><button id="o3-reset">RESET LOOK</button></div></div>`;
+  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
 function drawOpt() {
   opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
@@ -720,7 +720,6 @@ opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('
 $o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
 $o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-$o('#o3-2d').onclick = () => { opt.close(); window.shyoyView('2d'); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
 
