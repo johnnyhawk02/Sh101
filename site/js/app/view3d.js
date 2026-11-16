@@ -126,7 +126,7 @@ const domLabel = (id) => { const l = document.querySelector(`label[for="f-${id}"
 const progOf = () => RV_PROG[REV_IDS[Math.max(0, Math.min(3, state.params.revtype | 0))]];
 
 // ---------------------------------------------------------------- renderer, scene
-await Promise.race([Promise.all([document.fonts.load(`600 12px ${MONO}`), document.fonts.load(`400 14px ${DISPLAY}`)]), new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
+await Promise.race([Promise.all([document.fonts.load(`600 12px ${MONO}`), document.fonts.load(`400 14px ${DISPLAY}`), document.fonts.load(`14px "Permanent Marker"`)]), new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
 const logo = new Image(); logo.src = 'icons/logo.png';
 await Promise.race([logo.decode().catch(() => {}), new Promise((r) => setTimeout(r, 2500))]);
 
@@ -516,7 +516,8 @@ const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logo
 logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
 // a strip of torn masking tape stuck on the panel (v0.32.2, Johnny): drawn on a canvas, crepe lines across it, ragged
 // torn ends and wavy edges, a little see-through; lit, with its own crinkle bump, on both pages
-const TAPE = { cx: W - M - 92, cy: H - M - 2, w: 168, h: 32, rot: 9 };
+// v0.32.4: across the top-right corner, wider, written on in marker (Johnny); clipped where it runs off the panel's edge
+const TAPE = { cx: W - 38, cy: 38, w: 156, h: 44, rot: -40, text: ['PROPERTY OF', 'GLOBAL GOON'] };
 const tape = (() => {
   const S = 4, cw = TAPE.w * S, ch = TAPE.h * S, R = rng(4242);
   const c = document.createElement('canvas'); c.width = cw; c.height = ch; const x = c.getContext('2d');
@@ -536,6 +537,18 @@ const tape = (() => {
   for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${R() < 0.5 ? '255,250,235' : '110,90,50'},${0.05 + R() * 0.08})`; x.fillRect(R() * cw, R() * ch, 1 + R() * 3, 1); }   // paper fleck
   const g = x.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, 'rgba(90,70,30,.18)'); g.addColorStop(0.12, 'rgba(0,0,0,0)'); g.addColorStop(0.88, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(90,70,30,.18)');
   x.fillStyle = g; x.fillRect(0, 0, cw, ch); x.restore();
+  // marker writing
+  x.save(); x.translate(cw / 2, ch / 2); x.rotate(-0.02); x.fillStyle = 'rgba(22,22,26,.88)'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = `${10 * S}px "Permanent Marker", "Marker Felt", "Chalkboard SE", "Comic Sans MS", cursive`;
+  TAPE.text.forEach((t, i) => x.fillText(t, (-16 + (i - 0.5) * 3) * S, (i - (TAPE.text.length - 1) / 2) * 15 * S));
+  x.restore();
+  // cut off where the tape runs past the panel (as if it wraps round the edge)
+  const a = -TAPE.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, cw, ch), d = img.data;
+  for (let v = 0, i = 0; v < ch; v++) for (let u = 0; u < cw; u++, i += 4) {
+    const lx = u / S - TAPE.w / 2, ly = v / S - TAPE.h / 2, px2 = TAPE.cx + lx * ca + ly * sa, py2 = TAPE.cy - (lx * sa - ly * ca);
+    if (px2 < 0.5 || py2 < 0.5 || px2 > W - 0.5 || py2 > H - 0.5) d[i + 3] = 0;
+  }
+  x.putImageData(img, 0, 0);
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
   const bump = new THREE.CanvasTexture(b);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(TAPE.w, TAPE.h), new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.2, transparent: true, depthWrite: false, roughness: 0.85, metalness: 0, envMapIntensity: 0.4 }));
