@@ -20,7 +20,7 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', boxCol: {}, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobCol: {}, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
@@ -40,7 +40,8 @@ try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); }
 if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
 if (typeof look.kstyle !== 'string') look.kstyle = 'yamaha';
-if (!look.boxCol || typeof look.boxCol !== 'object') look.boxCol = {};
+delete look.boxCol;   // v0.35.0's section backgrounds, dropped (Johnny meant knob colours)
+if (!look.knobCol || typeof look.knobCol !== 'object') look.knobCol = {};
 // v0.33.4 (Johnny): KNOB SIZE runs 0-100 over the real scale 0.9-1.5 (was 60-135%)
 const KSIZE = [0.9, 1.5], ksizeToUI = (k) => Math.max(0, Math.min(100, (k - KSIZE[0]) / (KSIZE[1] - KSIZE[0]) * 100));
 look.ksize = Math.max(KSIZE[0], Math.min(KSIZE[1], look.ksize));
@@ -404,14 +405,15 @@ function makeKnob(cx, cy, o) {
   // its own wear: one of the worn sets, turned and shifted, at a depth from barely marked to well knocked about
   const R = rng(knobs.length * 7919 + 13), wear = knobWear[R() * knobWear.length | 0].clone();
   wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
-  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
+  const sec = BOXR[BOXR.length - 1]; if (sec) sec.knobs = true; const secKey = sec ? boxKey(sec) : '';
+  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(), mPtr = mat.white.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
   // the usual knob, and for the filter knob (o.odd) also the mismatched pink spare (v0.32.3), shown unless OCD is past 50
   const std = new THREE.Group(), styles = {};
   const styleG = (id) => {   // v0.35.0: built the first time a style is picked, then kept
     if (styles[id]) return styles[id]; const G = KSTYLES[id].g, sg = new THREE.Group();
     const body = new THREE.Mesh(G.body, mBody); body.castShadow = true; body.receiveShadow = true; sg.add(body);
     if (G.top) { const top = new THREE.Mesh(G.top, mTop); top.castShadow = true; sg.add(top); }
-    const ptr = new THREE.Mesh(G.ptr, mat.white); sg.add(ptr); return styles[id] = sg;
+    const ptr = new THREE.Mesh(G.ptr, mPtr); sg.add(ptr); return styles[id] = sg;
   };
   let curStyle = null; const setStyle = (id) => { if (id === curStyle) return; if (curStyle) std.remove(styles[curStyle]); std.add(styleG(id)); curStyle = id; };
   setStyle(kstyle());
@@ -424,7 +426,10 @@ function makeKnob(cx, cy, o) {
   // a pot's shaft is never quite square to the panel (v0.31.5): each leans its own way, by up to look.tilt degrees
   const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
   const spin = new THREE.Group(); spin.add(std); if (oddG) spin.add(oddG); tiltG.add(spin); g.add(tiltG); grp.add(g);
-  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle, clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
+  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle,
+    colour: () => { const c = look.knobCol[secKey]; mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color); if (c) mTop.color.multiplyScalar(1.08);
+      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); },   // a pale knob gets a black line
+    clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
     mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
     if (oddG) { oddG.visible = c < 0.5; std.visible = !oddG.visible; }
   },  ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
@@ -433,7 +438,7 @@ function makeKnob(cx, cy, o) {
     const v = knobVal(id); if (v === k.shown) return false;
     k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; shadowDirty = true; return true;   // the skirt's nub turns, so its shadow must too
   };
-  k.tilt(look.tilt * (1 - look.ocd)); k.size(look.ksize); k.clean(look.ocd); addCtl(k); knobs.push(k); return k;
+  k.colour(); k.tilt(look.tilt * (1 - look.ocd)); k.size(look.ksize); k.clean(look.ocd); addCtl(k); knobs.push(k); return k;
 }
 function makeKey(cx, cy, w, h, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
@@ -476,8 +481,8 @@ function makeDisplay(x, y, w, h, text, o = {}) {
   addCtl(d); return d;
 }
 // the print: what's drawn on the face, refreshed whenever a label or the ink colour changes
-// v0.35.0 (Johnny): each boxed section can have its own colour (OPTIONS > COLOURS, look.boxCol { 'page:NAME': '#hex' });
-// the box is painted under the print, and its print turns white or black to read on it
+// v0.35.1 (Johnny): the knobs in each boxed section can have their own colour (OPTIONS > COLOURS, look.knobCol
+// { 'page:NAME': '#hex' }); a knob takes the section it is built in (the last box made). The pink spare stays pink.
 const BOXR = [], boxKey = (b) => b.page + ':' + b.n;
 const printsBy = { synth: [], seq: [], all: [] };   // functions (ctx, ink, paper) drawing one part, per page
 let prints = printsBy.synth;
@@ -959,7 +964,7 @@ function applyLook() {
   panelMat.bumpScale = PANEL_BUMP * w; edgeMat.bumpScale = EDGE_BUMP * w; print.material.bumpScale = logoMat.bumpScale = PANEL_BUMP * 1.6 * w;
   // v0.33.1 (Johnny): stickers have their own SHOW STICKERS checkbox; OCD only smooths them (the odd knob still goes at 50)
   for (const st of stickers) { st.place(); st.m.material.bumpScale = STICKER_BUMP * w; st.m.visible = look.stkOn && look.stickers.includes(st.id); }
-  for (const k of knobs) { k.style(kstyle()); k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
+  for (const k of knobs) { k.style(kstyle()); k.colour(); k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
@@ -984,13 +989,6 @@ function repaintPrint() {
   const ink = curInk, paper = inkOf(ink);
   px.clearRect(0, 0, W, H);
   for (const f of [...printsBy.all, ...printsBy[page]]) f(px, ink, paper);
-  const cols = BOXR.filter((b) => b.page === page && look.boxCol[boxKey(b)]);
-  px.save();
-  for (const b of cols) { const bi = lum(look.boxCol[boxKey(b)]) < 0.2 ? '#ffffff' : '#000000'; if (bi === ink) continue;   // the print inside, in the ink that reads on it
-    px.globalCompositeOperation = 'source-atop'; px.fillStyle = bi; px.fillRect(b.bx + 1, b.by + 9.5, b.bw - 2, b.bh - 10.5); }
-  px.globalCompositeOperation = 'destination-over';
-  for (const b of cols) { px.fillStyle = look.boxCol[boxKey(b)]; px.fillRect(b.bx, b.by, b.bw, b.bh); }
-  px.restore();
   // worn ink (v0.31.3): the whole print is rubbed through where the panel's wear map dips, like the logo
   px.save(); px.setTransform(1, 0, 0, 1, 0, 0); px.globalCompositeOperation = 'destination-in'; px.drawImage(inkMask(), 0, 0); px.restore();
   printTex.needsUpdate = true;
@@ -1178,8 +1176,8 @@ opt.body.innerHTML = `
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
-  ${['synth', 'seq'].map((pg) => `<div class="f"><span>${pg === 'synth' ? 'SYNTH PAGE' : 'SEQUENCER PAGE'}</span><div class="bxc">${BOXR.filter((b) => b.page === pg).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
-  <div class="row"><button id="o3-bxall">ALL TO PANEL</button></div>
+  ${['synth', 'seq'].map((pg) => `<div class="f"><span>${pg === 'synth' ? 'SYNTH PAGE' : 'SEQUENCER PAGE'}</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
+  <div class="row"><button id="o3-bxall">ALL BLACK</button></div>
   </div>
   <div class="pane" data-pane="knobs">
   <div class="f"><span>KNOB STYLE</span><div class="row">${Object.entries(KSTYLES).map(([k, st]) => `<button data-ks="${k}"><i></i>${st.name}</button>`).join('')}</div></div>
@@ -1204,7 +1202,7 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'boxCol', 'lights', 'stickers', 'stkOn', 'stk'];
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobCol', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
@@ -1232,7 +1230,7 @@ function drawOpt() {
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
   opt.body.querySelectorAll('[data-ks]').forEach((b) => b.classList.toggle('lit', b.dataset.ks === kstyle()));
-  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.boxCol[l.dataset.bk]; l.querySelector('input').value = c || look.colour; l.classList.toggle('set', !!c); });
+  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || '#0e0e0e'; l.classList.toggle('set', !!c); });
   $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
@@ -1244,7 +1242,7 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
   // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', boxCol: {} }, copyLook(lookSlots[i])); saveLook(); applyLook(); drawOpt();
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobCol: {} }, copyLook(lookSlots[i])); delete look.boxCol; saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
@@ -1270,10 +1268,10 @@ $o('#o3-stkon').onchange = (e) => setLook('stkOn', e.target.checked);
 $o('#o3-stkreset').onclick = () => setLook('stk', {});
 $o('#o3-ocd').oninput = (e) => setLook('ocd', e.target.value / 100);
 opt.body.querySelectorAll('[data-bk]').forEach((l) => {
-  l.querySelector('input').oninput = (e) => setLook('boxCol', { ...look.boxCol, [l.dataset.bk]: e.target.value });
-  l.querySelector('.clr').onclick = (e) => { e.preventDefault(); const c = { ...look.boxCol }; delete c[l.dataset.bk]; setLook('boxCol', c); };
+  l.querySelector('input').oninput = (e) => setLook('knobCol', { ...look.knobCol, [l.dataset.bk]: e.target.value });
+  l.querySelector('.clr').onclick = (e) => { e.preventDefault(); const c = { ...look.knobCol }; delete c[l.dataset.bk]; setLook('knobCol', c); };
 });
-$o('#o3-bxall').onclick = () => setLook('boxCol', {});
+$o('#o3-bxall').onclick = () => setLook('knobCol', {});
 opt.body.querySelectorAll('[data-ks]').forEach((b) => b.onclick = () => setLook('kstyle', b.dataset.ks));
 $o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
