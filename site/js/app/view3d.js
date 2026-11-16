@@ -64,10 +64,18 @@ const deg = (r) => Math.round(r * 180 / Math.PI);
 function presetLights(name) {
   const L = LIGHTS[name] || LIGHTS.studio, [x, y, z] = L.dir, az = deg(Math.atan2(y, x)), hex = (c) => '#' + c.toString(16).padStart(6, '0');
   return [
-    { col: hex(L.col), int: L.key, az: (az + 360) % 360, el: deg(Math.atan2(z, Math.hypot(x, y))) },
-    { col: L.fill || '#e6ecff', int: 0.4, az: 160, el: 35 },   // v0.31.4: from the left side, low, with its own shadows
-    { col: L.rim || '#fff0dc', int: 0.35, az: 20, el: 35 },      // and from the right (Johnny)
+    { col: hex(L.col), int: 0.6, az: 0, el: 90 },   // v0.35.5: light 1 is ambient (no direction)
+    { col: L.fill || '#e6ecff', int: L.key * 0.7, az: 180, el: 32 },   // 2 and 3: very diffuse, from the left
+    { col: L.rim || '#fff0dc', int: L.key * 0.6, az: 0, el: 32 },      // and the right (Johnny)
   ];
+}
+// v0.35.5 (Johnny): "one ambient and two very diffuse left and right". Older rigs (lv 2) keep their colours and levels;
+// light 1 becomes the ambient (half its level), 2 and 3 move to the left and right sides
+function migLights(o) {
+  if (o.lv === 3 && Array.isArray(o.lights) && o.lights.length === 3) return o;
+  const l = Array.isArray(o.lights) && o.lights.length === 3 ? o.lights : presetLights(o.light);
+  o.lights = [{ col: l[0].col, int: Math.min(1, l[0].int * 0.45), az: 0, el: 90 }, { col: l[1].col, int: Math.max(0.8, l[1].int), az: 180, el: 32 }, { col: l[2].col, int: Math.max(0.8, l[2].int), az: 0, el: 32 }];
+  o.lv = 3; return o;
 }
 const saveLook = () => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} };
 const SWATCHES = ['#e4e2da', '#f4f3ef', '#b9bbb8', '#6c6e70', '#202122', '#c4352b', '#df7a2c', '#e6c24a', '#4e7b56', '#2f5c88', '#ef9fbf'];
@@ -78,7 +86,9 @@ const LIGHTS = {
   raking: { name: 'LOW SUN', dir: [-1, 0.22, 0.42], col: 0xfff3e2, key: 2.4, hemi: 0.45 },
   top: { name: 'OVERHEAD', dir: [0, 1, 0.6], col: 0xffffff, key: 1.8, hemi: 0.65 },
 };
-if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // lv 2: side lights
+if (!Array.isArray(look.lights) || look.lights.length !== 3) { look.lights = presetLights(look.light); look.lv = 3; }
+migLights(look);   // lv 3: ambient + two diffuse sides
+migLights(LOOK0); for (const l of [...LOOK_SLOTS0, ...lookSlots]) if (l) migLights(l);
 const FINISH = { matt: { name: 'MATT', r: 0.95, m: 0, e: 0.25 }, satin: { name: 'SATIN', r: 0.55, m: 0, e: 0.6 }, metal: { name: 'METAL', r: 0.42, m: 0.7, e: 1.1, brushed: true } };
 const lensFov = (u) => 6 * Math.pow(8, Math.max(0, Math.min(1, u)));   // 6° (flat) .. 48° (wide)
 
@@ -155,7 +165,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPr
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;   // v0.35.5: plain PCF so shadow.radius blurs (very diffuse side lights) renderer.shadowMap.autoUpdate = false;
 const cv = renderer.domElement; cv.id = 'v3d';
 document.body.appendChild(cv);
 
@@ -164,13 +174,14 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(15, 1, 10, 100000);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x303030, 1); scene.add(hemi);
-const key = new THREE.DirectionalLight(0xffffff, 2); key.castShadow = true;
+const amb = new THREE.AmbientLight(0xffffff, 0); scene.add(amb);   // v0.35.5: light 1
+const key = new THREE.DirectionalLight(0xffffff, 0); key.castShadow = false;   // the old key light, now unused
 key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.5; key.shadow.radius = 4;
 Object.assign(key.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 });
 scene.add(key, key.target);
-const lamps = [key, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)];   // all three cast shadows (v0.31.4)
+const lamps = [amb, new THREE.DirectionalLight(0xffffff, 0), new THREE.DirectionalLight(0xffffff, 0)];   // 1 ambient, 2 and 3 cast soft shadows
 for (const l of lamps.slice(1)) {
-  l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = key.shadow.bias; l.shadow.normalBias = key.shadow.normalBias; l.shadow.radius = 5;
+  l.castShadow = true; l.shadow.mapSize.set(512, 512); l.shadow.bias = key.shadow.bias; l.shadow.normalBias = 1; l.shadow.radius = 9; l.shadow.blurSamples = 16;
   Object.assign(l.shadow.camera, { left: -W * 0.62, right: W * 0.62, top: H * 0.75, bottom: -H * 0.75, near: 10, far: 6000 }); scene.add(l, l.target);
 }
 
@@ -978,7 +989,7 @@ function applyLook() {
   hemi.intensity = L.hemi * b; hemi.color.set(L.hemiCol || 0xffffff); hemi.groundColor.set(0x404040);
   look.lights.forEach((l, i) => {
     const a = l.az * Math.PI / 180, e = l.el * Math.PI / 180, lamp = lamps[i];
-    lamp.color.set(l.col); lamp.intensity = l.int * b;
+    lamp.color.set(l.col); lamp.intensity = l.int * b; if (!i) return;
     lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
   });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
@@ -1116,6 +1127,7 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet .lamp input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
 .v3d-sheet .lamp label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .lamp label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
 .v3d-sheet .lamp label i { font-style: normal; grid-row: 1; grid-column: 2; }
+.v3d-sheet .lamp .amb { font-weight: 600; opacity: .55; grid-column: span 2; }
 .v3d-sheet .otab3 { display: flex; flex-wrap: wrap; gap: 0; margin: 4px 0 16px; border-bottom: 2px solid var(--v3d-ink); }
 .v3d-sheet .otab3 button { background: none; color: var(--v3d-ink); border-radius: 3px 3px 0 0; padding: 8px 12px 7px; opacity: .6; }
 .v3d-sheet .otab3 button.lit { background: var(--v3d-ink); color: var(--v3d-paper); opacity: 1; }
@@ -1194,8 +1206,8 @@ opt.body.innerHTML = `
     <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
   <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
     <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
-    <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
-    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
+    ${i ? `<label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
+    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label>` : '<b class="amb">AMBIENT</b>'}</div>`).join('')}</div>
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
@@ -1268,7 +1280,7 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
   // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look); saveLook(); applyLook(); drawOpt();
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look); migLights(look); saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
