@@ -1,10 +1,13 @@
-// Shyoy: Generate, the TB-303 app's AcidLab-style pattern maker (tb303-circuit-model src/js/app/generate.js, v164).
-// No stored patterns. Each bar comes from one of 16 step-by-step note styles: a walking scale degree shaped by the style,
-// a held "repeat note" layer that keeps pulling the line back to one pitch, odd octave jumps, then 303 slides; later bars
-// are the first one varied with the moves below. It works in the 303's note codes (0-59 = Shyoy pitch + 24) and turns
-// the result into Shyoy steps at the end.
-// Density (TB-303 app v165, Johnny: "needs a density knob"): the share of steps Generate and Refill fill with notes, set by
-// the dial in the sequencer foot; Alter whole pattern leans its new rests and fills towards it. Kept across reloads, not in presets
+// Shyoy: a direct copy of the TB-303 app's generate.js (johnnyhawk02/tb303-circuit-model src/js/app/generate.js, main).
+// Shyoy-only changes: pick is called genPick (view3d.js has its own pick), genDens is read without store, and
+// generatePattern also returns steps, the 303 steps turned into Shyoy steps by genToSteps (one to one, no extra ties).
+// Generate's own pattern maker: no stored patterns. Each bar comes from one of 16 step-by-step note styles (after the
+// AcidLab generator Johnny brought in: a walking scale degree shaped by the style, a held "repeat note" layer that keeps
+// pulling the line back to one pitch, odd octave jumps), then gets 303 slides and is varied bar by bar with the moves below.
+// a step is { code, gate, accent, slide }; code 0-59 is the 303's note number (33 = A)
+// Density (Johnny: "needs a density knob"): the share of steps Generate and Refill fill with notes, from the dial in the
+// sequencer foot; Alter leans its new rests and fills towards it too. Kept across reloads, not in presets
+// (Shyoy: read straight from localStorage, because store is made later, in presets.js)
 let genDens = 0.6;
 try { const v = parseFloat(localStorage.getItem('kestrel.genDens')); if (v >= 0.1 && v <= 1) genDens = v; } catch (e) {}
 const GEN_SCALES = {
@@ -13,10 +16,10 @@ const GEN_SCALES = {
 };
 const GEN_STYLES = ['Acid', 'Walk', 'Repeater', 'Syncopated', 'Evolving', 'Accented', 'Octaves', 'Fifths', 'Arpeggio',
   'Alternating', 'Pendulum', 'Rise', 'Fall', 'Dense', 'Sparse', 'Random'];
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const genPick = (a) => a[Math.floor(Math.random() * a.length)];
-const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const ACID_CONTOUR = [0, 0, 2, 1, 0, 3, 2, 0, 4, 3, 2, 1, 0, 2, 1, 0];
-// one bar of len steps { code, gate, accent, slide }. o: root (code), scale, style, dens (0-1), rep (repeat-note pull), oct (octave jump chance)
+// one bar of len steps. o: root (303 code), scale, style, dens (0-1), rep (repeat-note pull), oct (octave jump chance)
 function makeBar(len, o) {
   const { root, scale, style, dens, rep, oct } = o, sl = scale.length, maxD = sl * 2 - 1, r = Math.random;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), step = (n) => (r() < 0.5 ? -1 : 1) * n;
@@ -67,6 +70,7 @@ function makeBar(len, o) {
   }
   return P;
 }
+const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // moves applied to a made bar, and once to each later bar so the phrase develops
 const GEN_MOVES = {
   // grab a few steps and loop them to the end
@@ -88,24 +92,15 @@ const GEN_MOVES = {
     for (let j = 0; j < sw; j++) { const x = rint(0, blocks.length - 1), y = rint(0, blocks.length - 1); [blocks[x], blocks[y]] = [blocks[y], blocks[x]]; }
     P.splice(0, n, ...blocks.flat()); return b > 1 ? `swapped ${sw} beat${sw > 1 ? 's' : ''}` : `swapped ${sw} step${sw > 1 ? 's' : ''}`; },
 };
-// 303 steps to Shyoy steps: rests keep the pitch of the note before them, and about 1 in 10 notes that follow a note
-// of the same pitch become a tie (the generator has no ties of its own)
-function genToSteps(out) {
-  const S = out.map(st => ({ n: st.code % 12, o: Math.max(-2, Math.min(2, Math.floor(st.code / 12) - 2)), m: st.gate ? 'N' : 'R', a: st.gate && st.accent, s: st.gate && st.slide }));
-  let pv = S.find(st => st.m !== 'R');
-  for (const st of S) if (st.m === 'R') { st.n = pv.n; st.o = pv.o; } else pv = st;
-  for (let i = 1; i < S.length; i++) {
-    const st = S[i], p = S[i - 1];
-    if (st.m === 'N' && p.m !== 'R' && p.n === st.n && p.o === st.o && Math.random() < 0.1) { st.m = 'T'; st.a = false; }
-  }
-  return S;
-}
-// build one bar, move it, then later bars are the first one with one more move each
+// density: null keeps the source's own; otherwise a fraction of steps that play. Sources near it are preferred, then notes are added or removed to hit it
 function generatePattern(len, dens = null) {
   const style = genPick(GEN_STYLES), sn = genPick(Object.keys(GEN_SCALES)), root = rint(21, 33);
   const o = { root, scale: GEN_SCALES[sn], style, dens: dens != null ? Math.max(0.2, Math.min(0.95, dens * 1.1)) : 0.5 + Math.random() * 0.35,
     rep: Math.random() * 0.5, oct: 0.04 + Math.random() * 0.16 };
-  const barLen = Math.min(len, 16), P = makeBar(barLen, o);
+  const name = `${style} ${NOTE_NAMES[root % 12]} ${sn}`;
+  // build one bar, move it, then later bars are the first one with one more move each
+  const barLen = Math.min(len, 16);
+  const P = makeBar(barLen, o);
   const did = Object.keys(GEN_MOVES).sort(() => Math.random() - 0.5).slice(0, rint(0, 2)).map(m => GEN_MOVES[m](P));
   const out = [...P];
   while (out.length < len) {
@@ -123,5 +118,9 @@ function generatePattern(len, dens = null) {
     if (on > want) for (const i of idx(true).sort((a, b) => beat(b) - beat(a))) { if (on <= want) break; if (i === 0) continue; out[i].gate = false; out[i].accent = false; out[i].slide = false; on--; }
   }
   if (!out.some(st => st.gate)) out[0].gate = true;
-  return { steps: genToSteps(out), src: `${style} ${NOTE[root % 12]} ${sn}`, did };
+  return { pattern: out, steps: genToSteps(out), src: name, did };
+}
+// 303 steps to Shyoy steps, one for one: code 0-59 = Shyoy pitch + 24 (octave -2 to +2), gate off = rest, accent and slide kept
+function genToSteps(out) {
+  return out.map(st => ({ n: st.code % 12, o: Math.floor(st.code / 12) - 2, m: st.gate ? 'N' : 'R', a: st.gate && st.accent, s: st.gate && st.slide }));
 }

@@ -291,9 +291,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
     if (st.m === 'R' || (st.m === 'T' && !this.gate)) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else if (st.m === 'T') { this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen; this.lastSlide = !!st.s; }
     else {
-      // a note played during the run transposes the pattern; with Apply scale ticked, each step snaps to the chosen scale first
-      const s = st.n + 12 * st.o;
-      const n = 48 + (this.keyed && this.seq.scale ? this.qScale(s) : s) + this.transpose;
+      // a note played during the run transposes the pattern; with the scale on, each step snaps to it first (or only once a note is played, with MIDI NOTE ONLY)
+      const s = this.seq.cOnly ? 12 * (st.o + Math.floor(st.n / 12)) : st.n + 12 * st.o;   // C NOTES ONLY keeps the octave
+      const n = 48 + (this.seq.scale && (this.keyed || !this.seq.scaleMidi) ? this.qScale(s) : s) + this.transpose;
       if (this.lastSlide && this.gate) { this.setPitch(n, this.P.slide); this.accOn = st.a ? 1 : 0; }
       else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(st.a); }
       this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen;

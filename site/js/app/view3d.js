@@ -20,7 +20,7 @@ const root = document.documentElement;
 const LOOK_KEY = 'shyoy.look3d';
 // defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
 // aqua lights, bigger knobs, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobCol: {}, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
   lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
@@ -40,8 +40,10 @@ try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); }
 if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
 if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
 if (typeof look.kstyle !== 'string') look.kstyle = 'yamaha';
+if (typeof look.oddOn !== 'boolean') look.oddOn = true; if (typeof look.oddK !== 'number') look.oddK = -1;   // -1 = the cutoff
 delete look.boxCol;   // v0.35.0's section backgrounds, dropped (Johnny meant knob colours)
 if (!look.knobCol || typeof look.knobCol !== 'object') look.knobCol = {};
+if (typeof look.knobAll !== 'string') look.knobAll = '';
 // v0.33.4 (Johnny): KNOB SIZE runs 0-100 over the real scale 0.9-1.5 (was 60-135%)
 const KSIZE = [0.9, 1.5], ksizeToUI = (k) => Math.max(0, Math.min(100, (k - KSIZE[0]) / (KSIZE[1] - KSIZE[0]) * 100));
 look.ksize = Math.max(KSIZE[0], Math.min(KSIZE[1], look.ksize));
@@ -176,6 +178,7 @@ for (const l of lamps.slice(1)) {
 const P = (px, py, z = 0) => new THREE.Vector3(px - W / 2, H / 2 - py, z);   // panel px (y down) -> world
 const panelMat = new THREE.MeshStandardMaterial({ color: 0xe4e2da, roughness: 0.6 });
 const edgeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+let CUTOFF_KI = -1; const oddKi = () => look.oddK >= 0 ? look.oddK : CUTOFF_KI;
 const KNOB_BUMP = 4.5, PANEL_BUMP = 1.4, EDGE_BUMP = 1.5;   // wear depths (bump maps, below)
 const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H, DEPTH), [edgeMat, edgeMat, edgeMat, edgeMat, panelMat, edgeMat]);
 slab.position.z = -DEPTH / 2; slab.receiveShadow = true; scene.add(slab);
@@ -275,6 +278,7 @@ const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.1
 // nub, and a triangle on top. The 50k-triangle original is simplified to ~5.6k offline (its top's shallow triangle
 // recess flattened first, and drawn back here as a white inlay). Smooth-shaded with creases kept, squashed to SQ of
 // its height, scaled so the skirt is KR + 2 across. Its pointer lies along +y, so the value-to-angle mapping is unchanged.
+const TRI_BUMP = 6, PLASTIC_MAX = 0.5;   // how deep the Yamaha's pressed-in triangle reads
 const KNOB = await (async () => {
   const buf = await (await fetch(new URL('../../models/yamaha-knob.stl', import.meta.url))).arrayBuffer();
   const dv = new DataView(buf), n = dv.getUint32(80, true), SQ = 0.7, TRI = [[0, 3.03], [-2.02, -3.03], [2.02, -3.03]];
@@ -317,7 +321,15 @@ const KNOB = await (async () => {
   }
   const z = zTop + 0.03, tri = new THREE.BufferGeometry();
   tri.setAttribute('position', new THREE.Float32BufferAttribute(TRI.flatMap(([x, y]) => [x, y, z]), 3)); tri.computeVertexNormals(); tri.scale(s, s, s * SQ);
-  return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, h: z * s * SQ };
+  // v0.35.3 (Johnny): the triangle is pressed into the cap (a negative bump, the knob's own colour), not inked: a
+  // square patch of top over it carries a bump map with the triangle sunk in, softened at its walls
+  const PAD = 1.2, xs = TRI.map((q) => q[0]), ys = TRI.map((q) => q[1]), bw = Math.max(...xs) - Math.min(...xs) + 2 * PAD, bh = Math.max(...ys) - Math.min(...ys) + 2 * PAD;
+  const rc = document.createElement('canvas'); rc.width = rc.height = 256; const rx = rc.getContext('2d');
+  rx.fillStyle = '#808080'; rx.fillRect(0, 0, 256, 256); rx.filter = 'blur(2.5px)'; rx.fillStyle = '#000';
+  rx.beginPath(); TRI.forEach(([x, y], i) => { const u = (x - Math.min(...xs) + PAD) / bw * 256, v = (1 - (y - Math.min(...ys) + PAD) / bh) * 256; i ? rx.lineTo(u, v) : rx.moveTo(u, v); }); rx.closePath(); rx.fill(); rx.filter = 'none';
+  const recessTex = new THREE.CanvasTexture(rc), recess = new THREE.PlaneGeometry(bw, bh);
+  recess.translate((Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2, zTop + 0.02); recess.scale(s, s, s * SQ);
+  return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, recess, recessTex, h: z * s * SQ };
 })();
 // the odd one out (v0.32.3, Johnny): the filter knob is a mismatched spare, a pink standard round knob: a thin skirt,
 // a knurled grip, a bevelled, slightly domed top and a white line. Its line points along +y like the others.
@@ -413,32 +425,42 @@ function makeKnob(cx, cy, o) {
   const R = rng(knobs.length * 7919 + 13), wear = knobWear[R() * knobWear.length | 0].clone();
   wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
   const sec = BOXR[BOXR.length - 1]; if (sec) sec.knobs = true; const secKey = sec ? boxKey(sec) : '';
-  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(), mPtr = mat.white.clone(); mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
+  const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(), mPtr = mat.white.clone();
+  const mRec = mat.knobTop.clone(); mRec.bumpMap = KNOB.recessTex; mRec.bumpScale = TRI_BUMP; mRec.polygonOffset = true; mRec.polygonOffsetFactor = -1; mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
   // the usual knob, and for the filter knob (o.odd) also the mismatched pink spare (v0.32.3), shown unless OCD is past 50
   const std = new THREE.Group(), styles = {};
   const styleG = (id) => {   // v0.35.0: built the first time a style is picked, then kept
     if (styles[id]) return styles[id]; const G = KSTYLES[id].g, sg = new THREE.Group();
     const body = new THREE.Mesh(G.body, mBody); body.castShadow = true; body.receiveShadow = true; sg.add(body);
     if (G.top) { const top = new THREE.Mesh(G.top, mTop); top.castShadow = true; sg.add(top); }
-    const ptr = new THREE.Mesh(G.ptr, mPtr); sg.add(ptr); return styles[id] = sg;
+    if (G.recess) { const r = new THREE.Mesh(G.recess, mRec); r.receiveShadow = true; sg.add(r); }
+    else { const ptr = new THREE.Mesh(G.ptr, mPtr); sg.add(ptr); }
+    return styles[id] = sg;
   };
   let curStyle = null; const setStyle = (id) => { if (id === curStyle) return; if (curStyle) std.remove(styles[curStyle]); std.add(styleG(id)); curStyle = id; };
   setStyle(kstyle());
-  let oddG = null, mp = null;
-  if (o.odd) {
+  // v0.35.4 (Johnny): any knob can be the replaced pot (OPTIONS > KNOBS > REPLACED POT, look.oddOn / look.oddK); built when first needed
+  let oddG = null, mp = null; const ki = knobs.length; if (o.odd) CUTOFF_KI = ki;
+  const oddMake = () => {
+    if (oddG) return oddG;
     mp = mat.pink.clone(); mp.bumpMap = wear; mp.bumpScale = KNOB_BUMP * depth * 0.4;
     const pb = new THREE.Mesh(PINK.body, mp); pb.castShadow = true; pb.receiveShadow = true;
-    const pp = new THREE.Mesh(PINK.ptr, mat.white); pp.castShadow = true; oddG = new THREE.Group(); oddG.add(pb, pp);
-  }
+    const pp = new THREE.Mesh(PINK.ptr, mat.white); pp.castShadow = true; oddG = new THREE.Group(); oddG.add(pb, pp); spin.add(oddG); return oddG;
+  };
   // a pot's shaft is never quite square to the panel (v0.31.5): each leans its own way, by up to look.tilt degrees
   const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
-  const spin = new THREE.Group(); spin.add(std); if (oddG) spin.add(oddG); tiltG.add(spin); g.add(tiltG); grp.add(g);
+  const spin = new THREE.Group(); spin.add(std); tiltG.add(spin); g.add(tiltG); grp.add(g);
   const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle,
-    colour: () => { const c = look.knobCol[secKey]; mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color); if (c) mTop.color.multiplyScalar(1.08);
-      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); },   // a pale knob gets a black line
+    colour: () => { const c = look.knobCol[secKey] || look.knobAll;   // v0.35.8: a section's colour, else the global one
+      // v0.35.9 (Johnny: white blew out): real plastic never reflects all the light, so a picked colour is capped at
+      // PLASTIC_MAX (linear) and its finish goes a little glossier, so the fluting and the light still read on it
+      mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color);
+      if (c) { for (const m of [mBody, mTop]) { const mx = Math.max(m.color.r, m.color.g, m.color.b); if (mx > PLASTIC_MAX) m.color.multiplyScalar(PLASTIC_MAX / mx); }
+        mTop.color.multiplyScalar(1.05); mBody.roughness = 0.55; mTop.roughness = 0.38; } else { mBody.roughness = mat.knob.roughness; mTop.roughness = mat.knobTop.roughness; }
+      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); mRec.color.copy(mTop.color); },   // a pale knob gets a black line
     clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
     mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
-    if (oddG) { oddG.visible = c < 0.5; std.visible = !oddG.visible; }
+    const odd = look.oddOn && ki === oddKi(); if (odd) oddMake(); if (oddG) oddG.visible = odd; std.visible = !odd;
   },  ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
@@ -588,7 +610,7 @@ for (const b of BOXES) {
       labelAt(() => 'PATTERN', cx, ly);
     } else if (it.t === 'preset') {
       const dw = w * C - 16, dx = cx - dw / 2, ks = [0, 1, 2].map((k) => colX(b, col + k));
-      makeDisplay(dx, y0 + 26, dw, 24, () => (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
+      makeDisplay(dx, y0 + 26, dw, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
       makeKey(ks[0], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click(), pad: 8, tag: 'pre-' });
       makeKey(ks[1], y0 + KEYY, 24, 14, { on: () => false, press: () => openBrowser(), pad: 8, tag: 'browse' });
       makeKey(ks[2], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click(), pad: 8, tag: 'pre+' });
@@ -705,23 +727,23 @@ function stickerBump(st, own, p) {   // the page's wear under the sticker plus t
 // v0.33.0: each sticker can be resized, moved and turned in OPTIONS > STICKERS (look.stk); a move re-cuts it at the panel
 // edge and re-samples the wear under it.
 const stkPlace = () => { const q = look.stk.one || {}, d = STICKERS[0]; return { cx: q.x ?? d.cx, cy: q.y ?? d.cy, size: d.size * (q.s ?? 1), rot: q.r ?? d.rot }; };   // v0.35.2: one place for whichever sticker
+// v0.36.6 (Johnny: a spinning sticker lost its corners): the cut at the panel's edge was baked into the texture at the
+// sticker's resting angle, so it turned with the spin. Now four clipping planes at the panel's edges cut it, whatever
+// the angle.
+renderer.localClippingEnabled = true;
+const STK_CLIP = [new THREE.Plane(new THREE.Vector3(1, 0, 0), W / 2 - 0.5), new THREE.Plane(new THREE.Vector3(-1, 0, 0), W / 2 - 0.5),
+  new THREE.Plane(new THREE.Vector3(0, 1, 0), H / 2 - 0.5), new THREE.Plane(new THREE.Vector3(0, -1, 0), H / 2 - 0.5)];
 const stickers = STICKERS.map((st, k) => {
   const n = 384, src = document.createElement('canvas'); src.width = src.height = n; const sx = src.getContext('2d');
   const R = rng(777 + k); drawSticker(sx, st.id, n, R); const own = stickerWear(sx, n, R);
   const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpScale: STICKER_BUMP }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpScale: STICKER_BUMP, clippingPlanes: STK_CLIP }));
   m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
   const o = { id: st.id, m, bumps: null, key: '' };
   o.place = () => {
     const q = stkPlace(st), key = JSON.stringify(q); if (key === o.key) return; o.key = key;
-    x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0);
-    const a = -q.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), img = x.getImageData(0, 0, n, n), d = img.data, S = n / q.size;
-    for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {   // cut off past the panel's edge
-      const lx = u / S - q.size / 2, ly = v / S - q.size / 2, px2 = q.cx + lx * ca + ly * sa, py2 = q.cy - (lx * sa - ly * ca);
-      if (px2 < 0.5 || py2 < 0.5 || px2 > W - 0.5 || py2 > H - 0.5) d[i + 3] = 0;
-    }
-    x.putImageData(img, 0, 0); map.needsUpdate = true;
+    x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0); map.needsUpdate = true;   // the panel's edge is cut by STK_CLIP
     if (o.bumps) { o.bumps.synth.dispose(); o.bumps.seq.dispose(); }
     o.bumps = { synth: stickerBump(q, own, 'synth'), seq: stickerBump(q, own, 'seq') }; m.material.bumpMap = o.bumps[page]; m.material.needsUpdate = true;
     m.position.copy(P(q.cx, q.cy, 0.25 + k * 0.01)); m.rotation.z = -q.rot * Math.PI / 180; m.scale.set(q.size, q.size, 1);
@@ -738,13 +760,23 @@ function stickerAt(p) {
   }
   return null;
 }
+// v0.36.5 (Johnny: show something is going on): while the new sound is measured the clicked sticker spins, then it
+// eases round to rest and gives its wobble
 const wobbles = new Map();
-const wobble = (st) => { wobbles.set(st, performance.now()); dirty = true; };
+const wobble = (st, spin) => { wobbles.set(st, { t0: performance.now(), mode: spin ? 'spin' : 'wob' }); dirty = true; };
 function wobbleStep(now) {
-  for (const [st, t0] of wobbles) {
-    const k = STICKERS.findIndex((t) => t.id === st.id), base = -stkPlace(STICKERS[k]).rot * Math.PI / 180, t = (now - t0) / 1000;
-    if (t > 0.7) { st.m.rotation.z = base; wobbles.delete(st); } else st.m.rotation.z = base + Math.sin(t * 34) * Math.exp(-t * 6) * 0.16;
-    dirty = true;
+  for (const [st, w] of wobbles) {
+    const k = STICKERS.findIndex((t) => t.id === st.id), base = -stkPlace(STICKERS[k]).rot * Math.PI / 180, t = (now - w.t0) / 1000;
+    let off = 0;
+    if (w.mode === 'spin') {
+      off = -t * 7;
+      if (!shyoyRand.spinning) { w.mode = 'settle'; w.a0 = off % (2 * Math.PI); w.t0 = now; }
+    } else if (w.mode === 'settle') {
+      const u = Math.min(1, t / 0.45), e = 1 - (1 - u) * (1 - u);
+      off = w.a0 + (-2 * Math.PI - w.a0) * e; if (u >= 1) { w.mode = 'wob'; w.t0 = now; off = 0; }
+    } else if (t > 0.7) { st.m.rotation.z = base; wobbles.delete(st); dirty = true; continue; }
+    else off = Math.sin(t * 34) * Math.exp(-t * 6) * 0.16;
+    st.m.rotation.z = base + off; dirty = true;
   }
 }
 prints.push((x, ink) => {
@@ -844,13 +876,15 @@ keyList(box(13, 1, 5, 2, 'RANDOMISE'), [
   ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie']],
   ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']],
   ['PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']]]);
-// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, the second
-// ticks Apply scale on MIDI note
+// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, SCALE ON
+// (v0.38.0) switches it on and off, MIDI NOTE ONLY holds it back until a note is played during the run
 keyList(box(13, 3, 5, 2, 'TOOLS'), [
   ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN', 'p-join']],
   ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn'], ['SHIFT L', 'rot-l'], ['SHIFT R', 'rot-r']],
   ['SCALE', { t: () => SCALE_LIST[state.scale.i].name.toUpperCase(), press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), on: () => false, tag: 'scale0' },
-    { t: 'ON MIDI NOTE', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' }]], [0.85, 0.95, 1.4]);
+    { t: 'SCALE ON', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' },
+    { t: 'MIDI NOTE ONLY', press: () => setScale({ midi: !state.scale.midi }), on: () => state.scale.midi, tag: 'scale2' },
+    { t: 'C NOTES ONLY', press: () => setScale({ c: !state.scale.c }), on: () => state.scale.c, tag: 'scale3' }]], [0.85, 0.95, 1.4]);
 // ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
 const RB = box(0, 1, 13, 4, 'PATTERN EDIT');
 const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
@@ -1003,7 +1037,7 @@ function repaintPrint() {
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on : '');
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on + state.scale.midi + state.scale.c : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
@@ -1074,7 +1108,7 @@ function release(e) {
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
-  else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) shyoyRand.back(); else shyoyRand.roll(); wobble(c.st); printDirty = true; }
+  else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) { if (shyoyRand.back()) wobble(c.st); } else { shyoyRand.roll(); wobble(c.st, true); } printDirty = true; }
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
@@ -1183,12 +1217,14 @@ opt.body.innerHTML = `
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
+  <div class="f"><span>ALL KNOBS</span><div class="bxc"><label id="o3-kall"><input type="color" aria-label="All knobs colour"><span>EVERY KNOB</span><button class="clr" aria-label="Clear">×</button></label></div></div>
   ${['synth', 'seq'].map((pg) => `<div class="f"><span>${pg === 'synth' ? 'SYNTH PAGE' : 'SEQUENCER PAGE'}</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
   <div class="row"><button id="o3-bxall">ALL BLACK</button></div>
   </div>
   <div class="pane" data-pane="knobs">
   <div class="f"><span>KNOB STYLE</span><div class="row">${Object.entries(KSTYLES).map(([k, st]) => `<button data-ks="${k}"><i></i>${st.name}</button>`).join('')}</div></div>
   <div class="f"><span>KNOB SIZE</span><div class="row"><input type="range" min="0" max="100" id="o3-ksize" aria-label="Knob size"><b class="val" id="o3-ksizev"></b></div></div>
+  <div class="f"><div class="row"><label class="chk"><input type="checkbox" id="o3-odd"> REPLACED POT</label><button id="o3-oddrnd">RANDOM POT</button><button id="o3-oddcut">BACK ON CUTOFF</button></div></div>
   <div class="f"><span>KNOB TILT</span><div class="row"><input type="range" min="0" max="80" id="o3-tilt" aria-label="Knob tilt"><b class="val" id="o3-tiltv"></b></div></div>
   </div>
   <div class="pane" data-pane="stickers">
@@ -1210,7 +1246,7 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobCol', 'lights', 'stickers', 'stkOn', 'stk'];
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
@@ -1238,8 +1274,10 @@ function drawOpt() {
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
   opt.body.querySelectorAll('[data-ks]').forEach((b) => b.classList.toggle('lit', b.dataset.ks === kstyle()));
-  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || '#0e0e0e'; l.classList.toggle('set', !!c); });
+  $o('#o3-kall input').value = look.knobAll || '#0e0e0e'; $o('#o3-kall').classList.toggle('set', !!look.knobAll);
+  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || look.knobAll || '#0e0e0e'; l.classList.toggle('set', !!c); });
   $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
+  $o('#o3-odd').checked = look.oddOn;
   $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
   sheetVars();
@@ -1250,7 +1288,9 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
   // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobCol: {} }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look); saveLook(); applyLook(); drawOpt();
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look);
+  if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // looks saved with the v0.35.5-0.36.2 lights
+  saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
@@ -1278,9 +1318,17 @@ opt.body.querySelectorAll('[data-bk]').forEach((l) => {
   l.querySelector('input').oninput = (e) => setLook('knobCol', { ...look.knobCol, [l.dataset.bk]: e.target.value });
   l.querySelector('.clr').onclick = (e) => { e.preventDefault(); const c = { ...look.knobCol }; delete c[l.dataset.bk]; setLook('knobCol', c); };
 });
-$o('#o3-bxall').onclick = () => setLook('knobCol', {});
+$o('#o3-bxall').onclick = () => { look.knobAll = ''; setLook('knobCol', {}); };
+$o('#o3-kall input').oninput = (e) => setLook('knobAll', e.target.value);
+$o('#o3-kall .clr').onclick = (e) => { e.preventDefault(); setLook('knobAll', ''); };
 opt.body.querySelectorAll('[data-ks]').forEach((b) => b.onclick = () => setLook('kstyle', b.dataset.ks));
 $o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
+$o('#o3-odd').onchange = (e) => setLook('oddOn', e.target.checked);
+$o('#o3-oddrnd').onclick = () => {   // a different synth-page knob each time
+  const pool = knobs.map((k, i) => i).filter((i) => knobs[i].page === 'synth' && i !== oddKi());
+  look.oddOn = true; setLook('oddK', pool[Math.random() * pool.length | 0]);
+};
+$o('#o3-oddcut').onclick = () => setLook('oddK', -1);
 $o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
