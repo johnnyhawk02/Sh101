@@ -27,7 +27,7 @@ const shyoyRand = (() => {
     // release 26-330 ms; v0.36.7 (Johnny: the releases were all very short): 4 in 10 get a long tail, about 0.3-3 s, held at a level it can
     // be heard from (a release only sounds if the note is still up when the gate closes)
     if (chance(0.4)) { f.release = U(0.6, 0.87); if (f.sustain < 0.2) f.sustain = U(0.2, 0.6); }
-    s.trig = pick([6, 3, 1]); s.vcaMode = pick([8, 2]);
+    s.trig = pick([6, 4]); s.vcaMode = pick([8, 2]);   // v0.38.2 (Johnny): trig Gate+Trig or Gate only, never LFO
     f.glide = U(0, 0.4); s.glideMode = pick([2, 6, 2]); f.slide = U(0.1, 0.5);
     // a little movement now and then (1 in 4): vibrato or a filter wobble
     if (chance(0.25)) {
