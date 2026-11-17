@@ -876,13 +876,14 @@ keyList(box(13, 1, 5, 2, 'RANDOMISE'), [
   ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie']],
   ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']],
   ['PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']]]);
-// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, the second
-// ticks Apply scale on MIDI note
+// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, SCALE ON
+// (v0.38.0) switches it on and off, MIDI NOTE ONLY holds it back until a note is played during the run
 keyList(box(13, 3, 5, 2, 'TOOLS'), [
   ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN', 'p-join']],
   ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn'], ['SHIFT L', 'rot-l'], ['SHIFT R', 'rot-r']],
   ['SCALE', { t: () => SCALE_LIST[state.scale.i].name.toUpperCase(), press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), on: () => false, tag: 'scale0' },
-    { t: 'ON MIDI NOTE', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' }]], [0.85, 0.95, 1.4]);
+    { t: 'SCALE ON', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' },
+    { t: 'MIDI NOTE ONLY', press: () => setScale({ midi: !state.scale.midi }), on: () => state.scale.midi, tag: 'scale2' }]], [0.85, 0.95, 1.4]);
 // ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
 const RB = box(0, 1, 13, 4, 'PATTERN EDIT');
 const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
@@ -1035,7 +1036,7 @@ function repaintPrint() {
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on : '');
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on + state.scale.midi : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
