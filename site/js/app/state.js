@@ -53,9 +53,10 @@ const SCALE_LIST = [
 ];
 // v0.38.0 (Johnny: "a scale on/off button"): on = the pattern's steps snap to the scale (root C, moving with a played note);
 // midi = only once a note has been played during the run (the v0.28 behaviour)
-state.scale = { i: 0, on: false, midi: false, ...(state.scale || {}) };
+// v0.38.1 (Johnny): c = C NOTES ONLY, every step plays C in its own octave (still moved by a played note)
+state.scale = { i: 0, on: false, midi: false, c: false, ...(state.scale || {}) };
 if (!(state.scale.i >= 0 && state.scale.i < SCALE_LIST.length)) state.scale.i = 0;
-state.scale.on = !!state.scale.on; state.scale.midi = !!state.scale.midi;
+state.scale.on = !!state.scale.on; state.scale.midi = !!state.scale.midi; state.scale.c = !!state.scale.c;
 const SLOTS = 8;
 const slotOf = st => ({ steps: JSON.parse(JSON.stringify(st.steps)), swing: st.params ? st.params.swing : 0, gateLen: st.params ? st.params.gateLen : .5 });
 if (!Array.isArray(state.slots) || state.slots.length !== SLOTS) {

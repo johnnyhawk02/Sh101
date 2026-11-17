@@ -883,7 +883,8 @@ keyList(box(13, 3, 5, 2, 'TOOLS'), [
   ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn'], ['SHIFT L', 'rot-l'], ['SHIFT R', 'rot-r']],
   ['SCALE', { t: () => SCALE_LIST[state.scale.i].name.toUpperCase(), press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), on: () => false, tag: 'scale0' },
     { t: 'SCALE ON', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' },
-    { t: 'MIDI NOTE ONLY', press: () => setScale({ midi: !state.scale.midi }), on: () => state.scale.midi, tag: 'scale2' }]], [0.85, 0.95, 1.4]);
+    { t: 'MIDI NOTE ONLY', press: () => setScale({ midi: !state.scale.midi }), on: () => state.scale.midi, tag: 'scale2' },
+    { t: 'C NOTES ONLY', press: () => setScale({ c: !state.scale.c }), on: () => state.scale.c, tag: 'scale3' }]], [0.85, 0.95, 1.4]);
 // ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
 const RB = box(0, 1, 13, 4, 'PATTERN EDIT');
 const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
@@ -1036,7 +1037,7 @@ function repaintPrint() {
 // the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
 const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on + state.scale.midi : '');
+  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on + state.scale.midi + state.scale.c : '');
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
