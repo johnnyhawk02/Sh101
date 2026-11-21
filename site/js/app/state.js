@@ -26,22 +26,21 @@ const PRESETS = {
 const defaults = {};
 for (const m of RACK) for (const it of m.items) defaults[it.f || it.s] = it.def;
 for (const b of BENDER) defaults[b.f] = b.def; defaults.transpose = 1; defaults.swing = 0; defaults.gateLen = .5;
-for (const u of FX) for (const it of u.items) defaults[it.f || it.s] = it.def;
-for (const it of FX_ROUTE) defaults[it.s] = it.def;
+// v0.39.0 (Johnny: "simplify shyoy, remove fx"): the effects are gone; a saved sound keeps only the controls that still exist
+const knownParams = (p) => { const o = {}; for (const k in (p || {})) if (k in defaults) o[k] = p[k]; return o; };
 let state;
 function presetState(name) {
   const P = PRESETS[name];
   const bend = stockBend();
   for (const k in (P.bend || {})) { const b = BEND_ITEMS.find(x => x.id === k || x.sw === k); bend[k] = b.sw ? P.bend[k] : toNorm(b, P.bend[k]); }
-  return { params: { ...defaults, ...P.p }, bend, br: { ...(P.br || {}) }, steps: parsePat(P.pat), bpm: P.bpm, preset: name, fx: { ...FX_OFF(), ...(P.fx || {}) } };
+  return { params: { ...defaults, ...P.p }, bend, br: { ...(P.br || {}) }, steps: parsePat(P.pat), bpm: P.bpm, preset: name };
 }
 try { state = JSON.parse(localStorage.getItem('kestrel-ms1-v2')); } catch (e) { state = null; }
 if (!state || state.v !== 2 || !state.params || !Array.isArray(state.steps) || !state.steps.length || state.steps.length > 64) state = presetState('Acid line');
 if (state.len) { state.steps = state.steps.slice(0, Math.max(1, state.len)); delete state.len; }
 for (const st of state.steps) { while (st.n >= 12) { st.n -= 12; st.o++; } st.o = Math.max(-2, Math.min(2, st.o | 0)); }
 state.v = 2; state.bend = { ...stockBend(), ...(state.bend || {}) }; state.br = state.br || {};
-state.params = { ...defaults, ...migrateCmp(state.params) };
-state.fx = { ...FX_OFF(), ...(state.fx || {}) };
+state.params = { ...defaults, ...knownParams(state.params) }; delete state.fx;
 // pattern slots (from the 303 app's banks): 8 patterns, edits save to the selected slot, ctrl/right-click or long-press chains them
 // the sequencer's scale: a played note during a run snaps the pattern's steps to it (engine qScale); label is the short name on the panel
 const SCALE_LIST = [

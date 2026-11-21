@@ -1,8 +1,8 @@
-// Shyoy: Audio engine: boots the AudioWorklet and sends it the patch, effects and sequence.
+// Shyoy: Audio engine: boots the AudioWorklet and sends it the patch and sequence.
 // ---------- audio engine ----------
-// The engine runs in an AudioWorklet built from two files: the effects, then the circuit model. They are fetched as text
-// when the page loads, joined and handed over as one module, so every class sees the others (as when they were inline).
-const DSP_FILES = ['js/dsp/fx.js', 'js/dsp/engine.js'];
+// The engine runs in an AudioWorklet built from the circuit model (v0.39.0: the effects are gone). The file is fetched as
+// text when the page loads and handed over as one module.
+const DSP_FILES = ['js/dsp/engine.js'];
 const loadDsp = () => Promise.all(DSP_FILES.map(f => fetch(f).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.text(); }))).then(t => t.join('\n'));
 let dspCode = loadDsp(); dspCode.catch(() => {});
 let ctx = null, node = null, running = false, booting = null;
@@ -19,7 +19,6 @@ async function boot() {
     node.connect(ctx.destination);
     node.port.onmessage = onEngineMsg;
     pushAll();
-    if ((state.params.revtype | 0) === 3) { irFailed = false; loadIRs(); } // a failed list gets one more try when audio starts
     if (ctx.state !== 'running') await ctx.resume();
   })();
   return booting;
@@ -36,5 +35,4 @@ function seqMsg() {
   const scale = state.scale.on ? SCALE_LIST[state.scale.i].s : null;
   return { type: 'seq', seq: { steps, length: steps.length, bpm: state.bpm, swing: p.swing, gateLen: 0.1 + p.gateLen * 0.85, scale, scaleMidi: !!state.scale.midi, cOnly: !!state.scale.c } };
 }
-function pushFx() { post({ type: 'fxknobs', k: fxKnobs(state.params) }); for (const n of FX_UNITS) post({ type: 'fx', name: n, on: !!state.fx[n] }); }
-function pushAll() { pushFx(); post({ type: 'seq101', steps: state.s101 || [] }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); post(seqMsg()); }
+function pushAll() { post({ type: 'seq101', steps: state.s101 || [] }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); post(seqMsg()); }

@@ -2,10 +2,6 @@
 // ---------- presets: menu, save bar and namer copied from tb303-circuit-model (presets.js, namer.js @2b6e821) ----------
 const store = { get(k, d) { try { const v = localStorage.getItem('kestrel.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('kestrel.' + k, JSON.stringify(v)); } catch (e) {} } };
 function loadStore(key) { const v = store.get(key, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
-// saved presets from before the two-dial Compactor: give each 40% / 20 ms and drop the old Compactor fields, once
-{ const u = loadStore('projectPresets'); let ch = false;
-  for (const n in u) { const p = u[n] && u[n].sound && u[n].sound.params; if (p && (!('cmpamt' in p) || CMP_OLD.some(k => k in p))) { migrateCmp(p); ch = true; } }
-  if (ch) store.set('projectPresets', u); }
 function presetBar(pre, storeKey, builtins, snap, apply, autoName) {
   const sel = document.getElementById(pre + '-preset'), nameEl = document.getElementById(pre + '-name');
   const bar = { user: loadStore(storeKey) };

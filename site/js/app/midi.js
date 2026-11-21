@@ -28,7 +28,6 @@ const BS2_MAP = [
   [85, 'Filter mod env', 'VCF Env (right of centre)', (x, c) => ({ vcfEnv: Math.max(0, c) })],
   [17, 'Filter LFO 2', 'VCF Mod (either side)', (x, c) => ({ vcfMod: Math.abs(c) })],
   [114, 'Overdrive', 'VCF Drive', x => ({ drive: x })],
-  [94, 'Distortion', 'FX Drive pedal amount', x => ({ [['dist', 'dsdist', 'tsdrive'][state.params.drvtype | 0] || 'dist']: x })],
   [20, 'Osc 1 level', 'Saw', x => ({ saw: x })],
   [21, 'Osc 2 level', 'Pulse', x => ({ pulse: x })],
   [22, 'Sub osc level', 'Sub', x => ({ sub: x })],
@@ -60,8 +59,7 @@ const BS2_MAP = [
 const BS2_BY_CC = new Map(BS2_MAP.map(r => [r[0], r]));
 const BS2_14 = new Set([16, 17, 18, 19, 20, 21, 22, 23, 26, 28]); // 8-bit knobs: LSB on cc + 32
 // the MIDI tab's list (shorter than BS2_MAP: pairs that land on one control share a line)
-const BS2_SHOW = [['Filter freq', 'Cutoff'], ['Resonance', 'Reso'], ['Filter env', 'VCF Env'], ['Filter LFO 2', 'VCF Mod'], ['Overdrive', 'VCF Drive'],
-  ['Distortion', 'FX drive'], ['Osc 1 level', 'Saw'], ['Osc 2 level', 'Pulse'], ['Sub level', 'Sub'], ['Noise level', 'Noise'], ['Osc 1 range', 'Range'],
+const BS2_SHOW = [['Filter freq', 'Cutoff'], ['Resonance', 'Reso'], ['Filter env', 'VCF Env'], ['Filter LFO 2', 'VCF Mod'], ['Overdrive', 'VCF Drive'], ['Osc 1 level', 'Saw'], ['Osc 2 level', 'Pulse'], ['Sub level', 'Sub'], ['Noise level', 'Noise'], ['Osc 1 range', 'Range'],
   ['Osc 1 fine', 'Tune'], ['Osc 1 LFO 1', 'VCO Mod'], ['Osc 1 PW', 'PW + PWM'], ['Sub oct, wave', 'Sub switch'], ['LFO 1/2 speed', 'LFO Rate'],
   ['LFO 1/2 wave', 'LFO Wave'], ['Amp/mod env', 'Env ADSR'], ['Glide time', 'Porta'], ['Volume', 'VCA Level'], ['Bend amount', 'Bender VCO'],
   ['Arp rhythm', 'Pattern 1-8'], ['Pitch wheel', 'Bender'], ['Mod wheel', 'Mod lever'], ['Aftertouch', 'Mod lever'], ['Velocity 100+', 'Accent'], ['Sustain', 'Hold']];

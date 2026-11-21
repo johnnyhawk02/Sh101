@@ -47,7 +47,7 @@ setTimeout(() => window.shyoySplash.done(), 20000);
 <div class="unit" id="unit">
   <header class="top">
     <!-- v0.22.11: logo is Johnny's shyoy.psd artwork, used as a mask filled with the LCD ink and multiplied onto the glass -->
-    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.38.2</i></b></div>
+    <div class="brand"><b><span class="logo" role="img" aria-label="Shyoy"></span><i class="ver" id="ver">v0.39.0</i></b></div>
     <!-- v0.22.10: battery readout and Bend board tab taken off the page (Johnny); both stay in the HTML, hidden -->
     <span class="psu" id="psu" hidden>Battery 9.0 V · rail 100%</span>
     <div class="transport">
@@ -83,7 +83,6 @@ setTimeout(() => window.shyoySplash.done(), 20000);
       <button role="tab" id="tab-seq" aria-controls="pan-seq" aria-selected="true">Sequencer</button>
       <button role="tab" id="tab-bend" aria-controls="pan-bend" aria-selected="false" hidden>Bend board</button>
       <button role="tab" id="tab-br" aria-controls="pan-br" aria-selected="false" hidden>Bridges</button>
-      <button role="tab" id="tab-fx" aria-controls="pan-fx" aria-selected="false">FX</button>
       <button role="tab" id="tab-perf" aria-controls="perf101" aria-selected="false">Perform</button>
     </nav>
 
@@ -174,10 +173,6 @@ setTimeout(() => window.shyoySplash.done(), 20000);
       <div class="bend-vals" id="bendVals"></div>
     </section>
 
-    <section class="panel" id="pan-fx" role="tabpanel" aria-labelledby="tab-fx" hidden>
-      <div class="fxrow" id="fxrow"></div>
-    </section>
-
     <section class="panel" id="pan-br" role="tabpanel" aria-labelledby="tab-br" hidden>
       <div class="sec-h">
         <div class="tools"><label class="sld br-depth"><span>Depth</span><input type="range" id="brDepth" min="0" max="100" step="1" value="35" aria-label="Randomise depth"><output id="o-brDepth">35%</output></label><button class="btn light" id="mxRand">Randomise</button><button class="btn light" id="mxClear">Remove bridges</button></div>
@@ -235,7 +230,7 @@ setTimeout(() => window.shyoySplash.done(), 20000);
     <section class="osec" id="osec-about" role="tabpanel" aria-label="About" hidden>
       <div class="opt-acts"><button type="button" class="btn" id="mInstall">Install app</button><button type="button" class="btn" id="mUpdate">Check for update</button></div>
       <p class="opt-ver" id="mInstallHow" hidden></p>
-      <p class="opt-ver" id="mVer">Shyoy v0.38.2</p>
+      <p class="opt-ver" id="mVer">Shyoy v0.39.0</p>
       <div class="notes">
         <p><strong>VCO.</strong> An exponential converter, whose thermal voltage follows temperature, sets the current charging a 1 nF timing cap. A comparator at 5 V fires a reset transistor that discharges the cap through its on-resistance for a set pulse width. The pulse wave is a second comparator against the PW reference. Edges are band-limited with sub-sample polyBLEP.</p>
         <p><strong>Sub-oscillator.</strong> Two flip-flops clocked by the VCO reset give a square one octave down, a square two octaves down and a 25% pulse two octaves down. Their level follows the logic rail.</p>
@@ -248,15 +243,6 @@ setTimeout(() => window.shyoySplash.done(), 20000);
         <p><strong>Accent.</strong> A 303-style sweep capacitor: consecutive accents build up the filter sweep. Acc adds accent to the cutoff (0 is the real 101).</p>
         <p><strong>Bend board.</strong> The VCO timing cap, reset pulse width and discharge resistance, each VCF stage cap, OTA offset, resonance polarity, envelope cap and attack threshold, LFO cap and hysteresis, temperature, battery voltage and internal resistance.</p>
         <p hidden><strong>Bridges.</strong> Any tap node (saw cap, pulse comparator, sub flip-flop, noise, LFO, envelope cap, VCF stage 2, VCF out, VCA out, or a finger with mains hum) to any injection point, through 10 MΩ down to 1 kΩ, applied as current into a cap or summing node.</p>
-        <p><strong>RAT.</strong> An LM308 stage with gain-bandwidth and slew limits from its 30 pF cap, 1N914 diodes to ground, then the 3.3 nF filter. Run at 4× the host rate.</p>
-        <p><strong>DS-1 and TS808.</strong> The Boss DS-1 (transistor booster, op-amp into 1N4148 diodes to ground, tone filter) and the Ibanez TS808 (JRC4558 with diodes in the feedback, tone stage), from ElectroSmash's part values, at 4×.</p>
-        <p><strong>Folder.</strong> The Buchla 259 timbre wavefolder after Esqueda, Pöntynen, Välimäki and Parker (DAFx-17): five folding cells on 6 V rails, level-matched by a peak follower.</p>
-        <p><strong>Flanger.</strong> After the Boss BF-2: a 1024-stage bucket brigade clocked from 500 kHz down to 40 kHz (1 to 12.8 ms, swept as 1/f by a triangle LFO), Res feedback through a soft clip, 8 kHz filters either side, the dry and delayed signals mixed equally. Chorus mode has no feedback.</p>
-        <p><strong>Routing.</strong> The strip under the units: the folder before or after the drive, and the delay and reverb side by side or one into the other (the second fed the dry signal plus the first one's return). Click a block to switch its unit.</p>
-        <p><strong>Delay.</strong> A clean digital delay synced to the tempo, ping-pong or mono, with a low cut and a high cut inside the feedback loop so each repeat gets thinner and darker.</p>
-        <p><strong>Reverb slot.</strong> Four units: a Lexicon 224 (20 kHz, 12-bit gain-ranging converters, 16-bit words, 32K-word memory, on Dattorro's Griesinger-style plate; the variants are estimates), Dattorro's plate (JAES 1997), a spring tank after Välimäki, Parker and Abel (JAES 2010), and partitioned FFT convolution.</p>
-        <p><strong>Convolution IRs.</strong> EMT 140 plate impulse responses by Greg Hopkins (Hopkins Media Services), Creative Commons Attribution, via oramics/sampled. Drum room, silo, garage, Musikverein and On a Star impulse responses from Voxengo, free for any use. See irs/CREDITS.md.</p>
-        <p><strong>Compactor.</strong> A sidechain on the delay and reverb returns, keyed by the dry synth, after the Kilohearts Compactor: Amount sets depth and sensitivity, Release 0 to 1 s, with 3 ms lookahead.</p>
       </div>
     </section>
   </div>
@@ -286,7 +272,6 @@ setTimeout(() => window.shyoySplash.done(), 20000);
 <script src="js/app/audio.js"></script>
 <script src="js/app/controls.js"></script>
 <script src="js/app/bend.js"></script>
-<script src="js/app/effects.js"></script>
 <script src="js/app/strip.js"></script>
 <script src="js/app/generate.js"></script>
 <script src="js/app/sequencer.js"></script>

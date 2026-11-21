@@ -41,7 +41,7 @@
 /* ---------- glass themes: Options › Colours ----------
    Mono: one ink on one coloured glass (the swatch is the glass). Grey + colour (the default): black ink on grey glass,
    and the swatch is one deep spot colour, like a printed filter on a real LCD, on a few small things only:
-   Run while running, the open tab, the pattern in use and the step playing, FX power when on, lit switch LEDs.
+   Run while running, the open tab, the pattern in use and the step playing, lit switch LEDs.
    Dials, faders and sliders always stay ink. The head script sets data-lcd and data-lcdmode before first paint. */
 :root[data-lcd=green] { --glass-rgb: 195 216 58; --ink-rgb: 10 15 4; --hl1-rgb: 255 252 195; --hl2-rgb: 250 255 200;
   --dk1-rgb: 40 50 25; --dk2-rgb: 30 38 20; --dk3-rgb: 20 26 12; --acc: #5f7f00; }
@@ -58,7 +58,6 @@
 :root[data-lcdmode=colour] { --glass-rgb: 211 214 204; --ink-rgb: 18 20 16; --hl1-rgb: 255 255 248; --hl2-rgb: 250 252 244;
   --dk1-rgb: 45 48 40; --dk2-rgb: 34 36 30; --dk3-rgb: 22 24 18; --accent: var(--acc); }
 [data-lcdmode=colour] .btn.play.on, [data-lcdmode=colour] .slots button[aria-pressed=true],
-[data-lcdmode=colour] .fxu .onoff[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--glass); }
 [data-lcdmode=colour] .roll .hd.cur { background: var(--accent); color: var(--glass); }
 [data-lcdmode=colour] .sw button[aria-pressed="true"] .led { background: var(--accent); }
 
@@ -85,7 +84,7 @@ button, table, input, select { font: inherit; color: inherit; }
 .lower { display: contents; }
 
 /* ---------- shared controls ---------- */
-.btn, .acts button, .slots button, .rm-btn, .chain-read button, .fxu .onoff,
+.btn, .acts button, .slots button, .rm-btn, .chain-read button,
 .pm button, .pm-foot button, .pm input[type=text], .pm-foot input[type=text] {
   appearance: none; background: none; border: var(--bw) solid var(--ink); border-radius: var(--r); color: var(--ink);
   height: var(--h); padding: 0 calc(var(--gap-s) + 4px); font-family: var(--f-lcd); font-size: var(--fs); line-height: 1;
@@ -94,7 +93,7 @@ button, table, input, select { font: inherit; color: inherit; }
 .btn { box-shadow: var(--shadow); }
 .btn:active, .btn.held, .btn[aria-pressed="true"], .btn.on,
 .acts button:active, .rm-btn:active, .rm-btn[aria-expanded=true], .chain-read button:active,
-.slots button[aria-pressed=true], .slots button:active, .fxu .onoff[aria-pressed="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
+.slots button[aria-pressed=true], .slots button:active { background: var(--ink); color: var(--glass); text-shadow: none; }
 button:disabled { opacity: .35; cursor: default; }
 @media (hover: hover) {
   .btn:hover:not(:disabled):not(.on):not([aria-pressed="true"]), .acts button:hover:not(:disabled),
@@ -381,36 +380,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .cell.active span { background: var(--glass); padding: 0 3px; }
 .mx .volt { font-size: var(--fs-s); color: var(--muted); position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 4.2em; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* effects, laid out like the TB-303 app's FX page (v0.17.0): three bands, no boxes. Units in a row are split by a thin
-   rule on their left; the reverb row and the routing strip have a rule across the top. Each unit is a one-row header on
-   the glass (On / Off, its name, its own menus or switch) over one row of dials. The 303's sizes are drawn 1.4x here,
-   since its screen is 1000 px wide and this one 1400, so the two pages look the same. */
-#pan-fx { gap: 0; --knob: 60px; --kn-w: 82px; --fx-sp: 38px; }   /* --fx-sp: the space each side of a band rule (v0.20.0; 38 since v0.23.0 made the routing diagram 1.2x) */
-.fxrow { flex: none; display: flex; flex-direction: column; gap: 0; margin-bottom: var(--fx-sp); }
-.fxr { flex: none; display: flex; align-items: stretch; }
-.fxr1 { margin-top: var(--fx-sp); padding-top: var(--fx-sp); border-top: 1px solid var(--line); }
-.fxu { flex: none; display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 0 20px; border-left: 1px solid var(--line); }
-.fxu:first-child { padding-left: 0; border-left: 0; }
-.fxr0 .fxu:last-child { flex: 1 1 auto; }   /* the compactor takes what is left of the first row */
-.fxr0 { --kn-w: 77px; } .fxr0 .fxu { padding: 0 13px; } .fxr0 .fxu:first-child { padding-left: 0; }   /* v0.26.0: room for the drive Mix dial */
-.fxu.rv { flex: 1 1 auto; }                  /* the reverb most of the second row, the flanger at its right */
-.fxu.fg { padding-right: 0; }
-.fxu .fxh { display: flex; align-items: center; gap: 14px; height: var(--h-top); flex-wrap: nowrap; white-space: nowrap; }
-.fxname { font-size: var(--fs); line-height: 1; color: var(--ink); text-transform: lowercase; }
-.fxu .onoff { min-width: 72px; padding: 0 10px; text-transform: none; }
-/* a small segmented switch in a header: delay Mono / Ping-pong, flanger Flanger / Chorus */
-.fx-seg { display: inline-flex; flex: none; }
-.fx-seg button { appearance: none; background: none; border: var(--bw) solid var(--ink); border-right-width: 0; border-radius: 0; color: var(--ink);
-  height: var(--h); padding: 0 12px; font-family: var(--f-lcd); font-size: var(--fs); line-height: 1; text-transform: none; text-shadow: var(--shadow); cursor: pointer;
-  white-space: nowrap; -webkit-tap-highlight-color: transparent; }
-.fx-seg button:first-child { border-radius: var(--r) 0 0 var(--r); } .fx-seg button:last-child { border-right-width: var(--bw); border-radius: 0 var(--r) var(--r) 0; }
-.fx-seg button[aria-checked="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
-@media (hover: hover) { .fx-seg button:hover:not([aria-checked="true"]) { background: var(--tint); } }
-/* the dials: one row per unit, dimmed (and only they) while the unit is off */
-.fxu .ctrls { flex: none; display: flex; flex-wrap: nowrap; gap: 4px; justify-content: flex-start; transition: opacity .15s; }
-.fxu:not(.on) .ctrls { opacity: .5; }
-.fxu .dial { flex: none; min-width: var(--kn-w); gap: 6px; }
-.fxu .dial .knob { flex: none; width: var(--knob); height: var(--knob); min-height: 0; }
 .dial[hidden] { display: none; }
 .dial.dim { opacity: .4; }
 /* the type menus (the 303 app's .tmenu): a button with the current choice and ▾, the menu below it at its left edge */
@@ -418,24 +387,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .tmenu .fn-menu { left: 0; right: auto; min-width: 200px; }
 .tmenu .fn-menu button { position: relative; justify-content: flex-start; padding: 0 14px 0 28px; }
 .tmenu .fn-menu button[aria-checked=true]::before { content: "✓"; position: absolute; left: 8px; }
-/* routing (the 303 app's strip): the block diagram on the left, the two switches stacked on the right */
-.fx-route { flex: none; display: flex; align-items: center; gap: var(--gap); padding-top: var(--fx-sp); border-top: 1px solid var(--line); }
-.route-dia { width: 703px; height: 77px; flex: 0 1 auto; min-width: 0; overflow: visible; font-family: var(--f-lcd); }
-.route-dia .rw { fill: none; stroke: var(--ink); stroke-width: 1.5; }
-.route-dia .ra, .route-dia .rn { fill: var(--ink); stroke: none; }
-.route-dia .rsum { fill: none; stroke: var(--ink); stroke-width: 1.5; }
-.route-dia .rt { fill: var(--ink); font-size: 19px; }
-.route-dia .rs { fill: var(--muted); font-size: 17px; text-anchor: middle; }
-.route-dia .rb rect { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 2; }
-.route-dia .rb text { fill: var(--muted); font-size: 19px; text-anchor: middle; }
-.route-dia .rb.on rect { fill: var(--ink); stroke-dasharray: none; }
-.route-dia .rb.on text { fill: var(--glass); }
-[data-lcdmode=colour] .route-dia .rb.on rect { fill: var(--accent); stroke: var(--accent); }
-.route-dia [data-u] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.route-dia [data-u]:hover rect, .route-dia [data-u]:focus-visible rect { stroke-width: 2.5; }
-.route-dia [data-u]:focus-visible { outline: none; }
-.route-ctl { display: grid; gap: var(--gap-s); justify-items: stretch; margin-left: auto; flex: none; }
-.route-ctl .lcd-seg { display: flex; } .route-ctl .lcd-seg button { flex: 1; }
 .mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
 .fdr[hidden] { display: none; }
 

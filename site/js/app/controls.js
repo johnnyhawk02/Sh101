@@ -158,3 +158,29 @@ for (const m of RACK) {
 }
 for (const b of BENDER) fader(b, document.getElementById('benderSlot'));
 switcher({ s: 'transpose', label: 'Transpose', opts: ['Low', 'Mid', 'High'], def: 1 }, document.getElementById('trSw'));
+// ---------- type menus (the 303 app's drawTypeMenu; the performance strip's dial menus): a button showing the current choice and ▾, a menu below it with
+// a ✓ by the current one. Arrow keys move, Enter picks, Escape or a click outside closes. Picking switches at once.
+function typeMenu(el, pick) {
+  el.innerHTML = `<button type="button" class="rm-btn" aria-haspopup="menu" aria-expanded="false" aria-label="${el.dataset.label}"></button><div class="fn-menu" role="menu" hidden></div>`;
+  const btn = el.firstElementChild, menu = el.lastElementChild;
+  const open = (on) => {
+    menu.hidden = !on; btn.setAttribute('aria-expanded', on);
+    if (on) (menu.querySelector('[aria-checked=true]') || menu.querySelector('button')).focus();
+  };
+  btn.onclick = () => { for (const m of document.querySelectorAll('.tmenu .fn-menu:not([hidden])')) if (m !== menu) m.parentElement.firstElementChild.click(); open(menu.hidden); };
+  menu.addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (!b) return; open(false); boot(); pick(+b.dataset.t); btn.focus(); });
+  menu.addEventListener('keydown', (e) => {
+    const bs = [...menu.querySelectorAll('button')], j = bs.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); open(false); btn.focus(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); bs[(j + (e.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length].focus(); }
+  });
+  document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !el.contains(e.target)) open(false); });
+}
+function setTypeItems(el, names) {
+  el.lastElementChild.innerHTML = names.map((n, i) => `<button type="button" role="menuitemradio" aria-checked="false" data-t="${i}">${n}</button>`).join('');
+}
+function drawTypeMenu(el, t) {
+  const items = el.querySelectorAll('.fn-menu button');
+  for (const b of items) b.setAttribute('aria-checked', +b.dataset.t === t);
+  if (items[t]) el.firstElementChild.textContent = items[t].textContent;
+}

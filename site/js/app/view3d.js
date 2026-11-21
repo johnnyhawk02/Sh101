@@ -1,9 +1,9 @@
 // Shyoy 3D panel (v0.24.0, after FILTH's view3d.js): the whole synth as ONE flat panel in three.js.
 //
 // The 2D app keeps running underneath, hidden. This view never talks to the engine itself: every knob, key and switch
-// goes through the 2D app's own setters (ctlRegs[id].set, the switch buttons, setFxSw, setRev, setLever, the preset
+// goes through the 2D app's own setters (ctlRegs[id].set, the switch buttons, setLever, the preset
 // menu's own buttons), so presets, MIDI, the control step sequencers and saving are the app's, and the sound is the same.
-// It reads state (state.params, state.fx, running, playStep...) every frame and draws only when something changed.
+// It reads state (state.params, running, playStep...) every frame and draws only when something changed.
 //
 // Layout: an 18 x 5 grid, one control per column (C px), one module row per R px, boxed sections with their names
 // printed on the panel. Everything printed (boxes, tags, labels, the logo) is one flat canvas over the panel face.
@@ -85,31 +85,23 @@ const lensFov = (u) => 6 * Math.pow(8, Math.max(0, Math.min(1, u)));   // 6° (f
 
 // ---------------------------------------------------------------- what the panel holds
 const DEF = {}; for (const m of RACK) for (const it of m.items) DEF[it.f || it.s] = it;
-for (const b of BENDER) DEF[b.f] = b; for (const u of FX) for (const it of u.items) DEF[it.f || it.s] = it;
+for (const b of BENDER) DEF[b.f] = b;
 const K = (id, label) => ({ t: 'knob', id, label });
 const S = (id, label, opts, w = 1) => ({ t: 'sw', id, label, opts, w });
-const squeeze = (k, bs) => bs.map((b) => ({ ...b, c: b.c * k, s: b.s * k, it: b.it.map((it) => ({ ...it, w: (it.w || 1) * k })) }));
+// v0.39.0 (Johnny: "simplify shyoy, remove fx"): the FX rows are gone; the sequencer page still needs all five rows,
+// so the synth page's three rows are spread down the panel
+const ROW_VCF = 2, ROW_BENDER = 4;
 const BOXES = [
   { r: 0, c: 0, s: 2, n: 'LFO', it: [K('lfoRate', 'RATE'), S('lfoWave', 'WAVE', ['TRI', 'SQR', 'RND', 'NOISE'])] },
   { r: 0, c: 2, s: 6, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV']), K('drift', 'DRIFT')] },
   { r: 0, c: 8, s: 5, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
-  { r: 1, c: 0, s: 7, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
-  { r: 1, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
-  { r: 1, c: 12, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
-  { r: 1, c: 14, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('slide', 'SLIDE'), K('accent', 'ACCENT')] },
-  // row 2 holds 19 columns of controls since the drive's Mix (v0.26.0): its boxes and columns are 18/19 of the grid
-  ...squeeze(18 / 19, [
-  { r: 2, c: 0, s: 3, n: 'FOLDER', on: 'fold', it: [K('fldtimbre', 'TIMBRE'), K('fldsym', 'SYMM'), K('fldlevel', 'LEVEL')] },
-  { r: 2, c: 3, s: 5, n: 'DRIVE', on: 'rat', it: [S('drvtype', 'PEDAL', ['RAT', 'DS-1', 'TS808']), { t: 'slot', g: 'drv', k: 0 }, { t: 'slot', g: 'drv', k: 1 }, { t: 'slot', g: 'drv', k: 2 }, K('drvmix', 'MIX')] },
-  { r: 2, c: 8, s: 5, n: 'FLANGER', on: 'flg', it: [S('flgmode', 'MODE', ['FLANGE', 'CHORUS']), K('flgman', 'MANUAL'), K('flgdep', 'DEPTH'), K('flgrate', 'RATE'), K('flgres', 'RES')] },
-  { r: 2, c: 13, s: 6, n: 'DELAY', on: 'dly', it: [K('dlytime', 'TIME'), K('dlyfb', 'FDBK'), K('dlylo', 'LO CUT'), K('dlyhi', 'HI CUT'), K('dlymix', 'RETURN'), S('dlypp', 'MODE', ['MONO', 'PING'])] }]),
-  { r: 3, c: 0, s: 13, n: 'REVERB', on: 'lex', it: [S('revtype', 'TYPE', ['224', 'PLATE', 'SPRING', 'CONV']), { t: 'prog', w: 2 },
-    ...Array.from({ length: 10 }, (_, k) => ({ t: 'slot', g: 'rev', k }))] },
-  { r: 3, c: 13, s: 2, n: 'COMPACTOR', it: [K('cmpamt', 'AMOUNT'), K('cmprel', 'RELEASE')] },
-  { r: 3, c: 15, s: 3, n: 'ROUTING', it: [S('fxorder', 'ORDER', ['FOLD>DRV', 'DRV>FOLD'], 1.5), S('fxret', 'RETURNS', ['PARALLEL', 'DLY>REV', 'REV>DLY'], 1.5)] },
-  { r: 4, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
-  { r: 4, c: 7, s: 8, n: 'SEQUENCER', it: [{ t: 'key', k: 'run', label: 'RUN' }, { t: 'knob', id: 'bpm', label: 'TEMPO' }, { t: 'pattern', w: 4 }, { t: 'key', k: 'gen', label: 'GENERATE' }, { t: 'key', k: 'edit', label: 'EDIT' }] },
-  { r: 4, c: 15, s: 3, n: 'PRESET', it: [{ t: 'preset', w: 3 }] },
+  { r: ROW_VCF, c: 0, s: 7, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
+  { r: ROW_VCF, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
+  { r: ROW_VCF, c: 12, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
+  { r: ROW_VCF, c: 14, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('slide', 'SLIDE'), K('accent', 'ACCENT')] },
+  { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
+  { r: ROW_BENDER, c: 7, s: 8, n: 'SEQUENCER', it: [{ t: 'key', k: 'run', label: 'RUN' }, { t: 'knob', id: 'bpm', label: 'TEMPO' }, { t: 'pattern', w: 4 }, { t: 'key', k: 'gen', label: 'GENERATE' }, { t: 'key', k: 'edit', label: 'EDIT' }] },
+  { r: ROW_BENDER, c: 15, s: 3, n: 'PRESET', it: [{ t: 'preset', w: 3 }] },
 ];
 const TITLE = { x: M + 13 * C, y: M, w: 5 * C, h: R };
 
@@ -133,19 +125,8 @@ const knobText = (id, v) => SQK[id] ? SQK[id].text(SQK[id].get()) : id === 'bpm'
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
   boot();
-  if (id === 'drvtype') { setFxSw('drvtype', i); drawDrv(); }
-  else if (id === 'revtype') setRev('revtype', i);
-  else if (id === 'flgmode') fgModeEl.querySelector(`[data-t="${i}"]`).click();
-  else if (id === 'dlypp') dlyModeEl.querySelector(`[data-t="${i}"]`).click();
-  else if (id === 'fxorder' || id === 'fxret') routeSegs[id].querySelector(`[data-i="${i}"]`).click();
-  else { const b = document.getElementById(`s-${id}-${i}`); if (b) b.click(); }
+  { const b = document.getElementById(`s-${id}-${i}`); if (b) b.click(); }
 }
-const revItems = () => FX.find((u) => u.rv).items.filter((it) => it.f && it.rev === REV_IDS[Math.max(0, Math.min(3, state.params.revtype | 0))]);
-const drvItems = () => FX.find((u) => u.dv).items.filter((it) => it.f && it.drv === DRV_IDS[Math.max(0, Math.min(2, state.params.drvtype | 0))]);
-const slotItem = (g, k) => (g === 'rev' ? revItems() : drvItems())[k] || null;
-// a control's label as the 2D page shows it (the reverb renames some for its programs)
-const domLabel = (id) => { const l = document.querySelector(`label[for="f-${id}"]`); return l ? l.textContent.trim().toUpperCase() : (DEF[id] ? DEF[id].label.toUpperCase() : id); };
-const progOf = () => RV_PROG[REV_IDS[Math.max(0, Math.min(3, state.params.revtype | 0))]];
 
 // ---------------------------------------------------------------- renderer, scene
 await Promise.race([Promise.all([document.fonts.load(`600 12px ${MONO}`), document.fonts.load(`400 14px ${DISPLAY}`)]), new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
@@ -542,20 +523,13 @@ for (const b of BOXES) {
     x.font = `400 13px ${DISPLAY}`; if ('letterSpacing' in x) x.letterSpacing = '.6px';
     x.fillStyle = ink; x.fillRect(bx + 10, by - 9, tagW, 18);
     x.fillStyle = paper; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText(b.n, bx + 18, by + 0.5);
-    // an effect's on switch: a second tag beside the name, its LED and ON (as FILTH's SYNC)
-    if (b.on) { x.fillStyle = ink; text(x, 'ON', bx + bw - 26, by + 12.5, 10, 'right'); }   // an effect's on key: inside the box, top right
   });
-  if (b.on) makeKey(bx + bw - 14, by + 12, 15, 10, { on: () => state.fx[b.on], press: () => document.getElementById(`fx-${b.on}-on`).click(), pad: 4, tag: 'on:' + b.on });
   let col = 0;
   for (const it of b.it) {
     const w = it.w || 1, cx = colX(b, col, w), cy = y0 + KY, ly = y0 + LY;
     if (it.t === 'knob') {
       makeKnob(cx, cy, { cur: () => it.id, base: () => knobBase(it.id), odd: it.id === 'cutoff' });   // the filter knob is a mismatched spare (Johnny)
-      labelAt(() => it.label, cx, ly, { slab: () => cseqOn(it.id), dim: () => it.id === 'flgres' && (state.params.flgmode | 0) === 1 });
-    } else if (it.t === 'slot') {
-      const cur = () => { const d = slotItem(it.g, it.k); return d ? d.f : null; };
-      makeKnob(cx, cy, { cur });
-      labelAt(() => { const id = cur(); return id ? domLabel(id) : ''; }, cx, ly, { slab: () => { const id = cur(); return id && cseqOn(id); } });
+      labelAt(() => it.label, cx, ly, { slab: () => cseqOn(it.id) });
     } else if (it.t === 'sw') {
       px.font = `600 10.5px ${MONO}`; const tw = Math.max(...it.opts.map((o) => px.measureText(o).width + o.length * 0.6));
       const n = it.opts.length, pitch = 16, top = cy - (n - 1) * pitch / 2, kx = Math.max(bx + 14, Math.min(cx - 18, cx + C * w / 2 - 14 - tw - 14));   // the same place in every column, inside the box
@@ -587,12 +561,6 @@ for (const b of BOXES) {
       };
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
-    } else if (it.t === 'prog') {
-      const dw = w * C - 16, dx = cx - dw / 2, k0 = colX(b, col), k1 = colX(b, col + 1);
-      makeDisplay(dx, y0 + 26, dw, 24, () => (revProgEl.firstElementChild.textContent || '').trim(), { press: () => stepProg(1) });
-      makeKey(k0, y0 + KEYY, 24, 14, { on: () => false, press: () => stepProg(-1), pad: 8, tag: 'prog-' });
-      makeKey(k1, y0 + KEYY, 24, 14, { on: () => false, press: () => stepProg(1), pad: 8, tag: 'prog+' });
-      labelAt(() => 'PREV', k0, ly); labelAt(() => 'NEXT', k1, ly);
     } else if (it.t === 'pattern') {
       const span = w * C - 16, x0 = cx - span / 2, sp = span / 16, kp = span / 8;
       for (let i = 0; i < 16; i++) {   // the playhead: one LED per step of the 16 being played
@@ -620,7 +588,6 @@ for (const b of BOXES) {
   }
 }
 let modHeld = false;
-function stepProg(d) { const pit = progOf(), n = pit.opts.length, cur = Math.max(0, Math.min(n - 1, state.params[pit.s] | 0)); boot(); setRev(pit.s, (cur + d + n) % n); }
 // the title: Johnny's logo, printed; tapping it opens OPTIONS. Under it, the page keys (on both pages)
 buildPage = 'all'; grp = scene; prints = printsBy.all;
 // v0.31.1: the logo is printed on its own lit layer over the title, carrying the panel's wear (the same bump map,
@@ -1034,8 +1001,8 @@ function repaintPrint() {
   px.save(); px.setTransform(1, 0, 0, 1, 0, 0); px.globalCompositeOperation = 'destination-in'; px.drawImage(inkMask(), 0, 0); px.restore();
   printTex.needsUpdate = true;
 }
-// the print's labels that can change: the reverb and drive slots, the dimmed Res, the step-sequencer slabs
-const printSigNow = () => curInk + '|' + (state.params.revtype | 0) + (state.params.drvtype | 0) + (state.params.flgmode | 0) + (state.params.lexprog | 0) + (state.params.cnvprog | 0)
+// the print's labels that can change: the step-sequencer slabs
+const printSigNow = () => curInk
   + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
   + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on + state.scale.midi + state.scale.c : '');
 

@@ -1,7 +1,7 @@
 // Shyoy: the sticker randomiser (v0.34.0, Johnny: clicking a sticker randomises the sound; every sticker does the same).
-// One click = a new synth voice and a new FX chain, drawn from musical ranges, at the RANDOM AMOUNT set in
+// One click = a new synth voice, drawn from musical ranges, at the RANDOM AMOUNT set in
 // OPTIONS > STICKERS (0 = no change, 1 = a whole new sound; in between each knob moves that far towards its new value
-// and each switch flips with that chance). Tuning, accent, tempo, the sequence, the Compactor, the bender,
+// and each switch flips with that chance). Tuning, accent, tempo, the sequence, the bender,
 // the bend board and the bridges never change; the VCA Level is set to keep it as loud as a plain sound (below). It loads like a preset does (applySound + pushAll), so the engine
 // gets nothing it doesn't already get from a preset load. Each click keeps the sound before it (20 back) for undo.
 const shyoyRand = (() => {
@@ -10,7 +10,7 @@ const shyoyRand = (() => {
   const chance = (p) => Math.random() < p;
   const clamp = (v) => Math.max(0, Math.min(1, v));
   let amount = clamp(store.get('rndAmount', 1));
-  // a whole new sound: { f: knob targets, s: switch targets, fx: units on }
+  // a whole new sound: { f: knob targets, s: switch targets }
   function draw() {
     const f = {}, s = {};
     // VCO and source mix: one main source loud, the others sometimes; noise rare
@@ -34,26 +34,9 @@ const shyoyRand = (() => {
       f.lfoRate = U(0.3, 0.75); s.lfoWave = pick([4, 2, 3, 1]);
       if (chance(0.5)) { f.vcoMod = U(0.02, 0.12); f.vcfMod = 0; } else { f.vcoMod = 0; f.vcfMod = U(0.1, 0.4); }
     } else { f.vcoMod = 0; f.vcfMod = 0; }
-    // FX: one to three units, never folder + drive + flanger together
-    const fx = FX_OFF(), W = { fold: 2, rat: 4, flg: 2.5, dly: 5, lex: 5 };
-    for (const u of FX_UNITS) fx[u] = chance(W[u] / 10);
-    let on = FX_UNITS.filter((u) => fx[u]);
-    while (on.length > 3 || (fx.fold && fx.rat && fx.flg)) { const u = on[Math.floor(Math.random() * on.length)]; fx[u] = false; on = on.filter((x) => x !== u); }
-    if (!on.length) fx[['dly', 'lex', 'rat'][pick([4, 4, 2])]] = true;
-    f.fldtimbre = U(0.1, 0.7); f.fldsym = U(0.3, 0.7);
-    s.drvtype = pick([1, 1, 1]); f.dist = U(0.2, 0.8); f.filter = U(0.2, 0.7); f.dsdist = U(0.2, 0.8); f.dstone = U(0.3, 0.7);
-    f.tsdrive = U(0.2, 0.8); f.tstone = U(0.3, 0.7); f.drvmix = U(0.4, 1);
-    s.flgmode = pick([1, 1]); f.flgman = U(0.2, 0.8); f.flgdep = U(0.2, 0.8); f.flgrate = U(0, 0.6); f.flgres = U(0.2, 0.8);
-    f.dlytime = [2, 5, 7, 8][pick([2, 4, 3, 2])] / 10; f.dlyfb = U(0.15, 0.6); f.dlylo = U(0.1, 0.5); f.dlyhi = U(0.3, 0.8); f.dlymix = U(0.15, 0.45); s.dlypp = pick([1, 1]);
-    s.revtype = pick([3, 3, 2, 3]);
-    for (const it of FX.find((u) => u.rv).items) {
-      if (it.prog) s[it.s] = Math.floor(Math.random() * it.opts.length);
-      else if (it.f) f[it.f] = /mix$/.test(it.f) ? U(0.15, 0.45) : U(0.2, 0.8);
-    }
-    s.fxorder = pick([1, 1]); s.fxret = pick([5, 3, 2]);
-    // the output trims start from noon each time (levelled sets them after)
-    f.level = 0.7; f.fldlevel = 0.5; f.ratvol = 0.5; f.dslevel = 0.5; f.tslevel = 0.5;
-    return { f, s, fx };
+    // the output level starts from noon each time (levelled sets it after)
+    f.level = 0.7;
+    return { f, s };
   }
   // ---- loudness (v0.34.1, Johnny: randomised sounds came out very loud) ----
   // Before a new sound goes on, a copy of the engine (the same worklet code, run in a Web Worker, so the page doesn't
@@ -61,7 +44,7 @@ const shyoyRand = (() => {
   // sound's output is then trimmed to match the reference (see levelled). The live engine is not changed; it only gets
   // the finished sound, as from a preset.
   const REF = { saw: 0.8, pulse: 0, sub: 0.4, noise: 0, range: 1, cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, drive: 0.4, decay: 0.4, sustain: 0, release: 0.3, attack: 0, level: 0.7 };
-  const PEDAL_OUT = ['ratvol', 'dslevel', 'tslevel'], TRIMS = ['level', 'fldlevel', ...PEDAL_OUT];
+  const TRIMS = ['level'];
   let worker = null, jobs = 0; const waiting = new Map();
   async function meterWorker() {
     if (worker) return worker;
@@ -83,22 +66,17 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     return worker;
   }
   // what the engine is sent for a sound, then the pattern, then Run (as pushAll + Play do)
-  const msgsFor = (snap, seq) => [{ type: 'fxknobs', k: fxKnobs(snap.params) }, ...FX_UNITS.map((n) => ({ type: 'fx', name: n, on: !!snap.fx[n] })),
-    { type: 'params', p: snap.params }, { type: 'bend', b: bendPhysical(snap.bend) }, { type: 'bridges', br: snap.br }, seq, { type: 'run', on: true }];
+  const msgsFor = (snap, seq) => [{ type: 'params', p: snap.params }, { type: 'bend', b: bendPhysical(snap.bend) }, { type: 'bridges', br: snap.br }, seq, { type: 'run', on: true }];
   async function meter(snaps) {
     const w = await meterWorker(), id = ++jobs;
     // the current pattern; an empty one gets a plain eighth-note riff so there is something to hear
     let seq = seqMsg(); if (!seq.seq.steps.some((st) => st.m === 'N')) seq = { type: 'seq', seq: { ...seq.seq, steps: Array.from({ length: 16 }, (_, i) => ({ n: [0, 0, 7, 0, 3, 0, 10, 5][i % 8], o: 0, m: i % 2 ? 'R' : 'N', a: i % 4 === 0, s: false })), length: 16 } };
     return new Promise((res) => { waiting.set(id, res); w.postMessage({ id, sec: 2, msgs: snaps.map((s) => msgsFor(s, seq)) }); });
   }
-  // the reference: a plain saw + sub patch, no FX, played with the same pattern, tempo, transpose and accent
-  const refSnap = () => { const q = state.params, p = { ...defaults, ...REF, transpose: q.transpose, tune: q.tune, accent: q.accent, swing: q.swing, gateLen: q.gateLen }; return { params: p, bend: stockBend(), br: {}, fx: FX_OFF() }; };
+  // the reference: a plain saw + sub patch, played with the same pattern, tempo, transpose and accent
+  const refSnap = () => { const q = state.params, p = { ...defaults, ...REF, transpose: q.transpose, tune: q.tune, accent: q.accent, swing: q.swing, gateLen: q.gateLen }; return { params: p, bend: stockBend(), br: {} }; };
   const dB = (r) => 20 * Math.log10(Math.max(1e-6, r));
-  // (Johnny: it's mainly the distortion, so turn its post level down) with a drive pedal on, its output knob moves (the
-  // folder's Level when only the folder is on), so the drive itself sounds as drawn; with neither, or when that knob
-  // can't get there, the VCA Level (0.1-1) moves. Each knob is found by halving (six tries at most, stopping within
-  // 1 dB): the output knobs are audio taper, so a straight ratio overshoots.
-  const postOf = (snap) => snap.fx.rat ? PEDAL_OUT[Math.max(0, Math.min(2, snap.params.drvtype | 0))] : snap.fx.fold ? 'fldlevel' : null;
+  // the VCA Level (0.1-1) moves, found by halving (six tries at most, stopping within 1 dB)
   async function trim(snap, knob, lo, hi, ref, m) {
     const p = snap.params; let best = { e: dB(ref.rms / m.rms), v: p[knob], m };
     if (Math.abs(best.e) < 1) return best;
@@ -111,19 +89,17 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     p[knob] = best.v; return best;
   }
   async function levelled(snap) {
-    const post1 = postOf(snap);
     try {
       const [ref, first] = await meter([refSnap(), snap]);
       if (ref.rms < 1e-4 || first.rms < 1e-5) return snap;
       let r = { e: dB(ref.rms / first.rms), m: first };
-      if (post1) r = await trim(snap, post1, 0.02, 1, ref, first);
       if (Math.abs(r.e) >= 1.5) r = await trim(snap, 'level', 0.1, 1, ref, r.m);
-      last = { ref: dB(ref.rms), got: dB(first.rms), now: dB(r.m.rms), level: snap.params.level, post: post1 && snap.params[post1] };
+      last = { ref: dB(ref.rms), got: dB(first.rms), now: dB(r.m.rms), level: snap.params.level };
     } catch (e) { console.warn('sticker loudness', e); }
     return snap;
   }
-  // the fade (Johnny: fade low, then bring it up): the new sound goes on with its trim knob (the pedal's output, else
-  // Level) at 0 while it is measured, then that knob rises to the matched value
+  // the fade (Johnny: fade low, then bring it up): the new sound goes on with Level at 0 while it is measured, then
+  // Level rises to the matched value
   let fadeTok = 0, curP = null, reel = [], reelTok = 0, pend = false;
   const hush = () => { post({ type: 'param', id: 'level', v: 0 }); return new Promise((r) => setTimeout(r, 90)); };
   function fadeTo(tok, id, to) {
@@ -153,14 +129,13 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     const a = amount, t = draw(), p = clone(state.params);
     for (const k in t.f) p[k] = clamp(p[k] + (t.f[k] - p[k]) * a);
     for (const k in t.s) if (chance(a)) p[k] = t.s[k];
-    const fx = { ...state.fx }; for (const u of FX_UNITS) if (chance(a)) fx[u] = t.fx[u];
     // the musical limits hold however far it moved
     if (p.reso > 0.75) p.cutoff = Math.min(p.cutoff, 0.7);
     const m = Math.max(p.saw, p.pulse, p.sub); if (m < 0.5) { const k = ['saw', 'pulse', 'sub'].find((k) => p[k] === m); p[k] = 0.5; }
-    const snap = { params: p, bend: clone(state.bend), br: clone(state.br), fx, strip: clone(state.strip) }, tok = ++fadeTok;
-    // v0.36.6 (Johnny: loud blips before the volume changes): the engine glides the VCA Level over ~10 ms but switches,
-    // FX and pedals change at once, so the old sound is first taken to silence, and only then does the new one go on,
-    // still at Level 0; the output knobs are set while it is silent and Level fades up (the drive's own trim stays put)
+    const snap = { params: p, bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) }, tok = ++fadeTok;
+    // v0.36.6 (Johnny: loud blips before the volume changes): the engine glides the VCA Level over ~10 ms but switches
+    // change at once, so the old sound is first taken to silence, and only then does the new one go on, still at Level 0,
+    // and Level fades up
     const trim = 'level'; await hush(); if (tok !== fadeTok) return;
     load({ ...snap, params: { ...p, level: 0 } });
     // a new name from the namer, shown unsaved; SAVE stores it under that name
@@ -196,7 +171,7 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     get spinning() { return pend || this.working; },   // from the click (audio may still be starting) to the fade
     get reel() { return this.working ? reel[Math.floor(performance.now() / 85) % reel.length] : null; },
     // for tests: a whole new sound, drawn but not played
-    sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), fx: t.fx, strip: clone(state.strip) }; },
+    sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) }; },
     refSnap,
   };
 })();

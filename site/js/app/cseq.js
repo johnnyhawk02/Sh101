@@ -24,7 +24,6 @@ const CSEQ_NAME = (() => {
   const n = {};
   for (const m of RACK) for (const it of m.items) if (it.f) n[it.f] = STRIP_NAME[it.f] || it.label;
   for (const b of BENDER) n[b.f] = 'bender ' + b.label;
-  for (const u of FX) for (const it of u.items) if (it.f) n[it.f] = u.name + ' ' + it.label;
   for (const b of BEND_ITEMS) if (b.id) n['b:' + b.id] = b.label;
   return n;
 })();
