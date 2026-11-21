@@ -7,7 +7,7 @@ let stripLoad = () => {};
 const STRIP_DEF = ['cutoff', 'reso', 'vcfEnv', 'decay', 'accent', 'drive', 'pw', 'lfoRate'];
 const STRIP_NAME = { lfoRate: 'lfo rate', tune: 'tune', vcoMod: 'vco lfo', pw: 'pulse width', drift: 'drift', saw: 'saw', pulse: 'pulse', sub: 'sub', noise: 'noise',
   cutoff: 'cutoff', reso: 'reso', vcfEnv: 'env mod', vcfMod: 'vcf lfo', kybd: 'key track', drive: 'drive', accVcf: 'acc sweep',
-  attack: 'attack', decay: 'decay', sustain: 'sustain', release: 'release', level: 'level', glide: 'porta', slide: 'slide', accent: 'accent' };
+  attack: 'attack', decay: 'decay', sustain: 'sustain', release: 'release', level: 'level', glide: 'porta', accent: 'accent' };
 (() => {
   const ALL = [];   // every continuous rack control, in panel order
   for (const m of RACK) for (const it of m.items) if (it.f) ALL.push({ ...it, mod: m.name });

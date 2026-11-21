@@ -81,7 +81,6 @@ const RACK = [
   { id: 'perf', name: 'Perform', sub: 'glide · accent', items: [
     { f: 'glide', label: 'Porta', def: .3, fmt: v => v < .01 ? 'off' : ms(0.003 * Math.pow(5 / 0.003, v)) },
     { s: 'glideMode', label: 'Porta', opts: ['Off', 'Auto', 'On'], def: 1 },
-    { f: 'slide', label: 'Slide', def: .25, fmt: v => ((0.02 + v * 0.28) * 1000).toFixed(0) + 'ms' },
     { f: 'accent', label: 'Accent', def: .6, fmt: pct } ] },
 ];
 const BENDER = [

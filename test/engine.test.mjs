@@ -50,12 +50,11 @@ const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
   send({ type: 'noteOn', n: 60 }); const b = render(p, 1);
   assert.ok(finite(b)); assert.ok(peak(b) > 0.1, 'expected self-oscillation');
 }
-// sequencer + heavy bending stays finite and bounded
+// played notes + heavy bending stays finite and bounded
 {
   const [p, send] = make();
-  const steps = Array.from({ length: 16 }, (_, i) => ({ n: i % 5 * 2, o: i % 3 - 1, m: i % 7 === 3 ? 'T' : i % 5 === 4 ? 'R' : 'N', a: i % 3 === 0, s: i % 4 === 1 }));
-  send({ type: 'seq', seq: { steps, length: 16, bpm: 126, swing: .1, gateLen: .5 } }); send({ type: 'run', on: true });
-  assert.ok(finite(render(p, 2)));
+  for (const n of [48, 55, 60, 63]) { send({ type: 'noteOn', n, acc: n === 60 }); render(p, .3); send({ type: 'noteOff', n }); }
+  send({ type: 'noteOn', n: 48 }); assert.ok(finite(render(p, 2)));
   send({ type: 'bend', b: { vBatt: 5, rBatt: 10, tReset: 3e-3, rDis: 200e3, fbInv: 1, cf: [1e-9, 100e-9, 2e-9, 50e-9], otaOff: 0.06, ce: 1e-7, hys: 9, tempC: 80 } });
   const br = {}; for (const s of ['SAW', 'LFOSQ', 'VCFOUT', 'FINGER', 'VCAOUT']) for (const d of ['VCOCAP', 'VCOCV', 'VCFIN', 'VCFC2', 'ENVCAP', 'VCACV']) br[`${s}>${d}`] = 1;
   send({ type: 'bridges', br });

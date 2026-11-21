@@ -201,7 +201,6 @@ dialog#options[open] { display: flex; }
    no <dialog> (fit.js sets html.nodialog) an open one is placed as the browser would. */
 dialog:not([open]) { display: none; }
 html.nodialog dialog { position: fixed; z-index: 100; }
-html.nodialog dialog#cseq[open] { display: block; }
 dialog#options::backdrop { background: rgb(var(--ink-rgb) / .3); }
 .opt-head { flex: none; display: flex; align-items: flex-end; gap: var(--gap) calc(var(--gap) + 12px); padding: calc(var(--pad) - 4px) var(--pad) 0; border-bottom: 2px solid var(--ink); }
 .opt-head h2 { margin: 0; padding-bottom: var(--gap-s); font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; text-transform: lowercase; }
@@ -390,82 +389,6 @@ table.mx { width: 100%; border-collapse: separate; border-spacing: 4px; font-siz
 .mod .ctrls, .bend-grp .ctrls { justify-content: space-evenly; }
 .fdr[hidden] { display: none; }
 
-/* ---------- sequencer: controls in one strip, the piano roll fills the rest ---------- */
-.seq { gap: var(--gap-s); }
-.sq-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
-.sq-side { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) calc(var(--gap) + 6px); }
-.acts { display: flex; gap: var(--gap-s); }
-.sq-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--gap-s) + 2px); }
-.sq-bank { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-s) var(--gap); font-size: var(--fs-s); text-transform: lowercase; }
-.bk-lab { color: var(--muted); }
-.slots { display: flex; gap: 4px; }
-.slots button, .rm-btn { min-width: calc(var(--h) + 4px); padding: 0 6px; font-size: var(--fs-s); position: relative; -webkit-touch-callout: none; user-select: none; }
-.slots button.used:not([aria-pressed=true]) { background: var(--ghost); }
-.slots button[data-ch]:not([data-ch=""])::after { content: attr(data-ch); position: absolute; top: -8px; right: -5px; font-size: 14px; line-height: 1; padding: 1px 3px; background: var(--ink); color: var(--glass); border-radius: 2px; text-shadow: none; }
-.slots button.playing { outline: 2px dashed var(--ink); outline-offset: 2px; }
-/* Randomise and Tools menus (from the 303 app): at the right of the pattern row, styled like the app menu */
-.rmenu { position: relative; }
-.sq-bank > .rmenu { margin-left: auto; } .sq-bank > .rmenu + .rmenu, .sq-bank > .sq-side + .rmenu { margin-left: 0; }
-.sq-bank > .sq-side { margin-left: auto; margin-right: calc(var(--gap) * 2); }
-.sq-side .sld { grid-template-columns: auto 120px 2.4em; }
-.sq-side .sq-tick { display: inline-flex; align-items: center; gap: .4em; white-space: nowrap; }
-.sq-side .sld output { text-align: left; }   /* v0.23.0: the value right by its bar, not a gap away */
-.sq-bank > .rmenu + .rmenu { margin-left: 0; }   /* v0.20.0: randomise depth moved into the pattern row */
-.rm-btn { text-transform: none; }   /* Johnny: the menu buttons read "Randomise ▾" and "Tools ▾" */
-.rm-btn::after { content: " ▾"; }
-.fn-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 70; min-width: 230px; display: flex; flex-direction: column; padding: 4px 0 6px;
-  background: var(--glass); color: var(--ink); border: 2px solid var(--ink); border-radius: 4px; box-shadow: 0 10px 30px rgb(0 0 0 / .45); text-shadow: none; }
-.fn-menu[hidden] { display: none; }
-.fn-menu button { appearance: none; background: none; border: 0; border-radius: 0; box-shadow: none; margin: 0; width: 100%; height: var(--menu-h);
-  display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 0 12px 0 22px;
-  font-family: var(--f-lcd); font-size: var(--fs); line-height: 1; letter-spacing: 0; text-transform: none; text-align: left; color: var(--ink); text-shadow: none;
-  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.fn-menu .mh { padding: 6px 12px 2px; font-size: var(--fs-s); line-height: 1; color: var(--muted); text-transform: lowercase; }
-.fn-menu kbd { font-family: var(--f-lcd); font-size: var(--fs-s); line-height: 1; color: var(--muted); text-transform: none; }
-.fn-menu button:not(:disabled):hover, .fn-menu button:focus-visible { background: var(--ink); color: var(--glass); outline: 0; }
-.fn-menu button:not(:disabled):hover kbd, .fn-menu button:focus-visible kbd { color: var(--glass); }
-.fn-menu [aria-checked=true]::after { content: "✓"; }
-.tmenu .fn-menu [aria-checked=true]::after { content: none; }   /* v0.20.3: the type menus have theirs on the left: one tick, not two (Johnny) */
-.fn-menu button:disabled { opacity: .4; cursor: default; }
-.chain-read { display: flex; align-items: center; gap: 6px; } .chain-read[hidden] { display: none; }
-.chain-read .now { background: var(--ink); color: var(--glass); padding: 0 3px; } .chain-read .arr { opacity: .5; }
-.chain-read button { min-width: 0; height: calc(var(--h) - 4px); padding: 0 6px; }
-
-/* the D-pad under the roll, at its right-hand end (from the TB-303 app): square outlined buttons, ink arrows, in a cross */
-.sq-foot { flex: none; display: flex; align-items: center; gap: calc(var(--gap) * 2); }
-/* length and gate run the width of the roll under it, label left and value right, as in the TB-303 app */
-.sq-len { flex: 1 1 auto; min-width: 0; }
-.sq-len .sld { grid-template-columns: calc(var(--fs) * 4) 1fr 3em; }
-.dpad { display: grid; grid-template-columns: repeat(3, calc(var(--h) + 4px)); grid-template-rows: repeat(3, calc(var(--h) * .68)); gap: 1px 2px; flex: none; }
-.dpad button { min-width: 0; height: auto; margin: 0; padding: 0; font-size: calc(var(--fs-xs) * .9); line-height: 1; letter-spacing: 0; }
-.dp-up { grid-area: 1 / 2; } .dp-lt { grid-area: 2 / 1; } .dp-rt { grid-area: 2 / 3; } .dp-dn { grid-area: 3 / 2; }
-
-/* piano roll: key rows, octave lanes, tie/slide/accent rows; dim columns past the end extend the pattern */
-.rollwrap { flex: 1 1 auto; min-height: 0; overflow-x: auto; scrollbar-width: thin; }
-.roll { display: grid; grid-template-columns: calc(var(--fs) * 2.2) repeat(var(--steps, 32), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr);
-  width: 100%; height: 100%; min-width: 0; border: var(--bw) solid var(--ink); user-select: none; -webkit-user-select: none; text-shadow: none; }
-.roll > * { border: 0; border-right: 1px solid rgb(var(--ink-rgb) / .28); border-bottom: 1px solid rgb(var(--ink-rgb) / .28); padding: 0; background: transparent; color: var(--ink);
-  min-width: 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); line-height: 1; border-radius: 0; }
-.roll .rh { font-size: var(--fs-s); justify-content: flex-start; padding-left: 5px; border-right: var(--bw) solid var(--ink); text-transform: lowercase; white-space: nowrap; }
-.roll .blk { background: var(--tint); }
-.roll .rh.blk { background: rgb(var(--ink-rgb) / .17); }
-.roll .bar { border-right-color: rgb(var(--ink-rgb) / .6); }
-.roll .gap { border-bottom: var(--bw) solid rgb(var(--ink-rgb) / .65); }
-.roll button { cursor: pointer; }
-.roll button[data-t] { touch-action: none; }
-.roll button:focus-visible { outline: 2px dashed var(--ink); outline-offset: -3px; }
-.roll .hd { font-size: var(--fs-s); justify-content: flex-start; padding-left: 4px; }
-.roll .hd.sel { outline: 2px dashed var(--ink); outline-offset: -3px; }
-.roll .hd.cur { background: var(--ink); color: var(--glass); }
-.roll .cell.cur:not(.on) { background: rgb(var(--ink-rgb) / .3); }
-.roll .cell.on { background: var(--ink); box-shadow: inset 0 0 0 1px var(--glass); }
-.roll .cell.on.cur { box-shadow: inset 0 0 0 2px var(--glass); }
-.roll .cell.tie { background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 5px); }
-/* v0.22.7: a rest keeps its remembered pitch, but the roll draws nothing for it: no empty boxes (Johnny) */
-.roll .ghost { opacity: .3; }
-.roll .cell.ghost:hover { opacity: .55; }
-.roll .end { border-right: 3px solid var(--ink); }
-
 /* ---------- perform: the bender and transpose (arpeggio and the 101 sequencer were taken off in v0.13.2) ---------- */
 /* v0.23.0: laid out like the Synth rack: three modules across the glass, rules between them, the same 16 px gutter.
    The bender's three depth faders run full height; the lever and transpose sit centred in their own modules. */
@@ -512,57 +435,6 @@ html.fit .unit { position: absolute; left: 50%; top: 50%; width: 1400px; height:
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
 html.fit dialog#options { width: 1344px; height: 842px; inset: auto; left: 50%; top: 50%; margin: 0; max-width: none; max-height: none;
   transform: translate(-50%, -50%) scale(var(--k, 1)); }
-/* ---------- per-control step sequencer pop-up (v0.21.0, js/app/cseq.js; from Elixir Mobile's fader sequencers): a small
-   card of the same glass over a dimmed screen. A control with one switched on gets a small square after its readout. ---------- */
-/* v0.21.1 (Johnny): a control with a sequencer switched on has its name (on the strip, its readout) in an ink chip; while
-   it runs, the fill / ring stays at the control's setting and a marker shows the value heard */
-.fdr.cseq label, .dial.cseq label, .mslot .dial.cseq output { background: var(--ink); color: var(--glass); text-shadow: none; padding: 1px 5px 0; border-radius: 2px; }
-.fdr .sqm { display: none; position: absolute; left: -7px; right: -7px; height: 5px; bottom: calc(var(--m, 0) * 100% - 2.5px); background: var(--ink); box-shadow: 0 0 0 1.5px var(--glass); }
-.fdr .track.sq .sqm { display: block; }
-.dial .knob .sqm { fill: var(--ink); stroke: var(--glass); stroke-width: 1.4; paint-order: stroke; }
-html:has(dialog#cseq[open]) { overflow: hidden; }
-dialog#cseq { width: 620px; max-width: none; max-height: none; margin: auto; padding: 0; color: var(--ink); text-shadow: var(--shadow);
-  border: 6px solid var(--bezel); border-radius: 12px; background-color: var(--glass);
-  background-image: linear-gradient(170deg, rgba(255,255,255,.14), rgba(255,255,255,0) 38%, rgba(0,0,0,.05)),
-    repeating-linear-gradient(0deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgb(0 0 0 / calc(.03 * var(--grain))) 0 1px, transparent 1px 3px),
-    radial-gradient(130% 100% at 50% 60%, rgb(var(--dk3-rgb) / 0) 60%, rgb(var(--dk3-rgb) / calc(.22 * var(--dirt))) 100%);
-  box-shadow: inset 0 6px 14px rgba(0,0,0,.3), 0 18px 40px rgba(0,0,0,.5); }
-dialog#cseq::backdrop { background: rgb(0 0 0 / .55); }
-html.fit dialog#cseq { inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%) scale(var(--k, 1)); }
-.cs-head { display: flex; align-items: center; gap: var(--gap); padding: calc(var(--pad) - 4px) var(--pad); border-bottom: 2px solid var(--ink); }
-.cs-head h2 { margin: 0 auto 0 0; font-size: var(--fs-l); font-weight: 400; line-height: 1.1; letter-spacing: .03em; white-space: nowrap; }
-.cs-head output { font-size: var(--fs); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cs-head .btn { min-width: 3.4em; }
-.cs-body { display: grid; gap: var(--gap); padding: var(--pad); }
-.cs-pages { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap-s); }
-.cs-pages button { appearance: none; background: none; color: var(--ink); border: var(--bw) solid var(--ink); border-radius: var(--r); height: var(--h);
-  font: inherit; font-size: var(--fs); line-height: 1; text-shadow: var(--shadow); cursor: pointer; position: relative; -webkit-tap-highlight-color: transparent; }
-.cs-pages button[aria-selected="true"] { background: var(--ink); color: var(--glass); text-shadow: none; }
-.cs-pages button.past { border-style: dashed; opacity: .45; }
-.cs-pages button.now::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 6px; height: 4px; margin-left: -3px; background: var(--ink); }
-.cs-pages button:focus-visible { outline-offset: 2px; }
-.cs-steps { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(2, 132px); gap: 8px; cursor: crosshair; touch-action: none; outline-offset: 4px; }
-.cs-steps i { position: relative; display: block; border: var(--bw) solid var(--line); border-radius: var(--r); background: var(--tint); overflow: hidden; }
-.cs-steps i::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line); }
-.cs-steps i b { position: absolute; left: 5px; right: 5px; --seg: repeating-linear-gradient(0deg, var(--ink) 0 5px, transparent 5px 7px);
-  top: calc(50% - var(--up, 0) * 50%); bottom: calc(50% - var(--dn, 0) * 50%); background: var(--seg); filter: drop-shadow(var(--shadow)); }
-.cs-steps i em { position: absolute; right: 3px; bottom: 2px; padding: 0 2px; background: var(--glass); border-radius: 2px; font-style: normal; font-size: var(--fs-xs); line-height: 1; color: var(--muted); text-shadow: none; }
-.cs-steps i.off { opacity: .28; }
-.cs-steps i.now { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
-.cs-steps:focus-visible i.sel { outline: 2px dashed var(--ink); outline-offset: 2px; }
-.cs-bars { display: grid; gap: 4px; }
-.cs-bar { display: grid; grid-template-columns: 4.2em 1fr 5em; align-items: center; gap: 0 10px; font-size: var(--fs-s); }
-.cs-bar output { text-align: right; font-size: var(--fs); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cs-trk { height: var(--h); cursor: ew-resize; touch-action: none;
-  background: repeating-linear-gradient(90deg, var(--ink) 0 5px, transparent 5px 7px) left center / calc(var(--v, 0) * 100%) 16px no-repeat,
-    repeating-linear-gradient(90deg, var(--ghost) 0 5px, transparent 5px 7px) left center / 100% 16px no-repeat; filter: drop-shadow(var(--shadow)); }
-.cs-trk:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
-.cs-acts { display: flex; gap: var(--gap-s); padding-top: 2px; }
-.cs-acts .cs-kind { min-width: 5.2em; margin-right: auto; }
 html.fit { touch-action: pan-x pan-y; overscroll-behavior: none; }
 /* v0.20.2: text isn't selectable (Johnny); typing boxes still are */
 body, body *:not(input):not(textarea) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-/* Density dial (from the TB-303 app): name, small dial and value in the sequencer foot, left of the D-pad */
-/* v0.22.8: Density moved into the top row beside Complexity, with RND (Johnny) */
-.sq-rnd { font-size: var(--fs-s); }
-.rm-btn.sq-rnd::after { content: none; }

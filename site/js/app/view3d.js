@@ -2,15 +2,15 @@
 //
 // The 2D app keeps running underneath, hidden. This view never talks to the engine itself: every knob, key and switch
 // goes through the 2D app's own setters (ctlRegs[id].set, the switch buttons, setLever, the preset
-// menu's own buttons), so presets, MIDI, the control step sequencers and saving are the app's, and the sound is the same.
-// It reads state (state.params, running, playStep...) every frame and draws only when something changed.
+// menu's own buttons), so presets, MIDI and saving are the app's, and the sound is the same.
+// It reads state (state.params...) every frame and draws only when something changed.
 //
 // Layout: an 18 x 5 grid, one control per column (C px), one module row per R px, boxed sections with their names
 // printed on the panel. Everything printed (boxes, tags, labels, the logo) is one flat canvas over the panel face.
 import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
-const C = 72, R = 122, M = 24, COLS = 18, ROWS = 5;
+const C = 72, R = 150, M = 24, COLS = 18, ROWS = 3;
 const W = COLS * C + 2 * M, H = ROWS * R + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
@@ -88,9 +88,8 @@ const DEF = {}; for (const m of RACK) for (const it of m.items) DEF[it.f || it.s
 for (const b of BENDER) DEF[b.f] = b;
 const K = (id, label) => ({ t: 'knob', id, label });
 const S = (id, label, opts, w = 1) => ({ t: 'sw', id, label, opts, w });
-// v0.39.0 (Johnny: "simplify shyoy, remove fx"): the FX rows are gone; the sequencer page still needs all five rows,
-// so the synth page's three rows are spread down the panel
-const ROW_VCF = 2, ROW_BENDER = 4;
+// v0.39.0 (Johnny: "simplify shyoy, remove fx") took out the FX rows, v0.40.0 the sequencer page: three rows of sliders
+const ROW_VCF = 1, ROW_BENDER = 2;
 const BOXES = [
   { r: 0, c: 0, s: 2, n: 'LFO', it: [K('lfoRate', 'RATE'), S('lfoWave', 'WAVE', ['TRI', 'SQR', 'RND', 'NOISE'])] },
   { r: 0, c: 2, s: 6, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV']), K('drift', 'DRIFT')] },
@@ -98,30 +97,20 @@ const BOXES = [
   { r: ROW_VCF, c: 0, s: 7, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
   { r: ROW_VCF, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
   { r: ROW_VCF, c: 12, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
-  { r: ROW_VCF, c: 14, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('slide', 'SLIDE'), K('accent', 'ACCENT')] },
+  { r: ROW_VCF, c: 14, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
   { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
-  { r: ROW_BENDER, c: 7, s: 8, n: 'SEQUENCER', it: [{ t: 'key', k: 'run', label: 'RUN' }, { t: 'knob', id: 'bpm', label: 'TEMPO' }, { t: 'pattern', w: 4 }, { t: 'key', k: 'gen', label: 'GENERATE' }, { t: 'key', k: 'edit', label: 'EDIT' }] },
-  { r: ROW_BENDER, c: 15, s: 3, n: 'PRESET', it: [{ t: 'preset', w: 3 }] },
+  { r: ROW_BENDER, c: 10, s: 8, n: 'PRESET', it: [{ t: 'preset', w: 8 }] },
 ];
 const TITLE = { x: M + 13 * C, y: M, w: 5 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
-// the sequencer page's own knobs, each through the 2D control it stands for
-const SQK = {
-  len: { el: () => document.querySelector('input[data-a=len]'), lo: 1, hi: 64, text: (n) => n + (n === 1 ? ' STEP' : ' STEPS'), get: () => state.steps.length },
-  dens: { el: () => document.getElementById('sqDens'), lo: 10, hi: 100, text: (n) => n + '%', get: () => Math.round(genDens * 100) },
-  cplx: { el: () => document.getElementById('sqRndDepth'), lo: 0, hi: 100, text: (n) => n + '%', get: () => +document.getElementById('sqRndDepth').value },
-};
 function setKnob(id, v) {
-  if (SQK[id]) { const q = SQK[id], n = Math.round(q.lo + (q.hi - q.lo) * Math.max(0, Math.min(1, v))); if (n !== q.get()) { const el = q.el(); el.value = n; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } return; }
-  if (id === 'bpm') { const b = Math.round(40 + 200 * Math.max(0, Math.min(1, v))); if (b !== state.bpm) { bpmEl.value = b; bpmEl.onchange(); } return; }
   const r = regOf(id); if (r) r.set(Math.max(0, Math.min(1, v)));
 }
-const sqU = (id) => { const q = SQK[id]; return (q.get() - q.lo) / (q.hi - q.lo); };
-const knobVal = (id) => SQK[id] ? sqU(id) : id === 'bpm' ? (state.bpm - 40) / 200 : (cseqLive[id] ? cseqHeard(id) : state.params[id]);
-const knobBase = (id) => SQK[id] ? sqU(id) : id === 'bpm' ? (state.bpm - 40) / 200 : state.params[id];
-const knobText = (id, v) => SQK[id] ? SQK[id].text(SQK[id].get()) : id === 'bpm' ? state.bpm + ' BPM' : String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
+const knobVal = (id) => state.params[id];
+const knobBase = knobVal;
+const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
   boot();
@@ -163,9 +152,9 @@ let CUTOFF_KI = -1; const oddKi = () => look.oddK >= 0 ? look.oddK : CUTOFF_KI;
 const KNOB_BUMP = 4.5, PANEL_BUMP = 1.4, EDGE_BUMP = 1.5;   // wear depths (bump maps, below)
 const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H, DEPTH), [edgeMat, edgeMat, edgeMat, edgeMat, panelMat, edgeMat]);
 slab.position.z = -DEPTH / 2; slab.receiveShadow = true; scene.add(slab);
-// two pages on the one panel (v0.25.0): the synth, and the sequencer; the logo and the page keys are on both
-const pages = { synth: new THREE.Group(), seq: new THREE.Group() }; scene.add(pages.synth, pages.seq);
-let page = 'synth'; try { if (localStorage.getItem('shyoy.page3d') === 'seq') page = 'seq'; } catch (e) {}
+// the synth page (the sequencer page of v0.25.0-v0.39.0 is gone)
+const pages = { synth: new THREE.Group() }; scene.add(pages.synth);
+const page = 'synth';   // v0.40.0 (Johnny: "remove the sequencer"): the sequencer page is gone
 let grp = pages.synth, buildPage = 'synth';
 // brushed streaks for the metal finish
 const brushed = (() => {
@@ -245,147 +234,21 @@ function wearTex(w, h, seed, o) {
 // the case: the face, and the black edges round it
 const PANEL_WEAR = { scuff: 0.35, dent: 0.35, tile: 4, big: [26, 22, 0.35], knocks: [22, 30], scratches: [90, 120], edge: [0.12, 1.6, 260] };   // v0.31.6: faint round the knobs, deep at the edges (Johnny)
 const panelWear = wearTex(2048, 1024, 101, PANEL_WEAR);
-const seqWear = wearTex(2048, 1024, 909, PANEL_WEAR);   // v0.32.1: the sequencer page has its own marks (Johnny)
-const wearOf = (p) => p === 'seq' ? seqWear : panelWear;
+const wearOf = () => panelWear;
 const edgeWear = wearTex(1024, 128, 202, { scuff: 0.5, dent: 0.3, tile: 8, big: [10, 10, 0.5], knocks: [22, 16], scratches: [30, 50] });
 // knobs: four worn sets; each knob takes one, turned and shifted its own way, and a wear depth from barely to well used
 panelMat.bumpMap = wearOf(page); panelMat.bumpScale = PANEL_BUMP; edgeMat.bumpMap = edgeWear; edgeMat.bumpScale = EDGE_BUMP; edgeWear.repeat.set(8, 1);
-window.shyoyWearMaps = () => ({ panel: panelWear.image, seq: seqWear.image, edges: edgeWear.image, knobs: knobWear.map((t) => t.image) });   // to look at the bump maps (console)
+window.shyoyWearMaps = () => ({ panel: panelWear.image, edges: edgeWear.image, knobs: knobWear.map((t) => t.image) });   // to look at the bump maps (console)
 print.material = new THREE.MeshStandardMaterial({ map: printTex, transparent: true, depthWrite: false, roughness: 0.45, metalness: 0, envMapIntensity: 0.7, bumpMap: wearOf(page), bumpScale: PANEL_BUMP * 1.6 });   // v0.31.3: the print is lit and carries the dents
 print.receiveShadow = true;
 const knobWear = [1, 2, 3, 4].map((i) => wearTex(512, 512, 300 + i, { scuff: 0.12 + 0.06 * i, dent: 0.25 + 0.1 * i, tile: 1, big: [2 + 2 * i, 14, 0.3 + 0.08 * i], scratches: [6 + 5 * i, 70] }));
 
-// the knob (v0.30.0): Johnny's Yamaha CS1x/CS2x/AN1x knob STL: a fluted, tapered cap on a flared skirt with a pointed
-// nub, and a triangle on top. The 50k-triangle original is simplified to ~5.6k offline (its top's shallow triangle
-// recess flattened first, and drawn back here as a white inlay). Smooth-shaded with creases kept, squashed to SQ of
-// its height, scaled so the skirt is KR + 2 across. Its pointer lies along +y, so the value-to-angle mapping is unchanged.
-const TRI_BUMP = 6, PLASTIC_MAX = 0.5;   // how deep the Yamaha's pressed-in triangle reads
-const KNOB = await (async () => {
-  const buf = await (await fetch(new URL('../../models/yamaha-knob.stl', import.meta.url))).arrayBuffer();
-  const dv = new DataView(buf), n = dv.getUint32(80, true), SQ = 0.7, TRI = [[0, 3.03], [-2.02, -3.03], [2.02, -3.03]];
-  const pos = new Float32Array(n * 9);
-  for (let i = 0; i < n; i++) for (let j = 0; j < 9; j++) pos[i * 9 + j] = dv.getFloat32(84 + 50 * i + 12 + 4 * j, true);
-  let zTop = 0; for (let i = 2; i < pos.length; i += 3) zTop = Math.max(zTop, pos[i]);
-  const s = (KR + 2) / 9.9, sets = { body: [], top: [] };
-  for (let i = 0; i < n; i++) {
-    const p = [0, 1, 2].map((j) => [pos[i * 9 + j * 3], pos[i * 9 + j * 3 + 1], pos[i * 9 + j * 3 + 2]]);
-    const e1 = p[1].map((v, k) => v - p[0][k]), e2 = p[2].map((v, k) => v - p[0][k]);
-    const nz = (e1[0] * e2[1] - e1[1] * e2[0]) / (Math.hypot(e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]) || 1);
-    sets[nz > 0.9 && p.every(([, , z]) => z > zTop - 0.2) ? 'top' : 'body'].push(...p.flat());
-  }
-  // smooth normals, but only across edges under CREASE: the flutes and the skirt's rim stay sharp
-  const CREASE = Math.cos(35 * Math.PI / 180);
-  function geo(a, sc) {
-    const g = new THREE.BufferGeometry(), m = a.length / 9, fn = [], at = new Map(), key = (i) => a[i].toFixed(3) + ',' + a[i + 1].toFixed(3) + ',' + a[i + 2].toFixed(3);
-    for (let f = 0; f < m; f++) {
-      const o = f * 9, u = [a[o + 3] - a[o], a[o + 4] - a[o + 1], a[o + 5] - a[o + 2]], v = [a[o + 6] - a[o], a[o + 7] - a[o + 1], a[o + 8] - a[o + 2]];
-      const c = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], l = Math.hypot(...c) || 1;
-      fn.push([c[0] / l, c[1] / l, c[2] / l, l]);
-      for (let j = 0; j < 3; j++) { const k = key(o + j * 3); (at.get(k) || at.set(k, []).get(k)).push(f); }
-    }
-    const nor = new Float32Array(a.length), uv = new Float32Array(m * 6);
-    for (let f = 0; f < m; f++) {
-      const N = fn[f], us = [];
-      for (let j = 0; j < 3; j++) {
-        const o = f * 9 + j * 3; let x = 0, y = 0, z = 0;
-        for (const g of at.get(key(o))) { const M = fn[g]; if (M[0] * N[0] + M[1] * N[1] + M[2] * N[2] > CREASE) { x += M[0] * M[3]; y += M[1] * M[3]; z += M[2] * M[3]; } }
-        const l = Math.hypot(x, y, z) || 1; nor[o] = x / l; nor[o + 1] = y / l; nor[o + 2] = z / l;
-        // texture: wrapped round the sides (one turn = one texture width), straight down on anything facing up
-        const X = a[o], Y = a[o + 1], Z = a[o + 2];
-        us.push(Math.abs(N[2]) > 0.7 ? [X / 50 + 0.5, Y / 50 + 0.5, 1] : [Math.atan2(Y, X) / (2 * Math.PI) + 0.5, Z / 50, 0]);
-      }
-      if (!us[0][2]) { const lo = Math.min(...us.map((q) => q[0])); for (const q of us) if (q[0] - lo > 0.5) q[0] -= 1; }   // across the seam
-      us.forEach((q, j) => { uv[f * 6 + j * 2] = q[0]; uv[f * 6 + j * 2 + 1] = q[1]; });
-    }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    g.scale(s, s, s * sc); return g;
-  }
-  const z = zTop + 0.03, tri = new THREE.BufferGeometry();
-  tri.setAttribute('position', new THREE.Float32BufferAttribute(TRI.flatMap(([x, y]) => [x, y, z]), 3)); tri.computeVertexNormals(); tri.scale(s, s, s * SQ);
-  // v0.35.3 (Johnny): the triangle is pressed into the cap (a negative bump, the knob's own colour), not inked: a
-  // square patch of top over it carries a bump map with the triangle sunk in, softened at its walls
-  const PAD = 1.2, xs = TRI.map((q) => q[0]), ys = TRI.map((q) => q[1]), bw = Math.max(...xs) - Math.min(...xs) + 2 * PAD, bh = Math.max(...ys) - Math.min(...ys) + 2 * PAD;
-  const rc = document.createElement('canvas'); rc.width = rc.height = 256; const rx = rc.getContext('2d');
-  rx.fillStyle = '#808080'; rx.fillRect(0, 0, 256, 256); rx.filter = 'blur(2.5px)'; rx.fillStyle = '#000';
-  rx.beginPath(); TRI.forEach(([x, y], i) => { const u = (x - Math.min(...xs) + PAD) / bw * 256, v = (1 - (y - Math.min(...ys) + PAD) / bh) * 256; i ? rx.lineTo(u, v) : rx.moveTo(u, v); }); rx.closePath(); rx.fill(); rx.filter = 'none';
-  const recessTex = new THREE.CanvasTexture(rc), recess = new THREE.PlaneGeometry(bw, bh);
-  recess.translate((Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2, zTop + 0.02); recess.scale(s, s, s * SQ);
-  return { body: geo(sets.body, SQ), top: geo(sets.top, SQ), ptr: tri, recess, recessTex, h: z * s * SQ };
-})();
-// the odd one out (v0.32.3, Johnny): the filter knob is a mismatched spare, a pink standard round knob: a thin skirt,
-// a knurled grip, a bevelled, slightly domed top and a white line. Its line points along +y like the others.
+// sliders (v0.40.0, Johnny: "use sliders instead of knobs"): every continuous control is a fader, as on a real 101: a
+// printed slot with a scale beside it and a black cap with a white line across it, riding TRAVEL above and below the
+// control's centre. The caps keep what the knobs had: their wear, a colour per section, the size and the pink spare.
+const PLASTIC_MAX = 0.5;   // real plastic never reflects all the light: a picked cap colour is capped at this (linear)
+const TRAVEL = 38, CAP = { w: 24, h: 13, d: 11 };
 mat.pink = new THREE.MeshStandardMaterial({ color: 0xc23a74, roughness: 0.5, metalness: 0, envMapIntensity: 0.5 });
-const PINK = (() => {
-  const prof = [[0, 0], [19.5, 0], [19.5, 2.4], [17.2, 3.4], [17.2, 15.2], [16, 16.8], [14.5, 17.5], [8, 17.9], [0, 18]].map(([r, y]) => new THREE.Vector2(r, y));
-  const g = new THREE.LatheGeometry(prof, 144), p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {   // knurling: 36 ridges round the grip
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = Math.hypot(x, z);
-    if (y > 3.6 && y < 15.0 && r > 16) { const a = Math.atan2(z, x), k = 1 + 0.045 * Math.max(0, Math.cos(36 * a)); p.setX(i, x * k); p.setZ(i, z * k); }
-  }
-  g.rotateX(Math.PI / 2); g.computeVertexNormals();
-  const ptr = new THREE.BoxGeometry(2, 11.5, 0.5); ptr.translate(0, 3 + 11.5 / 2, 18.05);
-  return { body: g, ptr };
-})();
-// knob styles (v0.35.0, Johnny: "a choice of knobs for the whole synth", OPTIONS > KNOBS > STYLE, look.kstyle):
-// YAMAHA (the CS1x/AN1x STL above), POT (Johnny's pot-knob5.stl as it was in v0.29.1), ROUND (a black standard
-// knurled knob, the pink spare's shape), CHICKEN (a chicken-head pointer) and SKIRT (a fluted cap on a wide skirt).
-// Every style: { body, top?, ptr, h }, pointer along +y, sat on z 0. The cutoff's pink spare stays whatever the style.
-const planarUV = (g) => { const p = g.attributes.position, uv = new Float32Array(p.count * 2); for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getX(i) / 50 + 0.5; uv[i * 2 + 1] = p.getY(i) / 50 + 0.5 + p.getZ(i) / 50; } g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); return g; };
-const POT = await (async () => {
-  const buf = await (await fetch(new URL('../../models/pot-knob5.stl', import.meta.url))).arrayBuffer();
-  const dv = new DataView(buf), n = dv.getUint32(80, true), sets = { body: [], top: [], ptr: [] };
-  const read = (o) => [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)];
-  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, zTop = 0; const tris = [];
-  for (let i = 0; i < n; i++) { const o = 84 + 50 * i, t = [read(o + 12), read(o + 24), read(o + 36)]; tris.push(t); for (const [x, y] of t) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, r = (x1 - x0) / 2;
-  for (const t of tris) for (const [x, y, z] of t) if (Math.hypot(x - cx, y - cy) > r * 0.99) zTop = Math.max(zTop, z);
-  const SQ = 0.5, BEV = 1.1, PW = 0.5, zT = zTop * SQ, near = (v, w) => Math.abs(v - w) < 1e-3;
-  const ring = (x, y, rr) => { const h = Math.hypot(x, y); return [x * rr / h, y * rr / h]; };
-  const edges = new Map();
-  for (const t of tris) {
-    const p = t.map(([x, y, z]) => [x - cx, y - cy, z]);
-    const isPtr = p.every(([x, y]) => Math.abs(x) < r * 0.2 && y > -r * 0.3) && p.some(([, , z]) => z > zTop + 1e-3);
-    const isTop = !isPtr && p.every(([, , z]) => near(z, zTop));
-    if (!isPtr && p.every(([x, y]) => Math.hypot(x, y) < r * 0.6)) continue;
-    if (isPtr) { sets.ptr.push(...p.flatMap(([x, y, z]) => [x * PW, Math.min(y, r - BEV - 0.35), z - zTop + zT])); continue; }
-    const out = p.map(([x, y, z]) => { const rim = near(z, zTop) && Math.hypot(x, y) > r * 0.99; if (rim && isTop) return [...ring(x, y, r - BEV), zT]; if (rim) return [x, y, zT - BEV]; return [x, y, z * SQ]; });
-    if (!isTop) { const top = p.filter(([x, y, z]) => near(z, zTop) && Math.hypot(x, y) > r * 0.99); if (top.length === 2) edges.set(top.map(([x, y]) => x.toFixed(3) + ',' + y.toFixed(3)).sort().join('|'), top); }
-    sets[isTop ? 'top' : 'body'].push(...out.flat());
-  }
-  for (const [[ax, ay], [bx, by]] of edges.values()) {
-    const lo = (x, y) => [x, y, zT - BEV], hi = (x, y) => [...ring(x, y, r - BEV), zT];
-    const ccw = ax * by - ay * bx > 0, [p, q] = ccw ? [[ax, ay], [bx, by]] : [[bx, by], [ax, ay]];
-    sets.top.push(...lo(...p), ...lo(...q), ...hi(...q), ...lo(...p), ...hi(...q), ...hi(...p));
-  }
-  const s = (KR + 1) / r, geo = (a) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.scale(s, s, s); g.computeVertexNormals(); return planarUV(g); };
-  return { body: geo(sets.body), top: geo(sets.top), ptr: geo(sets.ptr), h: Math.max(...sets.ptr.filter((_, i) => i % 3 === 2)) * s };
-})();
-const lathe = (pts, seg, fn) => {
-  const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg), p = g.attributes.position;
-  if (fn) for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = fn(Math.atan2(z, x), y, Math.hypot(x, z)); p.setX(i, x * k); p.setZ(i, z * k); }
-  g.rotateX(Math.PI / 2); g.computeVertexNormals(); return g;
-};
-const line = (w, l, y0, z) => { const b = new THREE.BoxGeometry(w, l, 0.5); b.translate(0, y0 + l / 2, z); return b; };
-const ROUND = { body: PINK.body, ptr: PINK.ptr, h: 18 };
-const CHICKEN = (() => {
-  const base = lathe([[0, 0], [18, 0], [18, 1.8], [16.8, 3.2], [0, 3.2]], 96);
-  const sh = new THREE.Shape(); sh.moveTo(0, 22); sh.bezierCurveTo(3, 14, 10, 6, 10, -3); sh.bezierCurveTo(10, -12, -10, -12, -10, -3); sh.bezierCurveTo(-10, 6, -3, 14, 0, 22);
-  const head = new THREE.ExtrudeGeometry(sh, { depth: 11, bevelEnabled: true, bevelThickness: 1.6, bevelSize: 1.4, bevelSegments: 3, curveSegments: 24 });
-  head.translate(0, 0, 4.6); planarUV(head);
-  const body = mergeGeos([base, head]);
-  return { body, ptr: line(1.4, 12, 6, 17.3), h: 17.3 };
-})();
-const SKIRT = (() => {
-  const body = lathe([[0, 0], [22, 0], [22, 1.6], [20.5, 3.4], [12.5, 3.8], [12.5, 15.5], [11.6, 16.8], [6, 17.3], [0, 17.4]], 160,
-    (a, y, r) => (y > 4 && y < 15.6 && r > 12) ? 1 + 0.06 * Math.pow(Math.max(0, Math.cos(18 * a)), 3) : 1);
-  return { body, ptr: mergeGeos([line(1.6, 7, 13, 3.95), line(1.4, 7.5, 2.5, 17.45)]), h: 17.4 };
-})();
-function mergeGeos(gs) {   // non-indexed position/normal/uv merge
-  const parts = gs.map((g) => g.index ? g.toNonIndexed() : g), cat = (k, n) => { const out = []; for (const g of parts) { const a = g.attributes[k]; if (a) out.push(...a.array); else out.push(...new Array(g.attributes.position.count * n).fill(0)); } return new Float32Array(out); };
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(cat('position', 3), 3)); g.setAttribute('normal', new THREE.BufferAttribute(cat('normal', 3), 3)); g.setAttribute('uv', new THREE.BufferAttribute(cat('uv', 2), 2)); return g;
-}
-const KSTYLES = { yamaha: { name: 'YAMAHA', g: KNOB }, pot: { name: 'POT', g: POT }, round: { name: 'ROUND', g: ROUND }, chicken: { name: 'CHICKEN', g: CHICKEN }, skirt: { name: 'SKIRT', g: SKIRT } };
-const kstyle = () => KSTYLES[look.kstyle] ? look.kstyle : 'yamaha';
 const ledGeo = new THREE.CylinderGeometry(2.2, 2.2, 1.4, 20); ledGeo.rotateX(Math.PI / 2);
 const keyGeos = {};
 function keyGeo(w, h, d) {
@@ -407,48 +270,40 @@ function makeKnob(cx, cy, o) {
   wear.offset.set(R(), R()); wear.rotation = R() * Math.PI * 2; const depth = 0.15 + 0.85 * Math.pow(R(), 1.8);
   const sec = BOXR[BOXR.length - 1]; if (sec) sec.knobs = true; const secKey = sec ? boxKey(sec) : '';
   const mBody = mat.knob.clone(), mTop = mat.knobTop.clone(), mPtr = mat.white.clone();
-  const mRec = mat.knobTop.clone(); mRec.bumpMap = KNOB.recessTex; mRec.bumpScale = TRI_BUMP; mRec.polygonOffset = true; mRec.polygonOffsetFactor = -1; mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
-  // the usual knob, and for the filter knob (o.odd) also the mismatched pink spare (v0.32.3), shown unless OCD is past 50
-  const std = new THREE.Group(), styles = {};
-  const styleG = (id) => {   // v0.35.0: built the first time a style is picked, then kept
-    if (styles[id]) return styles[id]; const G = KSTYLES[id].g, sg = new THREE.Group();
-    const body = new THREE.Mesh(G.body, mBody); body.castShadow = true; body.receiveShadow = true; sg.add(body);
-    if (G.top) { const top = new THREE.Mesh(G.top, mTop); top.castShadow = true; sg.add(top); }
-    if (G.recess) { const r = new THREE.Mesh(G.recess, mRec); r.receiveShadow = true; sg.add(r); }
-    else { const ptr = new THREE.Mesh(G.ptr, mPtr); sg.add(ptr); }
-    return styles[id] = sg;
-  };
-  let curStyle = null; const setStyle = (id) => { if (id === curStyle) return; if (curStyle) std.remove(styles[curStyle]); std.add(styleG(id)); curStyle = id; };
-  setStyle(kstyle());
-  // v0.35.4 (Johnny): any knob can be the replaced pot (OPTIONS > KNOBS > REPLACED POT, look.oddOn / look.oddK); built when first needed
+  mBody.bumpMap = mTop.bumpMap = wear; mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth;
+  // the slot and its scale, printed: ticks every tenth, long at 0, 5 and 10
+  prints.push((x, ink) => {
+    x.fillStyle = ink; x.beginPath(); x.roundRect ? x.roundRect(cx - 2.5, cy - TRAVEL - 5, 5, 2 * TRAVEL + 10, 2.5) : x.rect(cx - 2.5, cy - TRAVEL - 5, 5, 2 * TRAVEL + 10); x.fill();
+    for (let i = 0; i <= 10; i++) { const ty = cy + TRAVEL - i * 2 * TRAVEL / 10, l = i % 5 ? 5 : 9; x.fillRect(cx - 17 - l / 2 + 4.5, ty - 0.6, l, 1.2); x.fillRect(cx + 17 - 4.5 - l / 2, ty - 0.6, l, 1.2); }
+  });
+  const cap = new THREE.Group(), std = new THREE.Group();
+  const body = new THREE.Mesh(keyGeo(CAP.w, CAP.h, CAP.d), [mTop, mBody]); body.castShadow = true; body.receiveShadow = true;
+  const line = new THREE.Mesh(new THREE.BoxGeometry(CAP.w - 6, 1.8, 0.4), mPtr); line.position.z = CAP.d + 0.2;
+  std.add(body, line); cap.add(std); g.add(cap); grp.add(g);
+  // v0.35.4 (Johnny): any control can be the replaced part (OPTIONS > KNOBS > REPLACED POT, look.oddOn / look.oddK): a pink cap
   let oddG = null, mp = null; const ki = knobs.length; if (o.odd) CUTOFF_KI = ki;
   const oddMake = () => {
     if (oddG) return oddG;
     mp = mat.pink.clone(); mp.bumpMap = wear; mp.bumpScale = KNOB_BUMP * depth * 0.4;
-    const pb = new THREE.Mesh(PINK.body, mp); pb.castShadow = true; pb.receiveShadow = true;
-    const pp = new THREE.Mesh(PINK.ptr, mat.white); pp.castShadow = true; oddG = new THREE.Group(); oddG.add(pb, pp); spin.add(oddG); return oddG;
+    const pb = new THREE.Mesh(keyGeo(CAP.w, CAP.h, CAP.d), mp); pb.castShadow = true; pb.receiveShadow = true;
+    const pl = new THREE.Mesh(line.geometry, mat.white); pl.position.z = CAP.d + 0.2; oddG = new THREE.Group(); oddG.add(pb, pl); cap.add(oddG); return oddG;
   };
-  // a pot's shaft is never quite square to the panel (v0.31.5): each leans its own way, by up to look.tilt degrees
-  const tiltG = new THREE.Group(), tiltDir = R() * Math.PI * 2, tiltAmt = 0.35 + 0.65 * R();
-  const spin = new THREE.Group(); spin.add(std); tiltG.add(spin); g.add(tiltG); grp.add(g);
-  const k = { kind: 'knob', cx, cy, g, spin, shown: NaN, tilt: (deg) => { const a = deg * tiltAmt * Math.PI / 180; tiltG.quaternion.setFromAxisAngle(new THREE.Vector3(Math.cos(tiltDir), Math.sin(tiltDir), 0), a); }, size: (u) => tiltG.scale.setScalar(u), style: setStyle,
+  const k = { kind: 'knob', cx, cy, g, cap, shown: NaN, tilt: () => {}, style: () => {}, size: (u) => cap.scale.set(u, u, 1),
     colour: () => { const c = look.knobCol[secKey] || look.knobAll;   // v0.35.8: a section's colour, else the global one
-      // v0.35.9 (Johnny: white blew out): real plastic never reflects all the light, so a picked colour is capped at
-      // PLASTIC_MAX (linear) and its finish goes a little glossier, so the fluting and the light still read on it
       mBody.color.set(c || mat.knob.color); mTop.color.set(c || mat.knobTop.color);
       if (c) { for (const m of [mBody, mTop]) { const mx = Math.max(m.color.r, m.color.g, m.color.b); if (mx > PLASTIC_MAX) m.color.multiplyScalar(PLASTIC_MAX / mx); }
         mTop.color.multiplyScalar(1.05); mBody.roughness = 0.55; mTop.roughness = 0.38; } else { mBody.roughness = mat.knob.roughness; mTop.roughness = mat.knobTop.roughness; }
-      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); mRec.color.copy(mTop.color); },   // a pale knob gets a black line
+      mPtr.color.set(c && lum(c) > 0.35 ? 0x111111 : 0xffffff); },   // a pale cap gets a black line
     clean: (c) => {   // OCD: c 0 = as found .. 1 = spotless
-    mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
-    const odd = look.oddOn && ki === oddKi(); if (odd) oddMake(); if (oddG) oddG.visible = odd; std.visible = !odd;
-  },  ...o, rect: [cx - C / 2 + 2, cy - 40, C - 4, 84] };
+      mBody.bumpScale = mTop.bumpScale = KNOB_BUMP * depth * (1 - c); if (mp) mp.bumpScale = KNOB_BUMP * depth * 0.4 * (1 - c);
+      const odd = look.oddOn && ki === oddKi(); if (odd) oddMake(); if (oddG) oddG.visible = odd; std.visible = !odd;
+    }, ...o, rect: [cx - C / 2 + 2, cy - TRAVEL - 14, C - 4, 2 * TRAVEL + 28] };
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
     const v = knobVal(id); if (v === k.shown) return false;
-    k.shown = v; spin.rotation.z = -(-135 + 270 * v) * Math.PI / 180; shadowDirty = true; return true;   // the skirt's nub turns, so its shadow must too
+    k.shown = v; cap.position.y = -TRAVEL + 2 * TRAVEL * v; shadowDirty = true; return true;
   };
-  k.colour(); k.tilt(look.tilt * (1 - look.ocd)); k.size(look.ksize); k.clean(look.ocd); addCtl(k); knobs.push(k); return k;
+  k.colour(); k.size(look.ksize); k.clean(look.ocd); addCtl(k); knobs.push(k); return k;
 }
 function makeKey(cx, cy, w, h, o) {
   const g = new THREE.Group(); g.position.copy(P(cx, cy, 0));
@@ -494,24 +349,23 @@ function makeDisplay(x, y, w, h, text, o = {}) {
 // v0.35.1 (Johnny): the knobs in each boxed section can have their own colour (OPTIONS > COLOURS, look.knobCol
 // { 'page:NAME': '#hex' }); a knob takes the section it is built in (the last box made). The pink spare stays pink.
 const BOXR = [], boxKey = (b) => b.page + ':' + b.n;
-const printsBy = { synth: [], seq: [], all: [] };   // functions (ctx, ink, paper) drawing one part, per page
+const printsBy = { synth: [], all: [] };   // functions (ctx, ink, paper) drawing one part, per page
 let prints = printsBy.synth;
 const addCtl = (c) => { c.page = c.page || buildPage; ctls.push(c); return c; };
 const text = (x, s, tx, ty, size = 11, align = 'center', font = MONO, wgt = 600) => { x.font = `${wgt} ${size}px ${font}`; x.textAlign = align; x.textBaseline = 'middle'; if ('letterSpacing' in x) x.letterSpacing = '.6px'; x.fillText(s, tx, ty); };
 
 const colX = (b, col, w = 1) => M + (b.c + col) * C + (w * C) / 2;
 const rowY = (b) => M + b.r * R;
-const KY = 60, LY = 106, KEYY = 72;   // knob centre, label line, and the key line under a display   // knob centre and label line, from the top of the row
+const KY = 72, LY = 134, KEYY = 98;   // control centre, label line, and the key line under a display, from the top of the row
 const labelAt = (getText, cx, ly, opts = {}) => prints.push((x, ink) => {
   const t = getText(); if (!t) return;
   x.globalAlpha = opts.dim && opts.dim() ? 0.35 : 1;
-  if (opts.slab && opts.slab()) {   // a control with a running step sequencer: its label white on a black slab
+  if (opts.slab && opts.slab()) {   // a label white on a black slab
     x.font = `600 11px ${MONO}`; const w = x.measureText(t).width + 10; x.fillStyle = ink; x.fillRect(cx - w / 2, ly - 8, w, 16); x.fillStyle = inkOf(ink); text(x, t, cx, ly + 0.5);
   } else { x.fillStyle = ink; text(x, t, cx, ly + 0.5); }
   x.globalAlpha = 1;
 });
 const inkOf = (ink) => ink === '#000000' ? '#ffffff' : '#000000';
-const cseqOn = (id) => !!(state.cseq && state.cseq[id] && state.cseq[id].on);
 
 for (const b of BOXES) {
   const y0 = rowY(b), bx = M + b.c * C + 6, by = y0 + 12, bw = b.s * C - 12, bh = R - 12;
@@ -529,7 +383,7 @@ for (const b of BOXES) {
     const w = it.w || 1, cx = colX(b, col, w), cy = y0 + KY, ly = y0 + LY;
     if (it.t === 'knob') {
       makeKnob(cx, cy, { cur: () => it.id, base: () => knobBase(it.id), odd: it.id === 'cutoff' });   // the filter knob is a mismatched spare (Johnny)
-      labelAt(() => it.label, cx, ly, { slab: () => cseqOn(it.id) });
+      labelAt(() => it.label, cx, ly);
     } else if (it.t === 'sw') {
       px.font = `600 10.5px ${MONO}`; const tw = Math.max(...it.opts.map((o) => px.measureText(o).width + o.length * 0.6));
       const n = it.opts.length, pitch = 16, top = cy - (n - 1) * pitch / 2, kx = Math.max(bx + 14, Math.min(cx - 18, cx + C * w / 2 - 14 - tw - 14));   // the same place in every column, inside the box
@@ -542,8 +396,7 @@ for (const b of BOXES) {
       labelAt(() => it.label, cx, ly);
     } else if (it.t === 'key') {
       const k = makeKey(cx, it.k === 'mod' ? cy : y0 + KEYY, 24, 14, {
-        on: it.k === 'run' ? () => running : it.k === 'mod' ? () => modHeld : () => false,
-        press: it.k === 'run' ? () => setRun(!running) : it.k === 'gen' ? () => document.getElementById('sq-rnd').click() : it.k === 'edit' ? () => setPage('seq') : null,
+        on: it.k === 'mod' ? () => modHeld : () => false,
         hold: it.k === 'mod' ? (on) => { modHeld = on; push(on); } : null, pad: 10, tag: it.k });
       labelAt(() => it.label, cx, ly);
     } else if (it.t === 'lever') {
@@ -561,24 +414,9 @@ for (const b of BOXES) {
       };
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
-    } else if (it.t === 'pattern') {
-      const span = w * C - 16, x0 = cx - span / 2, sp = span / 16, kp = span / 8;
-      for (let i = 0; i < 16; i++) {   // the playhead: one LED per step of the 16 being played
-        const lx = x0 + kp * ((i >> 1) + 0.5) + (i & 1 ? 6 : -6), ly2 = y0 + 32, led = new THREE.Mesh(ledGeo, mat.ledOff); led.position.copy(P(lx, ly2, 0.8)); grp.add(led);
-        const glow = new THREE.Sprite(mat.glow); glow.scale.set(14, 14, 1); glow.position.copy(P(lx, ly2, 2.5)); glow.visible = false; grp.add(glow);
-        const o = { kind: 'led', lit: false, rect: null };
-        o.sync = () => { const on = running && playStep >= 0 && playStep % 16 === i; if (on === o.lit) return false; o.lit = on; led.material = on ? mat.ledOn : mat.ledOff; glow.visible = on; return true; };
-        addCtl(o);
-      }
-      for (let n = 0; n < 8; n++) {
-        const kx = x0 + kp * (n + 0.5);
-        makeKey(kx, y0 + KEYY, kp - 16, 14, { on: () => state.slot === n, press: () => slotsEl.querySelector(`[data-n="${n}"]`).click(), pad: 4, tag: 'pat:' + n });
-        prints.push((x, ink) => { x.fillStyle = ink; text(x, String(n + 1), kx, y0 + KEYY + 18, 10); });
-      }
-      labelAt(() => 'PATTERN', cx, ly);
     } else if (it.t === 'preset') {
-      const dw = w * C - 16, dx = cx - dw / 2, ks = [0, 1, 2].map((k) => colX(b, col + k));
-      makeDisplay(dx, y0 + 26, dw, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
+      const dw = w * C - 40, dx = cx - dw / 2, ks = [-1, 0, 1].map((k) => cx + k * C * 1.5);
+      makeDisplay(dx, y0 + 36, dw, 28, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
       makeKey(ks[0], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click(), pad: 8, tag: 'pre-' });
       makeKey(ks[1], y0 + KEYY, 24, 14, { on: () => false, press: () => openBrowser(), pad: 8, tag: 'browse' });
       makeKey(ks[2], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click(), pad: 8, tag: 'pre+' });
@@ -595,7 +433,7 @@ buildPage = 'all'; grp = scene; prints = printsBy.all;
 const LOGO_WEAR = [78, 26];   // wear-map level where the ink is gone, and the span over which it fades back to full
 const logoCv = document.createElement('canvas'); logoCv.width = TITLE.w * S2; logoCv.height = TITLE.h * S2;
 const logoTex = new THREE.CanvasTexture(logoCv); logoTex.colorSpace = THREE.SRGBColorSpace; logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const logoWears = Object.fromEntries(['synth', 'seq'].map((p) => { const t = wearOf(p).clone(); t.repeat.set(TITLE.w / W, TITLE.h / H); t.offset.set(TITLE.x / W, 1 - (TITLE.y + TITLE.h) / H); return [p, t]; }));
+const logoWears = Object.fromEntries(['synth'].map((p) => { const t = wearOf(p).clone(); t.repeat.set(TITLE.w / W, TITLE.h / H); t.offset.set(TITLE.x / W, 1 - (TITLE.y + TITLE.h) / H); return [p, t]; }));
 const logoWear = logoWears[page];
 const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
@@ -711,8 +549,8 @@ const stickers = STICKERS.map((st, k) => {
   o.place = () => {
     const q = stkPlace(st), key = JSON.stringify(q); if (key === o.key) return; o.key = key;
     x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0); map.needsUpdate = true;   // the panel's edge is cut by STK_CLIP
-    if (o.bumps) { o.bumps.synth.dispose(); o.bumps.seq.dispose(); }
-    o.bumps = { synth: stickerBump(q, own, 'synth'), seq: stickerBump(q, own, 'seq') }; m.material.bumpMap = o.bumps[page]; m.material.needsUpdate = true;
+    if (o.bumps) o.bumps.synth.dispose();
+    o.bumps = { synth: stickerBump(q, own, 'synth') }; m.material.bumpMap = o.bumps[page]; m.material.needsUpdate = true;
     m.position.copy(P(q.cx, q.cy, 0.25 + k * 0.01)); m.rotation.z = -q.rot * Math.PI / 180; m.scale.set(q.size, q.size, 1);
   };
   o.place(); return o;
@@ -765,180 +603,7 @@ prints.push((x, ink) => {
 });
 const VER3D = ((document.getElementById('ver') || {}).textContent || '').replace(/^v/, '');
 addCtl({ kind: 'title', rect: [TITLE.x + 60, TITLE.y + 4, TITLE.w - 120, 78], press: () => openOptions3d(), sync: () => false });
-[['synth', 'SYNTH'], ['seq', 'SEQUENCER']].forEach(([k, t], i) => {
-  const kx = TITLE.x + 22 + i * 96, ky = TITLE.y + 98;
-  makeKey(kx, ky, 15, 10, { on: () => page === k, press: () => setPage(k), pad: 4, tag: 'page:' + k });
-  ctls[ctls.length - 1].rect = [kx - 12, ky - 10, 90, 20];
-  prints.push((x, ink) => { x.fillStyle = ink; text(x, t, kx + 12, ky + 0.5, 10.5, 'left'); });
-});
-function setPage(k) {
-  page = k; try { localStorage.setItem('shyoy.page3d', k); } catch (e) {}
-  pages.synth.visible = k === 'synth'; pages.seq.visible = k === 'seq'; ro.hide();
-  panelMat.bumpMap = print.material.bumpMap = wearOf(k); logoMat.bumpMap = logoWears[k];   // each page its own wear
-  for (const st of stickers) st.m.material.bumpMap = st.bumps[k];
-  printDirty = shadowDirty = dirty = true;
-}
 
-// ================================================================ the sequencer page (v0.25.0)
-// The same panel, a second page: transport and pattern keys, length, gate, the generator, the piano roll as one printed
-// grid you draw on, and the Randomise and Tools menus as rows of keys. Every press goes through the 2D sequencer's own
-// functions (applyCell, paintCell, extendTo, keepUndo, stepChanged) and its menu buttons, so the pattern and what the
-// engine is sent are the same as from the 2D roll.
-buildPage = 'seq'; grp = pages.seq; prints = printsBy.seq;
-const box = (c, r, s, h, n) => { const bx = M + c * C + 6, by = M + r * R + 12, bw = s * C - 12, bh = h * R - 12; BOXR.push({ page: 'seq', n, bx, by, bw, bh });
-  px.font = `400 13px ${DISPLAY}`; if ('letterSpacing' in px) px.letterSpacing = '.6px'; const tagW = px.measureText(n).width + 16;
-  prints.push((x, ink, paper) => { x.strokeStyle = ink; x.lineWidth = 1.6; x.strokeRect(bx, by, bw, bh);
-    x.font = `400 13px ${DISPLAY}`; if ('letterSpacing' in x) x.letterSpacing = '.6px'; x.fillStyle = ink; x.fillRect(bx + 10, by - 9, tagW, 18);
-    x.fillStyle = paper; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText(n, bx + 18, by + 0.5); });
-  return { bx, by, bw, bh, cx: (k, w = 1) => M + (c + k) * C + w * C / 2, y0: M + r * R };
-};
-{ // row 0: transport, patterns, length and gate, the generator
-  const t = box(0, 0, 2, 1, 'TRANSPORT');
-  makeKey(t.cx(0), t.y0 + KEYY, 24, 14, { on: () => running, press: () => setRun(!running), pad: 10, tag: 'run2' }); labelAt(() => 'RUN', t.cx(0), t.y0 + LY);
-  makeKnob(t.cx(1), t.y0 + KY, { cur: () => 'bpm' }); labelAt(() => 'TEMPO', t.cx(1), t.y0 + LY);
-  const pt = box(2, 0, 5, 1, 'PATTERN'), span = 5 * C - 24, x0 = pt.cx(0, 5) - span / 2, kp = span / 8;
-  for (let n = 0; n < 8; n++) {
-    const kx = x0 + kp * (n + 0.5);
-    makeKey(kx, pt.y0 + KEYY, kp - 16, 14, { on: () => state.slot === n, press: () => slotsEl.querySelector(`[data-n="${n}"]`).click(), pad: 4, tag: 'pat2:' + n });
-    // its number on the label line, dimmed while the slot is empty
-    prints.push((x, ink) => { const u = state.slots[n] && state.slots[n].steps && state.slots[n].steps.some((st) => st.m !== 'R'); x.globalAlpha = u || state.slot === n ? 1 : 0.4; x.fillStyle = ink; text(x, String(n + 1), kx, pt.y0 + LY, 11); x.globalAlpha = 1; });
-  }
-  const lg = box(7, 0, 2, 1, 'STEPS');
-  makeKnob(lg.cx(0), lg.y0 + KY, { cur: () => 'len' }); labelAt(() => 'LENGTH', lg.cx(0), lg.y0 + LY);
-  const GATES = [10, 25, 50, 75, 95], gNow = () => Math.round((0.1 + state.params.gateLen * 0.85) * 100);
-  GATES.forEach((g, i) => { const kx = lg.cx(1) - 18, ky = lg.y0 + KY - 2 * 14 + i * 14;
-    makeKey(kx, ky, 15, 10, { on: () => GATES.reduce((m, q) => Math.abs(q - gNow()) < Math.abs(m - gNow()) ? q : m) === g, press: () => document.querySelector(`#gm-menu [data-gate="${g}"]`).click(), pad: 2, tag: 'gate:' + g });
-    ctls[ctls.length - 1].rect = [kx - 12, ky - 7, 60, 14];
-    prints.push((x, ink) => { x.fillStyle = ink; text(x, g + '%', kx + 12, ky + 0.5, 10.5, 'left'); }); });
-  labelAt(() => 'GATE', lg.cx(1), lg.y0 + LY);
-  const gn = box(9, 0, 4, 1, 'GENERATE');
-  makeKnob(gn.cx(0), gn.y0 + KY, { cur: () => 'dens' }); labelAt(() => 'DENSITY', gn.cx(0), gn.y0 + LY);
-  makeKnob(gn.cx(1), gn.y0 + KY, { cur: () => 'cplx' }); labelAt(() => 'COMPLEX', gn.cx(1), gn.y0 + LY);
-  makeKey(gn.cx(2), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('sq-rnd').click(), pad: 10, tag: 'rnd' }); labelAt(() => 'NEW', gn.cx(2), gn.y0 + LY);
-  makeKey(gn.cx(3), gn.y0 + KEYY, 24, 14, { on: () => false, press: () => document.getElementById('p-undo').click(), pad: 10, tag: 'undo' });
-  labelAt(() => 'UNDO', gn.cx(3), gn.y0 + LY, { dim: () => document.getElementById('p-undo').disabled });
-}
-// the menus as rows of keys: one column per group, [heading, entry...]; an entry is [label, id of the 2D button it clicks] or
-// { t: label or () => label, press, on, tag }. The rows spread evenly down the box, every column on the same row lines
-// (v0.27.1 tidy); ws: the columns' widths as shares of the box
-const keyList = (b, colsDef, ws) => {
-  const n = Math.max(...colsDef.map((l) => l.length - 1)), inner = b.bw - 28;
-  const W = ws || colsDef.map(() => 1), sum = W.reduce((p, q) => p + q, 0);
-  const top = b.by + 30, pitch = Math.min(30, (b.by + b.bh - 18 - top) / n);
-  let x0 = b.bx + 22;
-  colsDef.forEach(([head, ...list], ci) => {
-    const kx = x0, cw = inner * W[ci] / sum; x0 += cw;
-    prints.push((x, ink) => { x.fillStyle = ink; x.globalAlpha = 0.6; text(x, head, kx - 8, top, 9.5, 'left'); x.globalAlpha = 1; });
-    list.forEach((en, ri) => {
-      const ky = top + pitch * (ri + 1);
-      const e = Array.isArray(en) ? { t: en[0], el: () => document.getElementById(en[1]), tag: 'm:' + en[1] } : en;
-      const press = e.press || (() => { const d = e.el(); if (d && !d.disabled) d.click(); });
-      const k = makeKey(kx, ky, 15, 10, { on: e.on || (() => k.down), press, pad: 2, tag: e.tag });
-      k.rect = [kx - 12, ky - pitch / 2, cw - 4, pitch];
-      prints.push((x, ink) => { x.globalAlpha = e.el && e.el() && e.el().disabled ? 0.35 : 1; x.fillStyle = ink; text(x, typeof e.t === 'function' ? e.t() : e.t, kx + 13, ky + 0.5, 10.5, 'left'); x.globalAlpha = 1; });
-    });
-  });
-};
-keyList(box(13, 1, 5, 2, 'RANDOMISE'), [
-  ['RANDOMISE', ['ACCENTS', 'r-acc'], ['SLIDES', 'r-slide'], ['OCTAVES', 'r-oct'], ['TIES', 'r-tie']],
-  ['ALTER', ['ACCENTS', 'a-acc'], ['SLIDES', 'a-slide'], ['OCTAVES', 'a-oct'], ['TIES', 'a-tie'], ['WHOLE', 'a-all']],
-  ['PATTERN', ['SHUFFLE', 'p-shuf'], ['GENERATE', 'p-rnd'], ['REFILL', 'p-refill']]]);
-// TOOLS: the pattern and note commands, and Johnny's scale (v0.28.0): the first scale key steps the scale, SCALE ON
-// (v0.38.0) switches it on and off, MIDI NOTE ONLY holds it back until a note is played during the run
-keyList(box(13, 3, 5, 2, 'TOOLS'), [
-  ['PATTERN', ['COPY', 'p-copy'], ['PASTE', 'p-paste'], ['DOUBLE', 'p-dup'], ['CLEAR', 'p-clr'], ['UNDO', 'p-undo'], ['JOIN', 'p-join']],
-  ['NOTES', ['SEMI UP', 'nu-up'], ['SEMI DN', 'nu-dn'], ['OCT UP', 'nu-oup'], ['OCT DN', 'nu-odn'], ['SHIFT L', 'rot-l'], ['SHIFT R', 'rot-r']],
-  ['SCALE', { t: () => SCALE_LIST[state.scale.i].name.toUpperCase(), press: () => setScale({ i: (state.scale.i + 1) % SCALE_LIST.length }), on: () => false, tag: 'scale0' },
-    { t: 'SCALE ON', press: () => setScale({ on: !state.scale.on }), on: () => state.scale.on, tag: 'scale1' },
-    { t: 'MIDI NOTE ONLY', press: () => setScale({ midi: !state.scale.midi }), on: () => state.scale.midi, tag: 'scale2' },
-    { t: 'C NOTES ONLY', press: () => setScale({ c: !state.scale.c }), on: () => state.scale.c, tag: 'scale3' }]], [0.85, 0.95, 1.4]);
-// ---- the roll: one printed grid, redrawn when the pattern, the playhead or the page of steps changes
-const RB = box(0, 1, 13, 4, 'PATTERN EDIT');
-const RL = { x: RB.bx + 46, y: RB.by + 26, w: RB.bw - 56 };
-const ROWS_DEF = [['h'], ...[2, 1, -1, -2].map((o) => ['o', o, (o > 0 ? '+' : '-') + Math.abs(o)]), ['gap'],
-  ...[11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((k) => ['k', k, NOTE[k]]), ['gap'], ['t', 0, 'TIE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
-const RH = { h: 16, gap: 8 }, rowH = (RB.by + RB.bh - 12 - RL.y - RH.h - 2 * RH.gap) / 19;
-let ry = RL.y; const rowsY = ROWS_DEF.map((r) => { const y = ry; ry += RH[r[0]] || rowH; return y; });
-RL.h = ry - RL.y;
-let rollPage = 0;   // 0: steps 1-32, 1: steps 33-64
-const SHOW = 32, colW = RL.w / SHOW;
-const rc = document.createElement('canvas'); rc.width = Math.ceil(RL.w * 3); rc.height = Math.ceil(RL.h * 3); const rx = rc.getContext('2d');
-const rollTex = new THREE.CanvasTexture(rc); rollTex.colorSpace = THREE.SRGBColorSpace; rollTex.anisotropy = 4;
-const rollMesh = new THREE.Mesh(new THREE.PlaneGeometry(RL.w, RL.h), new THREE.MeshBasicMaterial({ map: rollTex, transparent: true, depthWrite: false }));
-rollMesh.position.copy(P(RL.x + RL.w / 2, RL.y + RL.h / 2, 0.08)); rollMesh.renderOrder = 1; grp.add(rollMesh);
-// row names, printed beside the grid
-ROWS_DEF.forEach((r, i) => { if (r[2] == null) return; const yy = rowsY[i] + rowH / 2;
-  prints.push((x, ink) => { x.fillStyle = ink; text(x, String(r[2]).toUpperCase(), RL.x - 8, yy + 0.5, 9.5, 'right'); }); });
-prints.push((x, ink) => { x.fillStyle = ink; text(x, 'STEP', RL.x - 8, RL.y + RH.h / 2, 9.5, 'right'); });
-// steps 1-32 / 33-64, top right inside the box
-[['1-32', 0], ['33-64', 1]].forEach(([t, k], i) => { const kx = RB.bx + RB.bw - 130 + i * 64, ky = RB.by + 12;
-  makeKey(kx, ky, 15, 10, { on: () => rollPage === k, press: () => { rollPage = k; }, pad: 4, tag: 'rpage:' + k });
-  ctls[ctls.length - 1].rect = [kx - 12, ky - 9, 60, 18];
-  prints.push((x, ink) => { x.fillStyle = ink; text(x, t, kx + 12, ky + 0.5, 10, 'left'); }); });
-let rollSig = '';
-function drawRoll() {
-  const P2 = state.steps, n = P2.length, off = rollPage * SHOW, ink = curInk, light = ink === '#000000';
-  const sig = JSON.stringify(P2) + '|' + n + off + ink + (running ? playStep : -1) + '|' + selStep;
-  if (sig === rollSig) return false; rollSig = sig;
-  rx.setTransform(3, 0, 0, 3, 0, 0); rx.clearRect(0, 0, RL.w, RL.h);
-  const tone = (a) => light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`;
-  ROWS_DEF.forEach((r, ri) => { if (r[0] === 'k' && BLACK.has(r[1])) { rx.fillStyle = tone(0.07); rx.fillRect(0, rowsY[ri] - RL.y, RL.w, rowH); } });
-  for (let c = 0; c < SHOW; c++) {
-    const i = off + c, x = c * colW, ghost = i >= n;
-    if (running && playStep === i) { rx.fillStyle = tone(0.16); rx.fillRect(x, 0, colW, RL.h); }
-    if (i === selStep) { rx.fillStyle = ink; rx.fillRect(x + 1, 0, colW - 2, RH.h); }
-    rx.globalAlpha = ghost ? 0.3 : 1;
-    if (i % 4 === 0) { rx.fillStyle = i === selStep ? inkOf(ink) : ink; text(rx, String(i + 1), x + colW / 2, RH.h / 2 + 1, 9.5); }
-    const st = P2[i];
-    ROWS_DEF.forEach((r, ri) => {
-      const [t, v] = r; if (t === 'h' || t === 'gap') return; const y = rowsY[ri] - RL.y;
-      rx.strokeStyle = tone(0.28); rx.lineWidth = 1; rx.strokeRect(x + 1.5, y + 1.5, colW - 3, rowH - 3);
-      if (!st) return;
-      let on = false, mem = false;
-      if (t === 'o') { on = st.o === v && st.m !== 'R'; mem = st.o === v && st.m === 'R'; }
-      else if (t === 'k') { on = st.n === v && st.m !== 'R'; mem = st.n === v && st.m === 'R'; }
-      else if (t === 't') on = st.m === 'T'; else on = !!st[t];
-      if (on) { rx.fillStyle = ink; rx.fillRect(x + 3, y + 3, colW - 6, rowH - 6);
-        if (t === 'k' && st.m === 'T') { rx.fillStyle = inkOf(ink); rx.fillRect(x + 3, y + rowH / 2 - 1, 5, 2); } }
-      else if (mem) { rx.strokeStyle = ink; rx.lineWidth = 1.5; rx.strokeRect(x + 4, y + 4, colW - 8, rowH - 8); }
-    });
-    rx.globalAlpha = 1;
-    if (i % 4 === 3 && c < SHOW - 1) { rx.fillStyle = tone(0.55); rx.fillRect(x + colW - 0.75, RH.h, 1.5, RL.h - RH.h); }
-    if (i === n - 1) { rx.fillStyle = ink; rx.fillRect(x + colW - 1.25, 0, 2.5, RL.h); }
-  }
-  rollTex.needsUpdate = true; return true;
-}
-// a point on the panel -> { col, row } in the roll (row = index in ROWS_DEF), or null
-function rollAt(p) {
-  if (!p || p[0] < RL.x || p[0] > RL.x + RL.w || p[1] < RL.y || p[1] > RL.y + RL.h) return null;
-  const c = Math.min(SHOW - 1, Math.floor((p[0] - RL.x) / colW)); let ri = -1;
-  for (let i = 0; i < ROWS_DEF.length; i++) if (p[1] >= rowsY[i] && p[1] < rowsY[i] + (RH[ROWS_DEF[i][0]] || rowH)) ri = i;
-  return ri < 0 ? null : { i: rollPage * SHOW + c, r: ROWS_DEF[ri] };
-}
-const cellOf = (i, r) => ({ dataset: { col: String(i), t: r[0], v: String(r[1]) } });   // what the 2D roll's buttons carry
-addCtl({ kind: 'roll', rect: [RL.x, RL.y, RL.w, RL.h], sync: () => page === 'seq' && drawRoll() });
-const rollGrab = {
-  down(p) {
-    const h = rollAt(p); if (!h) return false; const { i, r } = h;
-    if (r[0] === 'h') { if (i < state.steps.length) { selStep = selStep === i ? -1 : i; renderSeq(); } return true; }
-    if (r[0] === 'gap') return true;
-    if (i >= state.steps.length) { extendTo(i + 1); renderSeq(); }
-    if (i >= state.steps.length) return true;
-    keepUndo(); const b = cellOf(i, r); applyCell(b);
-    const st = state.steps[i], t = r[0];
-    paint = { t, id: -1, on: t === 'k' ? st.m !== 'R' : t === 'o' ? true : t === 't' ? st.m === 'T' : st[t], oct: st.o, x: 0, y: 0, dirty: false, raf: 0 };
-    rollGrab.last = p; stepChanged(); return true;
-  },
-  move(p) {
-    if (!paint || paint.id !== -1 || !rollGrab.last) return;
-    const [x0, y0] = rollGrab.last, dx = p[0] - x0, dy = p[1] - y0, n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 4)); let ch = false;
-    for (let k = 1; k <= n; k++) { const h = rollAt([x0 + dx * k / n, y0 + dy * k / n]); if (h && h.i < state.steps.length && h.r[0] !== 'h' && h.r[0] !== 'gap' && paintCell(cellOf(h.i, h.r))) ch = true; }
-    rollGrab.last = p;
-    if (ch) { paint.dirty = true; if (!paint.raf) paint.raf = requestAnimationFrame(paintFrame); }
-  },
-  up() { if (!paint || paint.id !== -1) return; const q = paint; paint = null; rollGrab.last = null; if (q.raf) cancelAnimationFrame(q.raf); if (q.dirty) stepChanged(); },
-};
-buildPage = 'synth'; grp = pages.synth; prints = printsBy.synth;
 // the readout while a knob turns: the value on a black slab where its label is
 const ro = (() => {
   const w = 84, h = 17, c = document.createElement('canvas'); c.width = w * 3; c.height = h * 3; const x = c.getContext('2d');
@@ -972,7 +637,7 @@ function applyLook() {
   panelMat.bumpScale = PANEL_BUMP * w; edgeMat.bumpScale = EDGE_BUMP * w; print.material.bumpScale = logoMat.bumpScale = PANEL_BUMP * 1.6 * w;
   // v0.33.1 (Johnny): stickers have their own SHOW STICKERS checkbox; OCD only smooths them (the odd knob still goes at 50)
   for (const st of stickers) { st.place(); st.m.material.bumpScale = STICKER_BUMP * w; st.m.visible = look.stkOn && look.stickers.includes(st.id); }
-  for (const k of knobs) { k.style(kstyle()); k.colour(); k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
+  for (const k of knobs) { k.colour(); k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
   document.body.style.setProperty('--v3d-bg', `radial-gradient(120% 90% at 50% 40%, #${bg.getHexString()} 0%, #0b0b0b 78%)`);
@@ -1001,10 +666,8 @@ function repaintPrint() {
   px.save(); px.setTransform(1, 0, 0, 1, 0, 0); px.globalCompositeOperation = 'destination-in'; px.drawImage(inkMask(), 0, 0); px.restore();
   printTex.needsUpdate = true;
 }
-// the print's labels that can change: the step-sequencer slabs
-const printSigNow = () => curInk
-  + '|' + Object.keys(state.cseq || {}).filter(cseqOn).join() + '|' + page
-  + '|' + (page === 'seq' ? ['p-paste', 'p-undo'].map((id) => +document.getElementById(id).disabled).join() + state.slots.map((x) => +!!(x && x.steps && x.steps.some((st) => st.m !== 'R'))).join('') + state.slot + '|' + state.scale.i + state.scale.on + state.scale.midi + state.scale.c : '');
+// the print changes with the ink
+const printSigNow = () => curInk;
 
 // ---------------------------------------------------------------- camera: face on, fixed
 function fit() {
@@ -1036,7 +699,9 @@ function pick(e) {
   return best;
 }
 const grabs = new Map();
-const dragRange = () => Math.max(140, Math.min(220, innerHeight * 0.38));
+// a slider's full travel in screen pixels
+const slotPx = (c) => { const a = P(c.cx, c.cy - TRAVEL, CAP.d).project(camera), b = P(c.cx, c.cy + TRAVEL, CAP.d).project(camera), r = cv.getBoundingClientRect();
+  return Math.max(40, Math.hypot((a.x - b.x) / 2 * r.width, (a.y - b.y) / 2 * r.height)); };
 cv.addEventListener('pointerdown', (e) => {
   if (e.button === 2) return;
   const sk = stickerAt(toPanel(e));
@@ -1045,11 +710,8 @@ cv.addEventListener('pointerdown', (e) => {
   e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   boot();
   const g = { c, x: e.clientX, y: e.clientY, moved: false };
-  if (c.kind === 'roll') { rollGrab.down(toPanel(e)); }
-  else if (c.kind === 'knob') {
-    g.id = c.cur(); g.v0 = knobBase(g.id); ro.show(c, knobText(g.id, g.v0));
-    if (g.id !== 'bpm' && !SQK[g.id]) g.hold = setTimeout(() => { if (!g.moved && grabs.get(e.pointerId) === g) { grabs.delete(e.pointerId); ro.hide(); setKnob(g.id, g.v0); sheetVars(); cseqOpen(g.id); } }, 550);
-  } else if (c.kind === 'key') { c.down = true; if (c.hold) c.hold(true); else if (c.press) c.press(); }
+  if (c.kind === 'knob') { g.id = c.cur(); g.v0 = knobBase(g.id); ro.show(c, knobText(g.id, g.v0)); }
+  else if (c.kind === 'key') { c.down = true; if (c.hold) c.hold(true); else if (c.press) c.press(); }
   else if (c.kind === 'lever') { c.held = true; g.v0 = c.v; }
   grabs.set(e.pointerId, g); dirty = true;
 });
@@ -1057,9 +719,8 @@ cv.addEventListener('pointermove', (e) => {
   const g = grabs.get(e.pointerId); if (!g) return;
   if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.moved = true;
   const c = g.c;
-  if (c.kind === 'roll') rollGrab.move(toPanel(e));
-  else if (c.kind === 'knob') {
-    const v = Math.max(0, Math.min(1, g.v0 + (g.y - e.clientY) / dragRange() * (e.shiftKey ? 0.2 : 1)));
+  if (c.kind === 'knob') {   // the cap follows the finger along its slot (Shift: finer)
+    const v = Math.max(0, Math.min(1, g.v0 + (g.y - e.clientY) / slotPx(c) * (e.shiftKey ? 0.2 : 1)));
     setKnob(g.id, v); ro.show(c, knobText(g.id, knobBase(g.id)));
   } else if (c.kind === 'lever') {
     const r = cv.getBoundingClientRect(), pxPerUnit = r.width / W * (camera.position.z > 0 ? 1 : 1);
@@ -1071,7 +732,6 @@ function release(e) {
   const g = grabs.get(e.pointerId); if (!g) return; grabs.delete(e.pointerId); clearTimeout(g.hold);
   const c = g.c;
   if (c.kind === 'knob') ro.hide();
-  else if (c.kind === 'roll') rollGrab.up();
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
@@ -1079,7 +739,7 @@ function release(e) {
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
-cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const sk = stickerAt(toPanel(e)); if (sk) { if (shyoyRand.back()) wobble(sk); return; } const c = pick(e); if (c && c.kind === 'knob' && c.cur() !== 'bpm' && !SQK[c.cur()]) { sheetVars(); cseqOpen(c.cur()); } });
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const sk = stickerAt(toPanel(e)); if (sk) { if (shyoyRand.back()) wobble(sk); return; } });
 cv.addEventListener('wheel', (e) => {
   const c = pick(e); if (!c || c.kind !== 'knob') return; e.preventDefault(); boot();
   const id = c.cur(); setKnob(id, knobBase(id) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02));
@@ -1131,8 +791,8 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet .list button { width: 100%; justify-content: flex-start; margin: 0 0 4px; }
 .v3d-sheet .list button.lit { box-shadow: inset 3px 0 0 #ff2a14; }
 .v3d-sheet input[type=text] { flex: 1; font: 600 12px ${MONO}; padding: 6px 8px; border: 1.5px solid var(--v3d-ink); background: transparent; color: inherit; border-radius: 3px; min-width: 0; }
-/* v0.25.0: the 2D app's Options (MIDI, sequencer, about) and the per-control step sequencer, drawn as cards of the panel */
-html[data-view="3d"] dialog#options, html[data-view="3d"] dialog#cseq {
+/* v0.25.0: the 2D app's Options (MIDI, about), drawn as a card of the panel */
+html[data-view="3d"] dialog#options {
   --glass-rgb: var(--v3d-panel-rgb); --ink-rgb: var(--v3d-ink-rgb); --dirt: 0; --grain: 0; --glow: 0;
   --glass: rgb(var(--glass-rgb)); --ink: rgb(var(--ink-rgb)); --muted: rgb(var(--ink-rgb) / .62); --ghost: rgb(var(--ink-rgb) / .13);
   --tint: rgb(var(--ink-rgb) / .07); --lit: rgb(var(--glass-rgb) / .8); --line: rgb(var(--ink-rgb) / .42); --rule: 1px solid var(--line);
@@ -1140,11 +800,10 @@ html[data-view="3d"] dialog#options, html[data-view="3d"] dialog#cseq {
   font-family: ${MONO}; letter-spacing: .03em; background-image: none; border: 0; border-radius: 0;
   box-shadow: inset 0 0 0 2px var(--ink), 0 20px 60px rgba(0,0,0,.55); }
 html[data-view="3d"] dialog#options { width: min(860px, calc(100vw - 24px)); height: auto; max-height: min(600px, calc(100dvh - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
-html[data-view="3d"] dialog#cseq { width: min(620px, calc(100vw - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
-html[data-view="3d"] dialog#options::backdrop, html[data-view="3d"] dialog#cseq::backdrop { background: rgb(0 0 0 / .55); }
+html[data-view="3d"] dialog#options::backdrop { background: rgb(0 0 0 / .55); }
 html[data-view="3d"] #otabs [data-sec=colours] { display: none; }
-html[data-view="3d"] dialog#options :is(h2, h3, .otabs button), html[data-view="3d"] dialog#cseq h2 { text-transform: uppercase; }
-html[data-view="3d"] dialog#options .btn, html[data-view="3d"] dialog#cseq .btn { font-family: ${MONO}; text-transform: uppercase; }
+html[data-view="3d"] dialog#options :is(h2, h3, .otabs button) { text-transform: uppercase; }
+html[data-view="3d"] dialog#options .btn { font-family: ${MONO}; text-transform: uppercase; }
 #v3d-splash { position: fixed; inset: 0; z-index: 100; background: #0b0b0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity .35s; }
 `;
 document.head.appendChild(css);
@@ -1165,7 +824,7 @@ function sheet(title) {
 }
 const opt = sheet('OPTIONS');
 // v0.33.0 (Johnny): OPTIONS in tabs
-const OPT_TABS = [['look', 'LOOK'], ['light', 'LIGHT'], ['colours', 'COLOURS'], ['knobs', 'KNOBS'], ['stickers', 'STICKERS'], ['wear', 'WEAR'], ['more', 'MORE']];
+const OPT_TABS = [['look', 'LOOK'], ['light', 'LIGHT'], ['colours', 'COLOURS'], ['knobs', 'SLIDERS'], ['stickers', 'STICKERS'], ['wear', 'WEAR'], ['more', 'MORE']];
 let optTab = 'look'; try { optTab = localStorage.getItem('shyoy.opttab3d') || 'look'; } catch (e) {}
 opt.body.innerHTML = `
   <div class="otab3">${OPT_TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}</div>
@@ -1184,15 +843,13 @@ opt.body.innerHTML = `
   <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
   </div>
   <div class="pane" data-pane="colours">
-  <div class="f"><span>ALL KNOBS</span><div class="bxc"><label id="o3-kall"><input type="color" aria-label="All knobs colour"><span>EVERY KNOB</span><button class="clr" aria-label="Clear">×</button></label></div></div>
-  ${['synth', 'seq'].map((pg) => `<div class="f"><span>${pg === 'synth' ? 'SYNTH PAGE' : 'SEQUENCER PAGE'}</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
+  <div class="f"><span>ALL SLIDERS</span><div class="bxc"><label id="o3-kall"><input type="color" aria-label="All slider caps colour"><span>EVERY CAP</span><button class="clr" aria-label="Clear">×</button></label></div></div>
+  ${['synth'].map((pg) => `<div class="f"><span>SECTIONS</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
   <div class="row"><button id="o3-bxall">ALL BLACK</button></div>
   </div>
   <div class="pane" data-pane="knobs">
-  <div class="f"><span>KNOB STYLE</span><div class="row">${Object.entries(KSTYLES).map(([k, st]) => `<button data-ks="${k}"><i></i>${st.name}</button>`).join('')}</div></div>
-  <div class="f"><span>KNOB SIZE</span><div class="row"><input type="range" min="0" max="100" id="o3-ksize" aria-label="Knob size"><b class="val" id="o3-ksizev"></b></div></div>
-  <div class="f"><div class="row"><label class="chk"><input type="checkbox" id="o3-odd"> REPLACED POT</label><button id="o3-oddrnd">RANDOM POT</button><button id="o3-oddcut">BACK ON CUTOFF</button></div></div>
-  <div class="f"><span>KNOB TILT</span><div class="row"><input type="range" min="0" max="80" id="o3-tilt" aria-label="Knob tilt"><b class="val" id="o3-tiltv"></b></div></div>
+  <div class="f"><span>CAP SIZE</span><div class="row"><input type="range" min="0" max="100" id="o3-ksize" aria-label="Slider cap size"><b class="val" id="o3-ksizev"></b></div></div>
+  <div class="f"><div class="row"><label class="chk"><input type="checkbox" id="o3-odd"> REPLACED CAP</label><button id="o3-oddrnd">RANDOM CAP</button><button id="o3-oddcut">BACK ON CUTOFF</button></div></div>
   </div>
   <div class="pane" data-pane="stickers">
   <div class="f"><label class="chk"><input type="checkbox" id="o3-stkon"> SHOW STICKERS</label></div>
@@ -1210,7 +867,7 @@ opt.body.innerHTML = `
   <div class="f"><span>OCD</span><div class="row"><input type="range" min="0" max="100" id="o3-ocd" aria-label="OCD: 0 every defect, 100 spotless"><b class="val" id="o3-ocdv"></b></div></div>
   </div>
   <div class="pane" data-pane="more">
-  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-seqo">SEQUENCER</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
+  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
 const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
@@ -1240,12 +897,10 @@ function drawOpt() {
   });
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
-  opt.body.querySelectorAll('[data-ks]').forEach((b) => b.classList.toggle('lit', b.dataset.ks === kstyle()));
   $o('#o3-kall input').value = look.knobAll || '#0e0e0e'; $o('#o3-kall').classList.toggle('set', !!look.knobAll);
   opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || look.knobAll || '#0e0e0e'; l.classList.toggle('set', !!c); });
   $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
   $o('#o3-odd').checked = look.oddOn;
-  $o('#o3-tilt').value = Math.round(look.tilt * 10); $o('#o3-tiltv').textContent = look.tilt.toFixed(1) + '°';
   $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
   sheetVars();
 }
@@ -1288,7 +943,6 @@ opt.body.querySelectorAll('[data-bk]').forEach((l) => {
 $o('#o3-bxall').onclick = () => { look.knobAll = ''; setLook('knobCol', {}); };
 $o('#o3-kall input').oninput = (e) => setLook('knobAll', e.target.value);
 $o('#o3-kall .clr').onclick = (e) => { e.preventDefault(); setLook('knobAll', ''); };
-opt.body.querySelectorAll('[data-ks]').forEach((b) => b.onclick = () => setLook('kstyle', b.dataset.ks));
 $o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
 $o('#o3-odd').onchange = (e) => setLook('oddOn', e.target.checked);
 $o('#o3-oddrnd').onclick = () => {   // a different synth-page knob each time
@@ -1296,8 +950,7 @@ $o('#o3-oddrnd').onclick = () => {   // a different synth-page knob each time
   look.oddOn = true; setLook('oddK', pool[Math.random() * pool.length | 0]);
 };
 $o('#o3-oddcut').onclick = () => setLook('oddK', -1);
-$o('#o3-tilt').oninput = (e) => setLook('tilt', e.target.value / 10);
-for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-seqo', 'seq'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
+for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 $o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
 function openOptions3d() { drawOpt(); opt.open(); }
 
@@ -1349,9 +1002,7 @@ function frame() {
   if (drawn === 3) { drawn = 4; window.shyoySplash && window.shyoySplash.done(); }
   requestAnimationFrame(frame);
 }
-// the 2D view's own knob markers: a 3D knob is a registered copy of its control, so the step sequencer's
-// heard value reaches it (the frame loop reads it anyway; this keeps cseqOpen's checks happy for every control)
-applyLook(); setPage(page);
+applyLook(); printDirty = shadowDirty = dirty = true;
 requestAnimationFrame(frame);
 
 window.shyoy3d = {
@@ -1359,10 +1010,9 @@ window.shyoy3d = {
   show() { if (!live) { live = true; fit(); dirty = printDirty = shadowDirty = true; requestAnimationFrame(frame); } },
   hide() { live = false; opt.close(); pb.close(); },
   // for headless checks: where a control is on screen
-  where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy, KSTYLES[kstyle()].g.h * look.ksize).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
+  where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy - TRAVEL + 2 * TRAVEL * knobVal(id), CAP.d).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
   title() { return this.at(TITLE.x + TITLE.w / 2, TITLE.y + 50); },
-  rollCell(i, key) { const ri = ROWS_DEF.findIndex((r) => r[0] + r[1] === key); return this.at(RL.x + (i - rollPage * SHOW + 0.5) * colW, rowsY[ri] + rowH / 2); },
   at(pxX, pxY) { const v = P(pxX, pxY, 8).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   ctls, W, H, look,
 };

@@ -24,12 +24,12 @@ document.getElementById('mUpdate').onclick = async () => {
 };
 addEventListener('appinstalled', () => { installEvt = null; mInstall.hidden = true; installSay(''); });
 // Auto-update: check for a new build on launch, whenever the app comes back to the front, and every 15 minutes.
-// A new build activates straight away (skipWaiting + clients.claim) and the page reloads itself, but never mid-pattern:
-// if the sequencer is running it waits until you stop or switch away. Patch and pattern are saved, so nothing is lost.
+// A new build activates straight away (skipWaiting + clients.claim) and the page reloads itself, but only while no note
+// is held, or when you switch away. The sound is saved, so nothing is lost.
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   const hadSW = !!navigator.serviceWorker.controller;
   let reloadDue = false;
-  const tryReload = () => { if (reloadDue && (!running || document.hidden)) { reloadDue = false; clearTimeout(saveT); try { localStorage.setItem('kestrel-ms1-v2', JSON.stringify(state)); } catch (e) {} location.reload(); } };
+  const tryReload = () => { if (reloadDue && (!held.size || document.hidden)) { reloadDue = false; clearTimeout(saveT); try { localStorage.setItem('kestrel-ms1-v2', JSON.stringify(state)); } catch (e) {} location.reload(); } };
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSW) { reloadDue = true; tryReload(); } });
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
     const check = () => reg.update().catch(() => {});
@@ -37,7 +37,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
     document.addEventListener('visibilitychange', () => { if (document.hidden) tryReload(); else check(); });
     addEventListener('focus', check);
   }).catch(() => {});
-  playBtn.addEventListener('click', () => setTimeout(tryReload, 0));
+  addEventListener('keyup', () => setTimeout(tryReload, 0));
 }
 
-window.__kestrel = { state, boot, setRun };
+window.__kestrel = { state, boot };

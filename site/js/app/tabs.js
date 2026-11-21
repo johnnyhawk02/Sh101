@@ -2,7 +2,7 @@
 // ---------- tabs ----------
 // Bridges was taken off the page in v0.16.5: its tab and panel stay in the HTML, hidden, and bend.js still builds the matrix.
 // Bend board went the same way in v0.22.10 (Johnny): hidden in the HTML, bend.js still builds it and presets still apply it.
-const TABS = [['tab-synth', null], ['tab-seq', 'pan-seq'], ['tab-perf', null]];
+const TABS = [['tab-synth', null], ['tab-perf', null]];
 const unitEl = document.getElementById('unit');
 function showTab(id) {
   unitEl.dataset.view = id;

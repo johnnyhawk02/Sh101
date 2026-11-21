@@ -1,7 +1,7 @@
 // Shyoy: the sticker randomiser (v0.34.0, Johnny: clicking a sticker randomises the sound; every sticker does the same).
 // One click = a new synth voice, drawn from musical ranges, at the RANDOM AMOUNT set in
 // OPTIONS > STICKERS (0 = no change, 1 = a whole new sound; in between each knob moves that far towards its new value
-// and each switch flips with that chance). Tuning, accent, tempo, the sequence, the bender,
+// and each switch flips with that chance). Tuning, accent, the bender,
 // the bend board and the bridges never change; the VCA Level is set to keep it as loud as a plain sound (below). It loads like a preset does (applySound + pushAll), so the engine
 // gets nothing it doesn't already get from a preset load. Each click keeps the sound before it (20 back) for undo.
 const shyoyRand = (() => {
@@ -28,7 +28,7 @@ const shyoyRand = (() => {
     // be heard from (a release only sounds if the note is still up when the gate closes)
     if (chance(0.4)) { f.release = U(0.6, 0.87); if (f.sustain < 0.2) f.sustain = U(0.2, 0.6); }
     s.trig = pick([6, 4]); s.vcaMode = pick([8, 2]);   // v0.38.2 (Johnny): trig Gate+Trig or Gate only, never LFO
-    f.glide = U(0, 0.4); s.glideMode = pick([2, 6, 2]); f.slide = U(0.1, 0.5);
+    f.glide = U(0, 0.4); s.glideMode = pick([2, 6, 2]);
     // a little movement now and then (1 in 4): vibrato or a filter wobble
     if (chance(0.25)) {
       f.lfoRate = U(0.3, 0.75); s.lfoWave = pick([4, 2, 3, 1]);
@@ -40,7 +40,7 @@ const shyoyRand = (() => {
   }
   // ---- loudness (v0.34.1, Johnny: randomised sounds came out very loud) ----
   // Before a new sound goes on, a copy of the engine (the same worklet code, run in a Web Worker, so the page doesn't
-  // stall and nothing is heard) plays the current pattern with it for 2 s, and with a plain reference sound. The VCA
+  // stall and nothing is heard) plays a short riff with it for 2 s, and with a plain reference sound. The VCA
   // sound's output is then trimmed to match the reference (see levelled). The live engine is not changed; it only gets
   // the finished sound, as from a preset.
   const REF = { saw: 0.8, pulse: 0, sub: 0.4, noise: 0, range: 1, cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, drive: 0.4, decay: 0.4, sustain: 0, release: 0.3, attack: 0, level: 0.7 };
@@ -52,12 +52,12 @@ const shyoyRand = (() => {
     const src = `let Proc; class AudioWorkletProcessor { constructor() { this.port = { postMessage() {}, onmessage: null }; } }
 const registerProcessor = (_, c) => { Proc = c; }; const sampleRate = 48000;
 ${code}
-onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
+onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
   for (const ms of msgs) {
     const p = new Proc(); for (const m of ms) p.onMsg(m);
     const L = new Float32Array(128), R = new Float32Array(128), n = Math.floor(48000 * sec / 128), skip = Math.floor(48000 * 0.3 / 128);
     let ss = 0, cnt = 0, pk = 0;
-    for (let b = 0; b < n; b++) { p.process([], [[L, R]]); if (b < skip) continue; for (let j = 0; j < 128; j++) { const v = (L[j] + R[j]) / 2; ss += v * v; const a = Math.max(Math.abs(L[j]), Math.abs(R[j])); if (a > pk) pk = a; } cnt += 128; }
+    for (let b = 0, r = 0; b < n; b++) { while (r < riff.length && riff[r][0] <= b) p.onMsg(riff[r++][1]); p.process([], [[L, R]]); if (b < skip) continue; for (let j = 0; j < 128; j++) { const v = (L[j] + R[j]) / 2; ss += v * v; const a = Math.max(Math.abs(L[j]), Math.abs(R[j])); if (a > pk) pk = a; } cnt += 128; }
     out.push({ rms: Math.sqrt(ss / Math.max(1, cnt)), peak: pk });
   }
   postMessage({ id, out }); };`;
@@ -65,16 +65,17 @@ onmessage = (e) => { const { id, msgs, sec } = e.data; const out = [];
     worker.onmessage = (e) => { const r = waiting.get(e.data.id); if (r) { waiting.delete(e.data.id); r(e.data.out); } };
     return worker;
   }
-  // what the engine is sent for a sound, then the pattern, then Run (as pushAll + Play do)
-  const msgsFor = (snap, seq) => [{ type: 'params', p: snap.params }, { type: 'bend', b: bendPhysical(snap.bend) }, { type: 'bridges', br: snap.br }, seq, { type: 'run', on: true }];
+  // what the engine is sent for a sound (as pushAll does)
+  const msgsFor = (snap) => [{ type: 'params', p: snap.params }, { type: 'bend', b: bendPhysical(snap.bend) }, { type: 'bridges', br: snap.br }];
+  // v0.40.0 (no sequencer): the riff it is played with, eighth notes at 120 BPM, as [block of 128 samples, engine message]
+  const RIFF = [0, 0, 7, 0, 3, 0, 10, 5].flatMap((d, i) => { const b = Math.round(i * 0.25 * 48000 / 128), n = 48 + d;
+    return [[b, { type: 'noteOn', n, acc: i % 2 === 0 }], [b + 23, { type: 'noteOff', n }]]; });
   async function meter(snaps) {
     const w = await meterWorker(), id = ++jobs;
-    // the current pattern; an empty one gets a plain eighth-note riff so there is something to hear
-    let seq = seqMsg(); if (!seq.seq.steps.some((st) => st.m === 'N')) seq = { type: 'seq', seq: { ...seq.seq, steps: Array.from({ length: 16 }, (_, i) => ({ n: [0, 0, 7, 0, 3, 0, 10, 5][i % 8], o: 0, m: i % 2 ? 'R' : 'N', a: i % 4 === 0, s: false })), length: 16 } };
-    return new Promise((res) => { waiting.set(id, res); w.postMessage({ id, sec: 2, msgs: snaps.map((s) => msgsFor(s, seq)) }); });
+    return new Promise((res) => { waiting.set(id, res); w.postMessage({ id, sec: 2, riff: RIFF, msgs: snaps.map((s) => msgsFor(s)) }); });
   }
-  // the reference: a plain saw + sub patch, played with the same pattern, tempo, transpose and accent
-  const refSnap = () => { const q = state.params, p = { ...defaults, ...REF, transpose: q.transpose, tune: q.tune, accent: q.accent, swing: q.swing, gateLen: q.gateLen }; return { params: p, bend: stockBend(), br: {} }; };
+  // the reference: a plain saw + sub patch, played with the same riff, transpose and accent
+  const refSnap = () => { const q = state.params, p = { ...defaults, ...REF, transpose: q.transpose, tune: q.tune, accent: q.accent }; return { params: p, bend: stockBend(), br: {} }; };
   const dB = (r) => 20 * Math.log10(Math.max(1e-6, r));
   // the VCA Level (0.1-1) moves, found by halving (six tries at most, stopping within 1 dB)
   async function trim(snap, knob, lo, hi, ref, m) {

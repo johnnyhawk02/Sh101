@@ -71,7 +71,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, vcfMod: 0, kybd: 0.5,
       att: 0.002, dec: 0.3, sus: 0, rel: 0.1, trig: 0,
       vcaMode: 0, level: 0.7, lfoRate: 2, lfoWave: 0,
-      glide: 0.05, glideMode: 1, slide: 0.06, accent: 0.6, drive: 0.4,
+      glide: 0.05, glideMode: 1, accent: 0.6, drive: 0.4,
       bendVco: 0.3, bendVcf: 0, lfoMod: 0.3, lever: 0, modPush: 0, transpose: 0,
     };
     // components (bend board)
@@ -107,15 +107,11 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.dcx = 0; this.dcy = 0;
     this.dec1 = biquadLP(0.42 * fs, this.fso, 0.5412); this.dec2 = biquadLP(0.42 * fs, this.fso, 1.3066);
     this.keys = [];
-    this.seq = { steps: [], length: 16, bpm: 120, swing: 0, gateLen: 0.5 };
-    this.arp = 0; this.seqMode = 0; this.hold = false; this.arpNotes = []; this.arpIdx = -1; this.arpDir = 1; this.allUp = true;
-    this.s101 = []; this.s101Idx = 0; this.s101Tr = 0;
-    this.running = false; this.stepIdx = 0; this.n16 = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.transpose = 0;
-    this.keyed = false; // a note has been played during the run (the scale applies)
+    this.hold = false;   // MIDI sustain: the gate stays open after the last key is let go
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
-    this.y4 = 0; this.y2 = 0; this.out = 0; this.clockPending = false; this.fcLast = 1000;
+    this.y4 = 0; this.y2 = 0; this.out = 0; this.fcLast = 1000;
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
@@ -135,22 +131,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
         break;
       case 'noteOn': this.keyOn(m.n, m.acc); break; // acc: a hard key on a velocity keyboard (MIDI)
       case 'noteOff': this.keyOff(m.n); break;
-      case 'seq': Object.assign(this.seq, m.seq); break;
-      case 'mode': {
-        const was = this.arp || this.seqMode === 2;
-        if ('arp' in m) this.arp = m.arp | 0;
-        if ('seq' in m) this.seqMode = m.seq | 0;
-        if ('hold' in m) { this.hold = !!m.hold; if (!this.hold && !this.keys.length) { this.arpNotes = []; if (this.arp) this.gateOff(); } }
-        const now = this.arp || this.seqMode === 2;
-        if (now && !was) { this.arpIdx = -1; this.s101Idx = 0; this.lfoReset(); }
-        if (!now && was) this.gateOff();
-        break;
-      }
-      case 'seq101': this.s101 = m.steps || []; if (this.s101Idx >= this.s101.length) this.s101Idx = 0; break;
-      case 'run':
-        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.n16 = 0; this.nextStepAt = this.t; this.lastSlide = false; }
-        else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.transpose = 0; this.keyed = false; }
-        break;
+      case 'mode': if ('hold' in m) this.hold = !!m.hold; break;
       case 'panic': this.keys = []; this.gateOff(); break;
       case 'reset': this.vc = 0; this.s.fill(0); this.tl.fill(1); this.ve = 0; this.ltri = 0; break;
     }
@@ -181,7 +162,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'glide': P.glide = v < 0.01 ? 0 : 0.003 * Math.pow(5 / 0.003, v); break; // up to 5 s
       case 'glideMode': P.glideMode = v | 0; break;
       case 'accVcf': P.accVcf = v; break;
-      case 'slide': P.slide = 0.02 + v * 0.28; break;
     }
   }
   setBend(id, v) {
@@ -197,27 +177,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
   }
   trigger(acc) { this.stage = 1; this.gate = true; this.accOn = acc ? 1 : 0; }
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
-  lfoReset() { this.ltri = -this.C.hys * this.rail; this.lsq = -1; this.clockPending = true; }
-  clockedMode() { return this.arp > 0 || this.seqMode === 2; }
-  // the nearest degree of the scale (semitones above the played note) to a step's pitch, in the same octave; ties go down
-  qScale(s) {
-    const sc = this.seq.scale, o = Math.floor(s / 12), pc = s - 12 * o;
-    let best = sc[0], bd = 99;
-    for (const d of sc) if (Math.abs(pc - d) < bd) { bd = Math.abs(pc - d); best = d; }
-    return 12 * o + best;
-  }
   keyOn(n, acc) {
     n += this.P.transpose * 12;
-    if (this.running) { this.transpose = n - 60; this.keyed = true; return; }
-    if (this.seqMode === 2) { this.s101Tr = n - 60; return; }
-    if (this.arp) {
-      if (this.hold && this.keys.length === 0) this.arpNotes = [];
-      this.keys.push(n);
-      if (!this.arpNotes.includes(n)) this.arpNotes.push(n);
-      this.arpNotes.sort((a, b) => a - b);
-      if (this.keys.length === 1 && this.arpIdx < 0 || this.keys.length === 1 && !this.hold) { this.arpIdx = -1; this.arpDir = 1; this.lfoReset(); }
-      return;
-    }
     const legato = this.keys.length > 0 && this.gate;
     this.keys = this.keys.filter(k => k !== n); this.keys.push(n);
     const gm = this.P.glideMode;
@@ -226,12 +187,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
   }
   keyOff(n) {
     n += this.P.transpose * 12;
-    if (this.running || this.seqMode === 2) return;
-    if (this.arp) {
-      this.keys = this.keys.filter(k => k !== n);
-      if (!this.hold) { this.arpNotes = this.arpNotes.filter(k => k !== n); if (!this.arpNotes.length) { this.gateOff(); this.arpIdx = -1; } }
-      return;
-    }
     // Last-note priority: letting go of an older key while a newer one is held
     // changes nothing (no pitch move, no retrigger). Only releasing the sounding
     // key falls back to the newest key still held.
@@ -239,65 +194,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.keys = this.keys.filter(k => k !== n);
     if (this.keys.length) { if (!top) return; this.setPitch(this.keys[this.keys.length - 1] - 12, this.P.glideMode ? this.P.glide : 0); if (this.P.trig === 0) this.trigger(false); }
     else if (!this.hold) this.gateOff();
-  }
-
-  // LFO-clocked arpeggiator and 100-step sequencer (one step per LFO cycle, gate = high half)
-  clockRise() {
-    if (this.arp && this.arpNotes.length) {
-      const N = this.arpNotes.length;
-      if (this.arp === 1) this.arpIdx = (this.arpIdx + 1) % N;
-      else if (this.arp === 3) this.arpIdx = this.arpIdx <= 0 ? N - 1 : this.arpIdx - 1;
-      else {
-        if (N === 1) this.arpIdx = 0;
-        else { let i = this.arpIdx + this.arpDir; if (i >= N) { this.arpDir = -1; i = N - 2; } if (i < 0) { this.arpDir = 1; i = 1; } this.arpIdx = i; }
-      }
-      if (this.arpIdx >= N) this.arpIdx = 0;
-      this.setPitch(this.arpNotes[this.arpIdx] - 12, this.P.glideMode === 2 ? this.P.glide : 0);
-      this.trigger(false);
-      this.port.postMessage({ type: 'arp', i: this.arpIdx });
-    } else if (this.seqMode === 2 && this.s101.length) {
-      if (this.s101Idx >= this.s101.length) this.s101Idx = 0;
-      const st = this.s101[this.s101Idx];
-      if (st.r) this.gateOff();
-      else {
-        const n = st.n + this.s101Tr - 12;
-        if (st.l && this.gate) this.setPitch(n, this.P.glideMode ? this.P.glide : 0);
-        else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(false); }
-      }
-      this.port.postMessage({ type: 's101', i: this.s101Idx });
-      this.s101Idx = (this.s101Idx + 1) % this.s101.length;
-    }
-  }
-  clockFall() {
-    if (this.arp && this.arpNotes.length) this.gateOff();
-    else if (this.seqMode === 2 && this.s101.length) {
-      const nx = this.s101[this.s101Idx % this.s101.length];
-      if (!(nx && nx.l && !nx.r)) this.gateOff();
-    }
-  }
-
-  seqStep() {
-    const S = this.seq, len = Math.max(1, Math.min(512, S.length | 0, S.steps.length || 1));
-    if (this.stepIdx >= len) this.stepIdx = 0;
-    const i = this.stepIdx, st = S.steps[i] || { m: 'R' }, nx = S.steps[(i + 1) % len] || { m: 'R' };
-    const base = this.fs * 60 / S.bpm / 4, sw = S.swing * 0.5;
-    const dur = (i % 2 === 0) ? base * (1 + sw) : base * (1 - sw);
-    this.nextStepAt += dur;
-    const hold = st.s || nx.m === 'T';
-    if (st.m === 'R' || (st.m === 'T' && !this.gate)) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
-    else if (st.m === 'T') { this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen; this.lastSlide = !!st.s; }
-    else {
-      // a note played during the run transposes the pattern; with the scale on, each step snaps to it first (or only once a note is played, with MIDI NOTE ONLY)
-      const s = this.seq.cOnly ? 12 * (st.o + Math.floor(st.n / 12)) : st.n + 12 * st.o;   // C NOTES ONLY keeps the octave
-      const n = 48 + (this.seq.scale && (this.keyed || !this.seq.scaleMidi) ? this.qScale(s) : s) + this.transpose;
-      if (this.lastSlide && this.gate) { this.setPitch(n, this.P.slide); this.accOn = st.a ? 1 : 0; }
-      else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(st.a); }
-      this.gateOffAt = hold ? -1 : this.t + dur * S.gateLen;
-      this.lastSlide = !!st.s;
-    }
-    // n: sixteenths counted from the start (bar 1), for the per-control step sequencers; bpm for their slew
-    this.port.postMessage({ type: 'step', i, n: this.n16++, bpm: S.bpm });
-    this.stepIdx = (i + 1) % len;
   }
 
   process(inputs, outputs) {
@@ -313,10 +209,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const eR = 1 - Math.exp(-dt / (P.rel / (4 * CE_NOM) * C.ce));
 
     for (let j = 0; j < n; j++) {
-      if (this.running) {
-        if (this.t >= this.nextStepAt) this.seqStep();
-        if (this.gateOffAt >= 0 && this.t >= this.gateOffAt) { this.gateOff(); this.gateOffAt = -1; }
-      }
       this.t++;
       if ((this.t & 7) === 0) { for (const k in sm) sm[k] += ((k in P ? P[k] : C[k]) - sm[k]) * smc; }
 
@@ -336,12 +228,10 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const kInt = P.lfoRate * 4 * 5 * (CL_NOM / C.cl);          // V/s for nominal hysteresis 5 V
       this.ltri += (this.lsq > 0 ? 1 : -1) * kInt * (vsat / 10) * dt + inj[7] / C.cl * dt;
       const hys = C.hys * rail;
-      if (this.ltri > hys && this.lsq > 0) { this.ltri = hys; this.lsq = -1; if (this.clockedMode()) this.clockFall(); }
-      else if ((this.ltri < -hys && this.lsq < 0) || this.clockPending) {
-        this.clockPending = false;
+      if (this.ltri > hys && this.lsq > 0) { this.ltri = hys; this.lsq = -1; }
+      else if (this.ltri < -hys && this.lsq < 0) {
         this.ltri = Math.max(this.ltri, -hys); this.lsq = 1; this.rnd = this.rand();
-        if (this.clockedMode()) this.clockRise();
-        else if (P.trig === 2 && this.gate) this.stage = 1;              // env retriggered by LFO
+        if (P.trig === 2 && this.gate) this.stage = 1;              // env retriggered by LFO
       }
       this.ltri = clamp(this.ltri, -vsat, vsat);
       this.lnoise += (this.rand() - this.lnoise) * 0.02;

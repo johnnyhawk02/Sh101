@@ -1,10 +1,10 @@
 // Offline support (same approach as the 303 app). The app's own code (the page, css/, js/) is fetched fresh when online,
 // so an update arrives as one consistent set, and served from cache when not. Icons and fonts are
 // cache-first. The cache name carries the version; every file of the app is cached on install so it works offline at once.
-const CACHE = 'kestrel-0.39.0';
+const CACHE = 'kestrel-0.40.0';
 const APP = ['css/shyoy.css', 'js/dsp/engine.js',
-  ...['fit', 'notips', 'defs', 'state', 'audio', 'controls', 'bend', 'strip', 'generate', 'sequencer', 'tabs', 'slots', 'seqmenu', 'transport', 'presets', 'namer', 'sounds', 'rand', 'keyboard', 'options', 'midi', 'cseq', 'app', 'pocket', 'view3d'].map((n) => `js/app/${n}.js`), 'js/vendor/three.module.min.js', 'js/vendor/RoomEnvironment.js'];
-const CORE = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/logo.png', './models/yamaha-knob.stl', './models/pot-knob5.stl', './textures/scuffs.jpg', './textures/dents.jpg', ...APP];
+  ...['fit', 'notips', 'defs', 'state', 'audio', 'controls', 'bend', 'strip', 'tabs', 'presets', 'namer', 'sounds', 'rand', 'keyboard', 'options', 'midi', 'app', 'pocket', 'view3d'].map((n) => `js/app/${n}.js`), 'js/vendor/three.module.min.js', 'js/vendor/RoomEnvironment.js'];
+const CORE = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/logo.png', './textures/scuffs.jpg', './textures/dents.jpg', ...APP];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE.map((u) => new Request(u, { cache: 'no-cache' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 // network first, bypassing the browser's HTTP cache, then the cache (offline)

@@ -1,31 +1,17 @@
-// Shyoy: Patterns, the saved state and the pattern slots data.
-// ---------- patterns ----------
-function parsePat(str) {
-  return str.split(',').map(t => t.trim()).map(t => {
-    if (t[0] === '.') return { n: 0, o: 0, m: 'R', a: false, s: false };
-    const tie = t[0] === '_';
-    const m = /^([A-G]#?)?([+-]?)\s*([as]*)$/.exec(tie ? t.slice(1).trim() : t) || [];
-    const n = m[1] ? NOTE.indexOf(m[1]) : 0;
-    return { n, o: m[2] === '+' ? 1 : m[2] === '-' ? -1 : 0, m: tie ? 'T' : 'N', a: (m[3] || '').includes('a'), s: (m[3] || '').includes('s') };
-  });
-}
+// Shyoy: The factory sounds and the saved state.
 const PRESETS = {
-  'Acid line': { bpm: 126, p: { accVcf: 0.45, saw: .85, pulse: 0, sub: .25, noise: 0, cutoff: .3, reso: .8, drive: .55, vcfEnv: .6, kybd: .5, attack: 0, decay: .38, sustain: 0, release: .22, vcaMode: 0, accent: .75, slide: .22, glideMode: 1, range: 1, swing: .12, gateLen: .5 },
-    pat: 'C a, C, C+ s, C, D# a, ., F s, G, C a, _, A#-, C s, D#+ a, C+ s, G, A# a' },
-  'Sub bass': { bpm: 118, p: { accVcf: 0.25, saw: .3, pulse: .55, sub: .85, subType: 0, noise: 0, cutoff: .34, reso: .25, drive: .6, vcfEnv: .35, kybd: .5, attack: 0, decay: .45, sustain: .35, release: .2, vcaMode: 0, accent: .4, pw: .15, pwmSrc: 1, range: 0, swing: .08, gateLen: .6 },
-    pat: 'C, ., C, C+, ., C, A#-, C, C, ., D#, C, ., C+ s, C, G-' },
-  'PWM arp': { bpm: 132, p: { accVcf: 0.25, saw: 0, pulse: .85, sub: .3, subType: 2, noise: 0, cutoff: .45, reso: .45, drive: .4, vcfEnv: .45, kybd: .5, attack: 0, decay: .35, sustain: .3, release: .35, vcaMode: 0, accent: .4, pw: .7, pwmSrc: 0, lfoRate: .45, lfoWave: 0, range: 1, swing: 0, gateLen: .45 },
-    pat: 'C, D#, G, C+, D#+, G, C+ s, D#+, A#-, D, F, A#, D+, F, A# s, D+' },
-  'Starved & bent': { bpm: 104, p: { accVcf: 0.375, saw: .8, pulse: .3, sub: .4, noise: 0, cutoff: .4, reso: .7, drive: .6, vcfEnv: .45, kybd: .4, attack: 0, decay: .4, sustain: .3, release: .3, vcaMode: 0, accent: .6, lfoRate: .35, lfoWave: 1, range: 1, swing: .1, gateLen: .6 },
+  'Acid line': { p: { accVcf: 0.45, saw: .85, pulse: 0, sub: .25, noise: 0, cutoff: .3, reso: .8, drive: .55, vcfEnv: .6, kybd: .5, attack: 0, decay: .38, sustain: 0, release: .22, vcaMode: 0, accent: .75, slide: .22, glideMode: 1, range: 1, swing: .12, gateLen: .5 } },
+  'Sub bass': { p: { accVcf: 0.25, saw: .3, pulse: .55, sub: .85, subType: 0, noise: 0, cutoff: .34, reso: .25, drive: .6, vcfEnv: .35, kybd: .5, attack: 0, decay: .45, sustain: .35, release: .2, vcaMode: 0, accent: .4, pw: .15, pwmSrc: 1, range: 0, swing: .08, gateLen: .6 } },
+  'PWM arp': { p: { accVcf: 0.25, saw: 0, pulse: .85, sub: .3, subType: 2, noise: 0, cutoff: .45, reso: .45, drive: .4, vcfEnv: .45, kybd: .5, attack: 0, decay: .35, sustain: .3, release: .35, vcaMode: 0, accent: .4, pw: .7, pwmSrc: 0, lfoRate: .45, lfoWave: 0, range: 1, swing: 0, gateLen: .45 } },
+  'Starved & bent': { p: { accVcf: 0.375, saw: .8, pulse: .3, sub: .4, noise: 0, cutoff: .4, reso: .7, drive: .6, vcfEnv: .45, kybd: .4, attack: 0, decay: .4, sustain: .3, release: .3, vcaMode: 0, accent: .6, lfoRate: .35, lfoWave: 1, range: 1, swing: .1, gateLen: .6 },
     bend: { vBatt: 5.6, rBatt: 4, tReset: 0.00008, rDis: 900, cf1: 680e-12, otaOff: 0.018 },
-    br: { 'LFOTRI>VCOCV': .2, 'VCFOUT>VCOCV': .55, 'SAW>ENVCAP': .3, 'FINGER>VCFIN': .3 },
-    pat: 'C, _, C+, ., G, _ s, C a, ., D#, _, C+ s, C, F, _, G, A#' },
+    br: { 'LFOTRI>VCOCV': .2, 'VCFOUT>VCOCV': .55, 'SAW>ENVCAP': .3, 'FINGER>VCFIN': .3 } },
 };
 
 // ---------- state ----------
 const defaults = {};
 for (const m of RACK) for (const it of m.items) defaults[it.f || it.s] = it.def;
-for (const b of BENDER) defaults[b.f] = b.def; defaults.transpose = 1; defaults.swing = 0; defaults.gateLen = .5;
+for (const b of BENDER) defaults[b.f] = b.def; defaults.transpose = 1;
 // v0.39.0 (Johnny: "simplify shyoy, remove fx"): the effects are gone; a saved sound keeps only the controls that still exist
 const knownParams = (p) => { const o = {}; for (const k in (p || {})) if (k in defaults) o[k] = p[k]; return o; };
 let state;
@@ -33,37 +19,13 @@ function presetState(name) {
   const P = PRESETS[name];
   const bend = stockBend();
   for (const k in (P.bend || {})) { const b = BEND_ITEMS.find(x => x.id === k || x.sw === k); bend[k] = b.sw ? P.bend[k] : toNorm(b, P.bend[k]); }
-  return { params: { ...defaults, ...P.p }, bend, br: { ...(P.br || {}) }, steps: parsePat(P.pat), bpm: P.bpm, preset: name };
+  return { params: { ...defaults, ...knownParams(P.p) }, bend, br: { ...(P.br || {}) }, preset: name };
 }
 try { state = JSON.parse(localStorage.getItem('kestrel-ms1-v2')); } catch (e) { state = null; }
-if (!state || state.v !== 2 || !state.params || !Array.isArray(state.steps) || !state.steps.length || state.steps.length > 64) state = presetState('Acid line');
-if (state.len) { state.steps = state.steps.slice(0, Math.max(1, state.len)); delete state.len; }
-for (const st of state.steps) { while (st.n >= 12) { st.n -= 12; st.o++; } st.o = Math.max(-2, Math.min(2, st.o | 0)); }
+if (!state || state.v !== 2 || !state.params) state = presetState('Acid line');
+// v0.40.0 (Johnny: "remove the sequencer"): a saved session's pattern, slots, tempo, scale and control sequencers are dropped
+for (const k of ['steps', 'len', 'bpm', 'slots', 'slot', 'chain', 'scale', 'cseq', 's101']) delete state[k];
 state.v = 2; state.bend = { ...stockBend(), ...(state.bend || {}) }; state.br = state.br || {};
 state.params = { ...defaults, ...knownParams(state.params) }; delete state.fx;
-// pattern slots (from the 303 app's banks): 8 patterns, edits save to the selected slot, ctrl/right-click or long-press chains them
-// the sequencer's scale: a played note during a run snaps the pattern's steps to it (engine qScale); label is the short name on the panel
-const SCALE_LIST = [
-  { label: 'MAJOR', name: 'Major', s: [0, 2, 4, 5, 7, 9, 11] }, { label: 'MINOR', name: 'Minor', s: [0, 2, 3, 5, 7, 8, 10] },
-  { label: 'DORIAN', name: 'Dorian', s: [0, 2, 3, 5, 7, 9, 10] }, { label: 'PHRYG', name: 'Phrygian', s: [0, 1, 3, 5, 7, 8, 10] },
-  { label: 'MIXO', name: 'Mixolydian', s: [0, 2, 4, 5, 7, 9, 10] }, { label: 'MIN PENT', name: 'Minor pentatonic', s: [0, 3, 5, 7, 10] },
-  { label: 'MAJ PENT', name: 'Major pentatonic', s: [0, 2, 4, 7, 9] }, { label: 'BLUES', name: 'Blues', s: [0, 3, 5, 6, 7, 10] },
-  { label: 'HARM MIN', name: 'Harmonic minor', s: [0, 2, 3, 5, 7, 8, 11] }, { label: 'WHOLE', name: 'Whole tone', s: [0, 2, 4, 6, 8, 10] },
-];
-// v0.38.0 (Johnny: "a scale on/off button"): on = the pattern's steps snap to the scale (root C, moving with a played note);
-// midi = only once a note has been played during the run (the v0.28 behaviour)
-// v0.38.1 (Johnny): c = C NOTES ONLY, every step plays C in its own octave (still moved by a played note)
-state.scale = { i: 0, on: false, midi: false, c: false, ...(state.scale || {}) };
-if (!(state.scale.i >= 0 && state.scale.i < SCALE_LIST.length)) state.scale.i = 0;
-state.scale.on = !!state.scale.on; state.scale.midi = !!state.scale.midi; state.scale.c = !!state.scale.c;
-const SLOTS = 8;
-const slotOf = st => ({ steps: JSON.parse(JSON.stringify(st.steps)), swing: st.params ? st.params.swing : 0, gateLen: st.params ? st.params.gateLen : .5 });
-if (!Array.isArray(state.slots) || state.slots.length !== SLOTS) {
-  const names = Object.keys(PRESETS);
-  state.slots = Array.from({ length: SLOTS }, (_, i) => i === 0 ? slotOf(state) : names[i] ? slotOf(presetState(names[i])) : null);
-  state.slot = 0; state.chain = [];
-}
-if (!(state.slot >= 0 && state.slot < SLOTS)) state.slot = 0;
-state.chain = (state.chain || []).filter(k => k >= 0 && k < SLOTS);
 let saveT;
 function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('kestrel-ms1-v2', JSON.stringify(state)); } catch (e) {} }, 300); }
