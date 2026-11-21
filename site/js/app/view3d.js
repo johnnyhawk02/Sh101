@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
-const C = 72, R = 150, M = 24, COLS = 18, ROWS = 3;
+const C = 62, R = 150, M = 24, COLS = 18, ROWS = 3;
 const W = COLS * C + 2 * M, H = ROWS * R + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';

@@ -45,6 +45,9 @@ const shyoyRand = (() => {
   // the finished sound, as from a preset.
   const REF = { saw: 0.8, pulse: 0, sub: 0.4, noise: 0, range: 1, cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, drive: 0.4, decay: 0.4, sustain: 0, release: 0.3, attack: 0, level: 0.7 };
   const TRIMS = ['level'];
+  // v0.41.2 (Johnny: Level always ended up very low): random sounds came out 8-15 dB louder than the plain reference, so
+  // Level was trimmed to 0.1-0.25. The target is now the reference +7 dB, so a typical sound lands near 0.4-0.8
+  const REF_LIFT = 10 ** (7 / 20);
   let worker = null, jobs = 0; const waiting = new Map();
   async function meterWorker() {
     if (worker) return worker;
@@ -91,7 +94,7 @@ onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
   }
   async function levelled(snap) {
     try {
-      const [ref, first] = await meter([refSnap(), snap]);
+      const [ref0, first] = await meter([refSnap(), snap]), ref = { ...ref0, rms: ref0.rms * REF_LIFT };
       if (ref.rms < 1e-4 || first.rms < 1e-5) return snap;
       let r = { e: dB(ref.rms / first.rms), m: first };
       if (Math.abs(r.e) >= 1.5) r = await trim(snap, 'level', 0.1, 1, ref, r.m);
