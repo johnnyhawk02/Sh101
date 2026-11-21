@@ -18,10 +18,9 @@ const root = document.documentElement;
 
 // ---------------------------------------------------------------- look (Options): panel colour, lighting, finish, lens
 const LOOK_KEY = 'shyoy.look3d';
-// defaults (v0.31.8): Johnny's own look from 16 Nov 2026 — grey panel, metal finish, white key light with magenta and
-// aqua lights, bigger knobs, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1.49, finish: 'metal', lens: Math.log(25 / 6) / Math.log(8), tilt: 3.5, ksize: 1.14, kstyle: 'yamaha', knobAll: '', knobCol: {}, oddOn: true, oddK: -1, ocd: 0, stickers: ['smile'], stkOn: true, stk: {}, lv: 2,
-  lights: [{ col: '#ffffff', int: 1.47, az: 45, el: 47 }, { col: '#fc2ddb', int: 1.89, az: 65, el: 48 }, { col: '#31fcc0', int: 1.59, az: 36, el: 44 }] };   // + lights (v0.31.0), filled from the preset
+// defaults (v0.41.1): Johnny's own look from 21 Nov 2026 (COPY LOOK) — grey matt panel, overhead light, longer lens
+const LOOK0 = { colour: '#b9bbb8', light: 'top', bright: 0.81, finish: 'matt', lens: 0.8, tilt: 7.6, ksize: 1.296, kstyle: 'chicken', knobAll: '', knobCol: {}, oddOn: false, oddK: 27, ocd: 0.28, stickers: ['smile'], stkOn: true, stk: { one: { y: 117 } }, lv: 2, room: 0.26,
+  lights: [{ col: '#ffffff', int: 1.8, az: 90, el: 31 }, { col: '#e6ecff', int: 0.4, az: 160, el: 35 }, { col: '#fff0dc', int: 0.35, az: 20, el: 35 }] };
 const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
 // saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
 // 3 and 4 start empty. SAVE then a slot stores the current look there (localStorage shyoy.looks3d).
