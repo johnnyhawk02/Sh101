@@ -100,18 +100,18 @@ const BOXES = [
   { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
   { r: ROW_BENDER, c: 11, s: 7, n: 'PRESET', it: [{ t: 'preset', w: 7 }] },
   // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
-  { r: 3, c: 0, s: 18, n: 'SEQUENCER', it: [{ t: 'seqrun' }, K('tempo', 'TEMPO'), ...Array.from({ length: SEQ_N }, (_, i) => ({ t: 'step', i }))] },
+  { r: 3, c: 0, s: 18, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
 ];
+let seqGrid = null;
+const SEQ_ROWS = [['o', 1, '2'], ['o', 0, '1'], ['o', -1, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
 function setKnob(id, v) {
-  if (id === 'tempo') return seqTempo(v);
   const r = regOf(id); if (r) r.set(Math.max(0, Math.min(1, v)));
 }
-const knobVal = (id) => id === 'tempo' ? state.seq.tempo : state.params[id];
-DEF.tempo = { fmt: (v) => Math.round(60 + v * 140) + ' BPM' };
+const knobVal = (id) => state.params[id];
 const knobBase = knobVal;
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
@@ -418,18 +418,17 @@ for (const b of BOXES) {
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'seqrun') {
-      makeKey(cx, y0 + 38, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 10, tag: 'play' });
+      makeKey(cx, y0 + KY, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 12, tag: 'play' });
       labelAt(() => 'PLAY', cx, ly);
-      prints.push((x, ink) => { x.fillStyle = ink; text(x, 'OCT', cx + C * spread / 2 - 6, y0 + 76.5, 10.5, 'right'); text(x, 'SLIDE', cx + C * spread / 2 - 6, y0 + 112.5, 10.5, 'right'); });
-    } else if (it.t === 'step') {
-      const i = it.i, st = () => state.seq.steps[i];
-      makeKey(cx, y0 + 38, 24, 14, { on: () => st().on !== (seqPos === i), press: () => { boot(); seqStepSet(i, 'on', !st().on); }, pad: 6, tag: 'st' + i });
-      [1, 0, -1].forEach((o, k) => { const ky = y0 + 62 + k * 14, kx = cx - 9;
-        makeKey(kx, ky, 15, 10, { on: () => (st().o | 0) === o, press: () => seqStepSet(i, 'o', o), pad: 2, tag: 'o' + i + ':' + o });
-        const kk = ctls[ctls.length - 1]; kk.rect = [kx - 10, ky - 7, 36, 14];
-        prints.push((x, ink) => { x.fillStyle = ink; text(x, o > 0 ? '+1' : String(o), kx + 12, ky + 0.5, 10, 'left'); }); });
-      makeKey(cx, y0 + 112, 20, 11, { on: () => !!st().s, press: () => seqStepSet(i, 's', !st().s), pad: 5, tag: 's' + i });
-      labelAt(() => String(i + 1), cx, ly);
+    } else if (it.t === 'grid') {
+      // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
+      // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
+      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52, gy = y0 + 26, gh = 102;
+      seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: gh / SEQ_ROWS.length };
+      SEQ_ROWS.forEach((r, ri) => { const yy = gy + (ri + 0.5) * seqGrid.rowH;
+        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 8, yy + 0.5, 9.5, 'right'); }); });
+      for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, ly);
+      makeSeqGrid();
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
       // steps and browser, and the sticker's randomise and undo
@@ -444,6 +443,45 @@ for (const b of BOXES) {
   }
 }
 let modHeld = false;
+// ---- the sequencer's note grid (v0.42.1), drawn on its own layer over the print
+function makeSeqGrid() {
+  const G = seqGrid, c = document.createElement('canvas'); c.width = Math.ceil(G.w * 3); c.height = Math.ceil(G.h * 3); const x = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(G.w, G.h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.position.copy(P(G.x + G.w / 2, G.y + G.h / 2, 0.08)); m.renderOrder = 1; grp.add(m);
+  let sig = '';
+  const draw = () => {
+    const ink = curInk, light = ink === '#000000', s2 = JSON.stringify(state.seq.steps) + ink + seqPos; if (s2 === sig) return false; sig = s2;
+    const tone = (a) => light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`, cw = G.colW, rh = G.rowH;
+    x.setTransform(3, 0, 0, 3, 0, 0); x.clearRect(0, 0, G.w, G.h);
+    for (let i = 0; i < SEQ_N; i++) {
+      const st = state.seq.steps[i], cx = i * cw;
+      if (seqPos === i) { x.fillStyle = tone(0.16); x.fillRect(cx, 0, cw, G.h); }
+      SEQ_ROWS.forEach(([t, v], ri) => {
+        const y = ri * rh; x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
+        const own = t === 'o' ? (st.o | 0) === v : !!st[t], on = own && (t === 'on' || st.on);
+        if (on) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
+        else if (own && t !== 'on') { x.strokeStyle = ink; x.lineWidth = 1.5; x.strokeRect(cx + 4, y + 4, cw - 8, rh - 8); }   // set, on a step that rests
+      });
+      if (i % 4 === 3 && i < SEQ_N - 1) { x.fillStyle = tone(0.55); x.fillRect(cx + cw - 0.75, 0, 1.5, G.h); }
+    }
+    tex.needsUpdate = true; return true;
+  };
+  const at = (p) => { if (!p || p[0] < G.x || p[0] >= G.x + G.w || p[1] < G.y || p[1] >= G.y + G.h) return null;
+    return { i: Math.min(SEQ_N - 1, Math.floor((p[0] - G.x) / G.colW)), r: SEQ_ROWS[Math.min(SEQ_ROWS.length - 1, Math.floor((p[1] - G.y) / G.rowH))] }; };
+  // what a press does: an octave cell picks that octave and turns the step on; the others toggle. A drag paints the same
+  const apply = (h, paint) => {
+    const st = state.seq.steps[h.i], [t, v] = h.r;
+    if (t === 'o') { if (paint && paint.t !== 'o') return; if ((st.o | 0) === v && st.on) return; st.o = v; st.on = true; }
+    else { const want = paint ? paint.v : !st[t]; if (paint && paint.t !== t) return; if (!!st[t] === want) return; st[t] = want; }
+    seqSend();
+  };
+  let paint = null;
+  addCtl({ kind: 'roll', rect: [G.x, G.y, G.w, G.h], sync: draw,
+    down(p) { const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
+    move(p) { const h = at(p); if (h && paint) apply(h, paint); },
+    up() { paint = null; } });
+}
 // the title: Johnny's logo, printed; tapping it opens OPTIONS. Under it, the page keys (on both pages)
 buildPage = 'all'; grp = scene; prints = printsBy.all;
 // v0.31.1: the logo is printed on its own lit layer over the title, carrying the panel's wear (the same bump map,
@@ -731,6 +769,7 @@ cv.addEventListener('pointerdown', (e) => {
   if (c.kind === 'knob') { g.id = c.cur(); g.v0 = knobBase(g.id); ro.show(c, knobText(g.id, g.v0)); }
   else if (c.kind === 'key') { c.down = true; if (c.hold) c.hold(true); else if (c.press) c.press(); }
   else if (c.kind === 'lever') { c.held = true; g.v0 = c.v; }
+  else if (c.kind === 'roll') c.down(toPanel(e));
   grabs.set(e.pointerId, g); dirty = true;
 });
 cv.addEventListener('pointermove', (e) => {
@@ -743,7 +782,7 @@ cv.addEventListener('pointermove', (e) => {
   } else if (c.kind === 'lever') {
     const r = cv.getBoundingClientRect(), pxPerUnit = r.width / W * (camera.position.z > 0 ? 1 : 1);
     const v = Math.max(-1, Math.min(1, g.v0 + (e.clientX - g.x) / (c.half * pxPerUnit))); c.v = v; setLever(v);
-  }
+  } else if (c.kind === 'roll') c.move(toPanel(e));
   dirty = true;
 });
 function release(e) {
@@ -752,6 +791,7 @@ function release(e) {
   if (c.kind === 'knob') ro.hide();
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
+  else if (c.kind === 'roll') c.up();
   else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
   else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) { if (shyoyRand.back()) wobble(c.st); } else { shyoyRand.roll(); wobble(c.st, true); } printDirty = true; }
   dirty = true;
@@ -1035,6 +1075,7 @@ window.shyoy3d = {
   // for headless checks: where a control is on screen
   where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy - TRAVEL + 2 * TRAVEL * knobVal(id), CAP.d).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
+  cell(i, ri) { const G = seqGrid; return this.at(G.x + (i + 0.5) * G.colW, G.y + (ri + 0.5) * G.rowH); },
   title() { return this.at(TITLE.x + TITLE.w / 2, TITLE.y + 50); },
   at(pxX, pxY) { const v = P(pxX, pxY, 8).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   ctls, W, H, look,

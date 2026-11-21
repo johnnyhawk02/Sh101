@@ -214,8 +214,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
     if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else {
       const n = (this.root >= 0 ? this.root : 36 + 12 * this.P.transpose) + 12 * (st.o | 0);
-      if (this.lastSlide && this.gate) this.setPitch(n, 0.06);
-      else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(false); }
+      if (this.lastSlide && this.gate) { this.setPitch(n, 0.06); this.accOn = st.a ? 1 : 0; }
+      else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(!!st.a); }
       this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
     }
     this.port.postMessage({ type: 'step', i });
