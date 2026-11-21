@@ -93,15 +93,15 @@ const ROW_VCF = 1, ROW_BENDER = 2;
 const BOXES = [
   { r: 0, c: 0, s: 2, n: 'LFO', it: [K('lfoRate', 'RATE'), S('lfoWave', 'WAVE', ['TRI', 'SQR', 'RND', 'NOISE'])] },
   { r: 0, c: 2, s: 6, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV']), K('drift', 'DRIFT')] },
-  { r: 0, c: 8, s: 5, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
+  { r: 0, c: 8, s: 6, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
   { r: ROW_VCF, c: 0, s: 7, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
   { r: ROW_VCF, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
   { r: ROW_VCF, c: 12, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
   { r: ROW_VCF, c: 14, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
   { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
-  { r: ROW_BENDER, c: 10, s: 8, n: 'PRESET', it: [{ t: 'preset', w: 8 }] },
+  { r: ROW_BENDER, c: 7, s: 11, n: 'PRESET', it: [{ t: 'preset', w: 11 }] },
 ];
-const TITLE = { x: M + 13 * C, y: M, w: 5 * C, h: R };
+const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
@@ -415,12 +415,14 @@ for (const b of BOXES) {
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'preset') {
-      const dw = w * C - 40, dx = cx - dw / 2, ks = [-1, 0, 1].map((k) => cx + k * C * 1.5);
+      // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
+      // steps and browser, and the sticker's randomise and undo
+      const dw = w * C - 40, dx = cx - dw / 2;
       makeDisplay(dx, y0 + 36, dw, 28, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
-      makeKey(ks[0], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click(), pad: 8, tag: 'pre-' });
-      makeKey(ks[1], y0 + KEYY, 24, 14, { on: () => false, press: () => openBrowser(), pad: 8, tag: 'browse' });
-      makeKey(ks[2], y0 + KEYY, 24, 14, { on: () => false, press: () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click(), pad: 8, tag: 'pre+' });
-      labelAt(() => 'PREV', ks[0], ly); labelAt(() => 'BROWSE', ks[1], ly); labelAt(() => 'NEXT', ks[2], ly);
+      const PK = [['PREV', 'pre-', () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click()], ['NEXT', 'pre+', () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click()],
+        ['BROWSE', 'browse', () => openBrowser()], ['RANDOM', 'rand', () => shyoyRand.roll()], ['UNDO', 'undo', () => shyoyRand.back()]];
+      PK.forEach(([label, tag, press], k) => { const kx = dx + dw * (k + 0.5) / PK.length;
+        makeKey(kx, y0 + KEYY, 24, 14, { on: () => false, press, pad: 8, tag }); labelAt(() => label, kx, ly); });
     }
     col += w;
   }
@@ -444,7 +446,7 @@ logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); 
 const STICKER_BUMP = PANEL_BUMP * 1.6;
 const STICKERS = [
   // v0.33.3 (Johnny): all about half as big again
-  { id: 'smile', name: 'SMILEY', cx: W - 58, cy: 58, size: 100, rot: 12 },
+  { id: 'smile', name: 'SMILEY', cx: W - 50, cy: H - 46, size: 100, rot: 12 },
   { id: 'wink', name: 'WINK', cx: 30, cy: H - 26, size: 76, rot: -18 },
   { id: 'dizzy', name: 'DIZZY', cx: W - 22, cy: H * 0.56, size: 70, rot: 25 },
   { id: 'heart', name: 'HEART', cx: W * 0.43, cy: H - 12, size: 66, rot: -10 },
@@ -829,7 +831,7 @@ let optTab = 'look'; try { optTab = localStorage.getItem('shyoy.opttab3d') || 'l
 opt.body.innerHTML = `
   <div class="otab3">${OPT_TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}</div>
   <div class="pane" data-pane="look">
-  <div class="f"><span>LOOKS</span><div class="row" id="o3-looks">${[0, 1, 2, 3].map((i) => `<button data-look="${i}"><i></i>LOOK ${i + 1}</button>`).join('')}<button id="o3-lsave">SAVE…</button></div></div>
+  <div class="f"><span>LOOKS</span><div class="row" id="o3-looks">${[0, 1, 2, 3].map((i) => `<button data-look="${i}"><i></i>LOOK ${i + 1}</button>`).join('')}<button id="o3-lsave">SAVE…</button><button id="o3-lcopy">COPY LOOK</button></div></div>
   <div class="f"><span>PANEL COLOUR</span><div class="row" id="o3-sw">${SWATCHES.map((c) => `<button class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}<input type="color" id="o3-col" aria-label="Any colour"></div></div>
   <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
   </div>
@@ -915,6 +917,11 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   saveLook(); applyLook(); drawOpt();
 });
 $o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
+// v0.41.0 (Johnny: "have copy setting for look for default"): the current look as text, to paste back to Claude to
+// become the default (LOOK0)
+$o('#o3-lcopy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(look);
+  try { await navigator.clipboard.writeText(t); b.textContent = 'COPIED'; } catch (er) { prompt('Copy this look', t); }
+  setTimeout(() => { b.textContent = 'COPY LOOK'; }, 1500); };
 opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
 $o('#o3-col').oninput = (e) => setLook('colour', e.target.value);
 opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => { look.lights = presetLights(b.dataset.l); setLook('light', b.dataset.l); });
