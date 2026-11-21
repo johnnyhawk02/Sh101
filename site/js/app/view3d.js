@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
-const C = 62, R = 150, M = 24, COLS = 18, ROWS = 3;
+const C = 62, R = 150, M = 24, COLS = 18, ROWS = 4;
 const W = COLS * C + 2 * M, H = ROWS * R + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
@@ -99,15 +99,19 @@ const BOXES = [
   { r: ROW_BENDER, c: 7, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
   { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
   { r: ROW_BENDER, c: 11, s: 7, n: 'PRESET', it: [{ t: 'preset', w: 7 }] },
+  // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
+  { r: 3, c: 0, s: 18, n: 'SEQUENCER', it: [{ t: 'seqrun' }, K('tempo', 'TEMPO'), ...Array.from({ length: SEQ_N }, (_, i) => ({ t: 'step', i }))] },
 ];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
 function setKnob(id, v) {
+  if (id === 'tempo') return seqTempo(v);
   const r = regOf(id); if (r) r.set(Math.max(0, Math.min(1, v)));
 }
-const knobVal = (id) => state.params[id];
+const knobVal = (id) => id === 'tempo' ? state.seq.tempo : state.params[id];
+DEF.tempo = { fmt: (v) => Math.round(60 + v * 140) + ' BPM' };
 const knobBase = knobVal;
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
@@ -413,6 +417,19 @@ for (const b of BOXES) {
       };
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
+    } else if (it.t === 'seqrun') {
+      makeKey(cx, y0 + 38, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 10, tag: 'play' });
+      labelAt(() => 'PLAY', cx, ly);
+      prints.push((x, ink) => { x.fillStyle = ink; text(x, 'OCT', cx + C * spread / 2 - 6, y0 + 76.5, 10.5, 'right'); text(x, 'SLIDE', cx + C * spread / 2 - 6, y0 + 112.5, 10.5, 'right'); });
+    } else if (it.t === 'step') {
+      const i = it.i, st = () => state.seq.steps[i];
+      makeKey(cx, y0 + 38, 24, 14, { on: () => st().on !== (seqPos === i), press: () => { boot(); seqStepSet(i, 'on', !st().on); }, pad: 6, tag: 'st' + i });
+      [1, 0, -1].forEach((o, k) => { const ky = y0 + 62 + k * 14, kx = cx - 9;
+        makeKey(kx, ky, 15, 10, { on: () => (st().o | 0) === o, press: () => seqStepSet(i, 'o', o), pad: 2, tag: 'o' + i + ':' + o });
+        const kk = ctls[ctls.length - 1]; kk.rect = [kx - 10, ky - 7, 36, 14];
+        prints.push((x, ink) => { x.fillStyle = ink; text(x, o > 0 ? '+1' : String(o), kx + 12, ky + 0.5, 10, 'left'); }); });
+      makeKey(cx, y0 + 112, 20, 11, { on: () => !!st().s, press: () => seqStepSet(i, 's', !st().s), pad: 5, tag: 's' + i });
+      labelAt(() => String(i + 1), cx, ly);
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
       // steps and browser, and the sticker's randomise and undo

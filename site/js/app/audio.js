@@ -24,4 +24,4 @@ async function boot() {
   return booting;
 }
 const post = (m) => { if (node) node.port.postMessage(m); };
-function pushAll() { post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); }
+function pushAll() { post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); if (typeof seqMsg === 'function') post(seqMsg()); }

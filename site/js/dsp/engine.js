@@ -108,6 +108,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.dec1 = biquadLP(0.42 * fs, this.fso, 0.5412); this.dec2 = biquadLP(0.42 * fs, this.fso, 1.3066);
     this.keys = [];
     this.hold = false;   // MIDI sustain: the gate stays open after the last key is let go
+    // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): 16 steps, each { on, o: -1/0/+1, s: slide }.
+    // Every step plays one note (C, or the last key played while it runs), in its own octave; a slide step glides into the next.
+    this.seq = { steps: [], bpm: 120 }; this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.root = -1;
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
@@ -132,6 +135,11 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'noteOn': this.keyOn(m.n, m.acc); break; // acc: a hard key on a velocity keyboard (MIDI)
       case 'noteOff': this.keyOff(m.n); break;
       case 'mode': if ('hold' in m) this.hold = !!m.hold; break;
+      case 'seq': Object.assign(this.seq, m.seq); break;
+      case 'run':
+        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; }
+        else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.port.postMessage({ type: 'step', i: -1 }); }
+        break;
       case 'panic': this.keys = []; this.gateOff(); break;
       case 'reset': this.vc = 0; this.s.fill(0); this.tl.fill(1); this.ve = 0; this.ltri = 0; break;
     }
@@ -179,6 +187,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
   keyOn(n, acc) {
     n += this.P.transpose * 12;
+    if (this.running) { this.root = n - 24; return; }   // a key played while the sequencer runs moves it to that note
     const legato = this.keys.length > 0 && this.gate;
     this.keys = this.keys.filter(k => k !== n); this.keys.push(n);
     const gm = this.P.glideMode;
@@ -187,6 +196,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
   }
   keyOff(n) {
     n += this.P.transpose * 12;
+    if (this.running) return;
     // Last-note priority: letting go of an older key while a newer one is held
     // changes nothing (no pitch move, no retrigger). Only releasing the sounding
     // key falls back to the newest key still held.
@@ -194,6 +204,22 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.keys = this.keys.filter(k => k !== n);
     if (this.keys.length) { if (!top) return; this.setPitch(this.keys[this.keys.length - 1] - 12, this.P.glideMode ? this.P.glide : 0); if (this.P.trig === 0) this.trigger(false); }
     else if (!this.hold) this.gateOff();
+  }
+
+  seqStep() {
+    const S = this.seq, len = Math.max(1, S.steps.length || 1);
+    if (this.stepIdx >= len) this.stepIdx = 0;
+    const i = this.stepIdx, st = S.steps[i] || { on: false }, dur = this.fs * 60 / S.bpm / 4;
+    this.nextStepAt += dur;
+    if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
+    else {
+      const n = (this.root >= 0 ? this.root : 36 + 12 * this.P.transpose) + 12 * (st.o | 0);
+      if (this.lastSlide && this.gate) this.setPitch(n, 0.06);
+      else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(false); }
+      this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
+    }
+    this.port.postMessage({ type: 'step', i });
+    this.stepIdx = (i + 1) % len;
   }
 
   process(inputs, outputs) {
@@ -209,6 +235,10 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const eR = 1 - Math.exp(-dt / (P.rel / (4 * CE_NOM) * C.ce));
 
     for (let j = 0; j < n; j++) {
+      if (this.running) {
+        if (this.t >= this.nextStepAt) this.seqStep();
+        if (this.gateOffAt >= 0 && this.t >= this.gateOffAt) { this.gateOff(); this.gateOffAt = -1; }
+      }
       this.t++;
       if ((this.t & 7) === 0) { for (const k in sm) sm[k] += ((k in P ? P[k] : C[k]) - sm[k]) * smc; }
 
