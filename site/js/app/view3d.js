@@ -1061,11 +1061,21 @@ function frame() {
   const sig = printSigNow(); if (sig !== printSig) { printSig = sig; printDirty = true; }
   if (printDirty) { printDirty = false; repaintPrint(); dirty = true; }
   if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; dirty = true; }
-  if (dirty || drawn < 3) { renderer.render(scene, camera); dirty = false; if (drawn < 3) drawn++; }
-  if (drawn === 3) { drawn = 4; window.shyoySplash && window.shyoySplash.done(); }
+  if (drawn < WARM) renderer.shadowMap.needsUpdate = true;
+  if (dirty || drawn < WARM) { renderer.render(scene, camera); dirty = false; if (drawn < WARM) drawn++; }
+  if (drawn === WARM) { drawn = WARM + 1; window.shyoySplash && window.shyoySplash.done(); }
   requestAnimationFrame(frame);
 }
 applyLook(); printDirty = shadowDirty = dirty = true;
+// v0.42.3 (Johnny: "some models come in without top parts while materializing"): every shader is built (in parallel
+// where the browser can) and every texture sent to the GPU before the first frame, and the splash stays up for a few
+// more frames, so the panel is whole when it shows rather than filling in as the GPU catches up
+const WARM = 8;
+try {
+  repaintPrint();
+  scene.traverse((o) => { for (const m of [].concat(o.material || [])) for (const k of ['map', 'bumpMap', 'roughnessMap', 'alphaMap']) if (m[k]) renderer.initTexture(m[k]); });
+  await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 4000))]);
+} catch (e) { console.warn('3D warm-up', e); }
 requestAnimationFrame(frame);
 
 window.shyoy3d = {
