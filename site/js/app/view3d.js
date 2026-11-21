@@ -103,7 +103,7 @@ const BOXES = [
   { r: 3, c: 0, s: 18, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
 ];
 let seqGrid = null;
-const SEQ_ROWS = [['o', 1, '2'], ['o', 0, '1'], ['o', -1, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
+const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters

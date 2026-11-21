@@ -81,13 +81,13 @@ console.log('key priority ok');
 
 // v0.42.0: the octave sequencer steps on time, plays C in each step's octave, rests on off steps, follows a played key
 {
-  const [p, send] = make(), steps = [{ on: true, o: 0 }, { on: true, o: 1 }, { on: false, o: 0 }, { on: true, o: -1 }];
+  const [p, send] = make(), steps = [{ on: true, o: 0 }, { on: true, o: 1 }, { on: false, o: 0 }, { on: true, o: 2 }];
   send({ type: 'seq', seq: { steps, bpm: 120 } }); send({ type: 'run', on: true });
   const at = []; render(p, 0.03); for (let k = 0; k < 4; k++) { at.push([p.pitchT, p.gate]); render(p, 0.125); }
   assert.equal(at[1][0] - at[0][0], 12, 'step 2 should be an octave above step 1');
   assert.equal(at[2][1], false, 'an off step rests');
   send({ type: 'noteOn', n: 62 }); render(p, 0.25);
-  assert.equal(p.root, 62 + 12 * p.P.transpose - 24, 'a key played while running moves the root');
+  assert.equal(p.root, 62 + 12 * p.P.transpose - 12, 'a key played while running moves the root');
   send({ type: 'run', on: false }); assert.equal(p.gate, false);
 }
 console.log('sequencer ok');

@@ -109,7 +109,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.keys = [];
     this.hold = false;   // MIDI sustain: the gate stays open after the last key is let go
     // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): 16 steps, each { on, o: -1/0/+1, s: slide }.
-    // Every step plays one note (C, or the last key played while it runs), in its own octave; a slide step glides into the next.
+    // Every step plays one note (C3, or the last key played while it runs), or 1 or 2 octaves above it; a slide step glides into the next.
     this.seq = { steps: [], bpm: 120 }; this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.root = -1;
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
@@ -187,7 +187,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
   keyOn(n, acc) {
     n += this.P.transpose * 12;
-    if (this.running) { this.root = n - 24; return; }   // a key played while the sequencer runs moves it to that note
+    if (this.running) { this.root = n - 12; return; }   // a key played while the sequencer runs moves it to that note (the note the key plays)
     const legato = this.keys.length > 0 && this.gate;
     this.keys = this.keys.filter(k => k !== n); this.keys.push(n);
     const gm = this.P.glideMode;
@@ -213,7 +213,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.nextStepAt += dur;
     if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else {
-      const n = (this.root >= 0 ? this.root : 36 + 12 * this.P.transpose) + 12 * (st.o | 0);
+      const n = (this.root >= 0 ? this.root : 36 + 12 * this.P.transpose) + 12 * Math.max(0, Math.min(2, st.o | 0));   // v0.42.2: octave 0 = the current note, 1 and 2 above it
       if (this.lastSlide && this.gate) { this.setPitch(n, 0.06); this.accOn = st.a ? 1 : 0; }
       else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(!!st.a); }
       this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
