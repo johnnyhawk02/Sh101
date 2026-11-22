@@ -508,7 +508,7 @@ function makeSeqGrid() {
     // v0.43.5 (Johnny): each lane's grab bar, at the end of its last step; drag it to set the lane's length
     for (const [k, r0, n] of SEQ_LANE_ROWS) {
       const ly = G.rowY(r0), bx = Math.min(G.w - 2, state.seq.len[k] * cw), y = ly + 2, h = n * rh - 4;
-      x.fillStyle = SPOT; x.fillRect(0, ly - 3.5, G.w, 2.5);   // the lane's spot-colour strip
+      x.fillStyle = SPOT; x.fillRect(0, ly - 3.5, bx + 1.5, 2.5);   // the lane's spot-colour strip, from step 1 to its length bar (v0.43.7)
       x.fillRect(bx - 1.5, y, 3, h); x.fillRect(bx - 4, y + h / 2 - 7, 8, 14);
       x.fillStyle = inkOf(ink); x.fillRect(bx - 2, y + h / 2 - 3, 4, 1); x.fillRect(bx - 2, y + h / 2, 4, 1); x.fillRect(bx - 2, y + h / 2 + 3, 4, 1);
     }
