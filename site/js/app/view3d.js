@@ -767,7 +767,7 @@ const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((
 const tp = sheet('TAPER');
 tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="240" height="160" style="display:block;width:240px;height:160px;margin:6px 0 10px"></canvas>
   <div class="row" style="font-size:10px;letter-spacing:.08em"><b>ANTI</b><input type="range" min="-100" max="100" id="tp-r" aria-label="Taper, anti-log through linear to log" list="tp-mid"><datalist id="tp-mid"><option value="0"></datalist><b>LOG</b><b class="val" id="tp-v"></b></div></div>
-  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button></div>`;
+  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
 let tpId = null;
 const tpDraw = () => {
   const id = tpId, c = tp.body.querySelector('#tp-cv'), x = c.getContext('2d'), w = c.width, h = c.height, ink = curInk;
@@ -782,6 +782,11 @@ const tpSet = (v) => { taper[tpId] = Math.round(v); try { localStorage.setItem(T
 tp.body.querySelector('#tp-r').oninput = (e) => tpSet(+e.target.value);
 tp.body.querySelector('#tp-lin').onclick = () => tpSet(0);
 tp.body.querySelector('#tp-def').onclick = () => tpSet(TAPER0[tpId] || 0);
+// v0.45.2 (Johnny: "a copy button to give you defaults"): every slider's taper (non-zero ones) as JSON, to paste back to
+// Claude to become TAPER0
+tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(Object.fromEntries(Object.entries(taper).filter(([, v]) => v)));
+  try { await navigator.clipboard.writeText(t); b.textContent = 'COPIED'; } catch (er) { prompt('Copy the tapers', t); }
+  setTimeout(() => { b.textContent = 'COPY ALL TAPERS'; }, 1500); };
 function openTaper(id) { tpId = id; tpDraw(); tp.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
