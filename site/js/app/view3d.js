@@ -93,11 +93,30 @@ const toX = (id, v) => ENV_IDS[id] ? 0.002 * Math.pow(5000, v) : v;
 const fromX = (id, x) => ENV_IDS[id] ? Math.log(Math.max(0.002, x) / 0.002) / Math.log(5000) : x;
 const segOf = (id) => Array.isArray(taper[id]) && taper[id].length >= 2 ? taper[id] : null;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+// v0.45.7 (Johnny: "can you smooth out the points? or a bezier curve?"): a smooth curve through the points, a monotone cubic
+// (Fritsch-Carlson), so it never turns back on itself and passes through every point
+function monoTan(P) {
+  const n = P.length, d = [], m = new Array(n).fill(0);
+  for (let k = 0; k < n - 1; k++) d.push((P[k + 1][1] - P[k][1]) / Math.max(1e-9, P[k + 1][0] - P[k][0]));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let k = 1; k < n - 1; k++) m[k] = d[k - 1] * d[k] <= 0 ? 0 : (d[k - 1] + d[k]) / 2;
+  for (let k = 0; k < n - 1; k++) {
+    if (d[k] === 0) { m[k] = m[k + 1] = 0; continue; }
+    const a = m[k] / d[k], b = m[k + 1] / d[k], h = a * a + b * b; if (h > 9) { const t = 3 / Math.sqrt(h); m[k] = t * a * d[k]; m[k + 1] = t * b * d[k]; }
+  }
+  return m;
+}
+const segX = (P, u) => {
+  let i = 0; while (i < P.length - 2 && u > P[i + 1][0]) i++;
+  const [u0, x0] = P[i], [u1, x1] = P[i + 1], hh = Math.max(1e-9, u1 - u0), t = clamp01((u - u0) / hh), m = monoTan(P);
+  const t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * x0 + (t3 - 2 * t2 + t) * hh * m[i] + (-2 * t3 + 3 * t2) * x1 + (t3 - t2) * hh * m[i + 1];
+};
 const valOf = (id, u) => { u = clamp01(u); const P = segOf(id);
-  if (P) { let i = 0; while (i < P.length - 2 && u > P[i + 1][0]) i++; const [u0, x0] = P[i], [u1, x1] = P[i + 1]; return clamp01(fromX(id, x0 + (x1 - x0) * (u1 > u0 ? (u - u0) / (u1 - u0) : 0))); }
+  if (P) return clamp01(fromX(id, segX(P, u)));
   const k = taperK(id); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
 const posOf = (id, v) => { v = clamp01(v); const P = segOf(id);
-  if (P) { const x = toX(id, v); let i = 0; while (i < P.length - 2 && x > P[i + 1][1]) i++; const [u0, x0] = P[i], [u1, x1] = P[i + 1]; return clamp01(u0 + (u1 - u0) * (x1 !== x0 ? (x - x0) / (x1 - x0) : 0)); }
+  if (P) { const x = toX(id, v); let lo = 0, hi = 1; for (let j = 0; j < 30; j++) { const mid = (lo + hi) / 2; if (segX(P, mid) < x) lo = mid; else hi = mid; } return (lo + hi) / 2; }
   const k = taperK(id); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
