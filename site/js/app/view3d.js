@@ -104,6 +104,7 @@ const BOXES = [
   { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
 ];
 let seqGrid = null;
+const SEQ_LANE_ROWS = [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]];   // lane, first row, rows
 const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
 
@@ -434,7 +435,7 @@ for (const b of BOXES) {
       // top half for one more and the bottom half for one fewer. The octave lane's box sits across its three rows
       const rh = seqGrid.rowH, nx = gx + gw + 10;
       prints.push((x, ink) => { x.fillStyle = ink; text(x, 'LEN', nx + 15, gy - 6, 9, 'center'); text(x, 'RETRIG', nx + 54, gy - 6, 9, 'center'); });
-      [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]].forEach(([k, r0, n]) => {
+      SEQ_LANE_ROWS.forEach(([k, r0, n]) => {
         const by = gy + r0 * rh + (n * rh - (rh - 3)) / 2, bh = rh - 3;
         if (n > 1) prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(nx - 5, gy + r0 * rh + 4, 1.2, n * rh - 8); });
         const d = makeDisplay(nx, by, 30, bh, () => String(state.seq.len[k]), { tag: 'len:' + k });
@@ -498,6 +499,12 @@ function makeSeqGrid() {
       });
       if (i % 4 === 3 && i < SEQ_N - 1) { x.fillStyle = tone(0.55); x.fillRect(cx + cw - 0.75, 0, 1.5, G.h); }
     }
+    // v0.43.5 (Johnny): each lane's grab bar, at the end of its last step; drag it to set the lane's length
+    for (const [k, r0, n] of SEQ_LANE_ROWS) {
+      const bx = Math.min(G.w - 2, state.seq.len[k] * cw), y = r0 * rh + 2, h = n * rh - 4;
+      x.fillStyle = ink; x.fillRect(bx - 1.5, y, 3, h); x.fillRect(bx - 4, y + h / 2 - 7, 8, 14);
+      x.fillStyle = inkOf(ink); x.fillRect(bx - 2, y + h / 2 - 3, 4, 1); x.fillRect(bx - 2, y + h / 2, 4, 1); x.fillRect(bx - 2, y + h / 2 + 3, 4, 1);
+    }
     tex.needsUpdate = true; return true;
   };
   const at = (p) => { if (!p || p[0] < G.x || p[0] >= G.x + G.w || p[1] < G.y || p[1] >= G.y + G.h) return null;
@@ -509,11 +516,17 @@ function makeSeqGrid() {
     else { const want = paint ? paint.v : !st[t]; if (paint && paint.t !== t) return; if (!!st[t] === want) return; st[t] = want; }
     seqSend();
   };
-  let paint = null;
-  addCtl({ kind: 'roll', rect: [G.x, G.y, G.w, G.h], sync: draw,
-    down(p) { const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
-    move(p) { const h = at(p); if (h && paint) apply(h, paint); },
-    up() { paint = null; } });
+  let paint = null, lenDrag = null;
+  // a press near a lane's grab bar takes the bar, not the cell under it
+  const barAt = (p) => { if (!p) return null; const ri = Math.floor((p[1] - G.y) / G.rowH);
+    const ln = SEQ_LANE_ROWS.find(([, r0, n]) => ri >= r0 && ri < r0 + n); if (!ln) return null;
+    const bx = G.x + state.seq.len[ln[0]] * G.colW; return Math.abs(p[0] - bx) <= 7 ? ln[0] : null; };
+  addCtl({ kind: 'roll', rect: [G.x, G.y, G.w + 8, G.h], sync: draw,
+    down(p) { const k = barAt(p); if (k) { lenDrag = k; return; }
+      const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
+    move(p) { if (lenDrag) { if (p) seqLen(lenDrag, Math.round((p[0] - G.x) / G.colW)); return; }
+      const h = at(p); if (h && paint) apply(h, paint); },
+    up() { paint = null; lenDrag = null; } });
 }
 // the title: Johnny's logo, printed; tapping it opens OPTIONS. Under it, the page keys (on both pages)
 buildPage = 'all'; grp = scene; prints = printsBy.all;
