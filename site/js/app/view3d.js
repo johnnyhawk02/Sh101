@@ -11,7 +11,8 @@ import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
 const C = 62, R = 150, M = 24, COLS = 18, ROWS = 4;
-const W = COLS * C + 2 * M, H = ROWS * R + 2 * M;
+const SEQ_TOOLS = 40;   // v0.42.4: the strip of keys under the sequencer's grid
+const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
 const root = document.documentElement;
@@ -100,7 +101,7 @@ const BOXES = [
   { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
   { r: ROW_BENDER, c: 11, s: 7, n: 'PRESET', it: [{ t: 'preset', w: 7 }] },
   // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
-  { r: 3, c: 0, s: 18, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
+  { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
 ];
 let seqGrid = null;
 const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
@@ -371,7 +372,7 @@ const labelAt = (getText, cx, ly, opts = {}) => prints.push((x, ink) => {
 const inkOf = (ink) => ink === '#000000' ? '#ffffff' : '#000000';
 
 for (const b of BOXES) {
-  const y0 = rowY(b), bx = M + b.c * C + 6, by = y0 + 12, bw = b.s * C - 12, bh = R - 12;
+  const y0 = rowY(b), bx = M + b.c * C + 6, by = y0 + 12, bw = b.s * C - 12, bh = (b.h || R) - 12;
   px.font = `400 13px ${DISPLAY}`; if ('letterSpacing' in px) px.letterSpacing = '.6px';
   const tagW = px.measureText(b.n).width + 16;
   BOXR.push({ page: 'synth', n: b.n, bx, by, bw, bh });
@@ -429,6 +430,20 @@ for (const b of BOXES) {
         prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 8, yy + 0.5, 9.5, 'right'); }); });
       for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, ly);
       makeSeqGrid();
+      // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
+      // slides and octaves
+      const ty = y0 + R + 10, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)],
+        ['RANDOM GATES', 'rndOn', () => seqRandom('on')], ['RANDOM ACC', 'rndA', () => seqRandom('a')],
+        ['RANDOM SLIDES', 'rndS', () => seqRandom('s')], ['RANDOM OCTAVES', 'rndO', () => seqRandom('o')]];
+      let tx = gx + 12;
+      TK.forEach(([label, tag, press], k) => {
+        makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); press(); }, pad: 6, tag });
+        const tri = label === '◀' || label === '▶', lx = tx + 20;
+        prints.push((x, ink) => { x.fillStyle = ink;
+          if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
+          else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
+        tx += tri ? 62 : (gw - 2 * 62 - 24) / 4;
+      });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
       // steps and browser, and the sticker's randomise and undo

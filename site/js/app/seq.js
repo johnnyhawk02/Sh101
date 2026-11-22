@@ -12,6 +12,18 @@ const seqBpm = () => 120;
 const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm() } });
 function seqSend() { post(seqMsg()); save(); }
 async function seqRun(on = !seqOn) { await boot(); seqOn = on; if (!on) seqPos = -1; post(seqMsg()); post({ type: 'run', on }); }
+// v0.42.4 (Johnny): nudge the whole pattern a step (d -1 = left, 1 = right), and randomise one part of every step
+function seqNudge(d) { const S = state.seq.steps; if (d < 0) S.push(S.shift()); else S.unshift(S.pop()); seqSend(); }
+function seqRandom(k) {
+  const r = Math.random;
+  for (const st of state.seq.steps) {
+    if (k === 'on') st.on = r() < 0.7;
+    else if (k === 'a') st.a = r() < 0.25;
+    else if (k === 's') st.s = r() < 0.2;
+    else if (k === 'o') { const x = r(); st.o = x < 0.6 ? 0 : x < 0.88 ? 1 : 2; }
+  }
+  seqSend();
+}
 function seqStepSet(i, k, v) { const st = state.seq.steps[i]; st[k] = v; seqSend(); }
 // the space bar starts and stops it
 window.addEventListener('keydown', (e) => {
