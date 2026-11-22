@@ -514,7 +514,10 @@ const logoWears = Object.fromEntries(['synth'].map((p) => { const t = wearOf(p).
 const logoWear = logoWears[page];
 const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
-logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
+// v0.44.2 (Johnny: "shyoy needs to float a bit higher off the grey plane"): 10 units up, casting a shadow of the letters
+// (not of its square: the shadow pass cuts by the logo's alpha)
+logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 10)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; logoLayer.castShadow = true;
+logoMat.shadowSide = THREE.DoubleSide; logoMat.alphaTest = 0.04; scene.add(logoLayer);   // the shadow pass copies map + alphaTest, so it casts the letters
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
     const lw = 262, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
@@ -528,7 +531,7 @@ prints.push((x, ink) => {
     const wv = pc2.getImageData(0, 0, patch.width, patch.height).data, img = lx2.getImageData(0, 0, logoCv.width, logoCv.height), d = img.data;
     for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const v = wv[i]; const f = Math.max(0, Math.min(1, (v - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i + 3] *= f + (1 - f) * look.ocd; }
     lx2.putImageData(img, 0, 0);
-    logoTex.needsUpdate = true;
+    logoTex.needsUpdate = true; shadowDirty = true;   // v0.44.2: the logo casts a shadow
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
   x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 122, 10, 'right');
 });
@@ -543,9 +546,9 @@ const wobbleLogo = () => { const U = (a, b) => a + Math.random() * (b - a), sg =
     fx: U(10, 24), fy: U(8, 20), fz: U(12, 28), px: U(0, 6.3), py: U(0, 6.3), pz: U(0, 6.3), k: U(1.8, 3.6), lift: U(25, 70) }); dirty = true; };
 function logoWobbleStep(now) {
   const w = logoWob, t = (now - w.t0) / 1000, e = Math.exp(-t * w.k) * (1 - Math.exp(-t * 25));   // eases in over ~0.1 s, then dies away
-  if (t > 0.3 && e < 0.01 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; w.t0 = -1; dirty = true; return; }
+  if (t > 0.3 && e < 0.01 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; w.t0 = -1; shadowDirty = dirty = true; return; }
   logoLayer.rotation.set(Math.sin(t * w.fx + w.px) * w.ax * e, Math.sin(t * w.fy + w.py) * w.ay * e, Math.sin(t * w.fz + w.pz) * w.az * e);
-  logoLayer.position.z = LOGO_Z + w.lift * e; dirty = true;
+  logoLayer.position.z = LOGO_Z + w.lift * e; shadowDirty = dirty = true;
 }
 const logoClick = (ev) => {
   if (ev && (ev.metaKey || ev.ctrlKey)) return openOptions3d();
