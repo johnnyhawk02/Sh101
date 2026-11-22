@@ -53,7 +53,7 @@ const BOXES = [
   { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
   { r: ROW_BENDER, c: 11, s: 7, n: 'PRESET', it: [{ t: 'preset', w: 7 }] },
   // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
-  { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
+  { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'grid', w: 18 }] },   // v0.49.0: PLAY moved under the grid
 ];
 let seqGrid = null;
 const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's highlights)
@@ -431,15 +431,10 @@ for (const b of BOXES) {
       };
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
-    } else if (it.t === 'seqrun') {
-      // v0.47.0: PLAY beside the grid (RECORD and the NOTES window moved under the grid in v0.48.0)
-      const gy = y0 + 28, sx = cx;
-      makeKey(sx, gy + 22, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 10, tag: 'play' });
-      labelAt(() => 'PLAY', sx, gy + 46);
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx0 = M + b.c * C + col * spread * C + 40, gx = gx0 + 30, gw = w * spread * C - 52 - 52, gy = y0 + 28, gh = SEQ_GH;
+      const gx0 = M + b.c * C + col * spread * C + 80, gx = gx0 + 30, gw = w * spread * C - 52 - 52 - 40, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
       const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
@@ -453,25 +448,28 @@ for (const b of BOXES) {
       makeSeqGrid();
       // v0.45.9 (Johnny's sketch): each lane's RETRIG tick (v0.43.1) is a tab on the top-left corner of its loop frame (makeSeqGrid)
       // v0.48.0 (Johnny: "make all the seq randomiser into a menu - have shortkeys for them"; "the new note seq can go on the LHS under
-      // the gate seq"): under the grid, left to right: the note sequencer (RECORD and its NOTES window), nudge ◀ ▶ (v0.42.4), and
-      // one RANDOM key that opens the randomiser menu (seqMenu below; its shortcuts are in seq.js SEQ_RND)
-      const ty = y0 + 28 + SEQ_GH + 34, kl = (kx, label) => prints.push((x, ink) => { x.fillStyle = ink; text(x, label, kx + 20, ty + 0.5, 10.5, 'left'); });
-      let tx = gx + 12;
-      makeKey(tx, ty, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 6, tag: 'rec' }); kl(tx, 'RECORD');
-      const dw = 6 * C, dx = tx + 86;
+      // the gate seq"); v0.49.0 (Johnny: "bring play down into the bottom section - also use icons"): under the grid, left to right:
+      // PLAY ▶ and RECORD ●, the NOTES window, nudge ← →, and the dice key that opens the RANDOM menu (seqMenu; shortcuts in seq.js SEQ_RND)
+      const ty = y0 + 28 + SEQ_GH + 34;
+      const icon = (kx, draw) => prints.push((x, ink) => { x.fillStyle = ink; x.strokeStyle = ink; x.lineWidth = 1.6; x.lineJoin = x.lineCap = 'round'; x.beginPath(); draw(x, kx + 26, ty); });
+      const play = (x, ix, iy) => { x.moveTo(ix - 4, iy - 6.5); x.lineTo(ix + 6.5, iy); x.lineTo(ix - 4, iy + 6.5); x.closePath(); x.fill(); };
+      const rec = (x, ix, iy) => { x.arc(ix + 1, iy, 5.5, 0, 7); x.fill(); };
+      const arrow = (d) => (x, ix, iy) => { x.moveTo(ix - 6 * d, iy); x.lineTo(ix + 6 * d, iy); x.moveTo(ix + 1.5 * d, iy - 4.5); x.lineTo(ix + 6 * d, iy); x.lineTo(ix + 1.5 * d, iy + 4.5); x.stroke(); };
+      const dice = (x, ix, iy) => { x.lineWidth = 1.4; x.roundRect ? x.roundRect(ix - 6, iy - 6, 12, 12, 2.5) : x.rect(ix - 6, iy - 6, 12, 12); x.stroke();
+        for (const [a, c] of [[-3, -3], [0, 0], [3, 3]]) { x.beginPath(); x.arc(ix + a, iy + c, 1.25, 0, 7); x.fill(); } };
+      let tx = gx0 - 50;
+      makeKey(tx, ty, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 6, tag: 'play' }); icon(tx, play); tx += 56;
+      makeKey(tx, ty, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 6, tag: 'rec' }); icon(tx, rec);
+      const dw = 6 * C, dx = tx + 50;
       makeDisplay(dx, ty - 12, dw, 24, () => { const N = state.seq.notes, c = N.length, nm = (a) => a.map(noteName).join(' ');
         if (seqRec) return c ? 'REC ' + nm(N.slice(-9)) : 'REC - PLAY SOME KEYS';
         if (!c) return 'NO NOTES - PRESS RECORD';
         const at = seqOn && seqNoteAt >= 0 ? seqNoteAt : -1;
         return (at >= 0 ? `${at + 1}/${c} ` : `${c} NOTES `) + nm(at >= 0 ? N.slice(at, at + 9) : N.slice(0, 9)); });
       tx = dx + dw + 30;
-      for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) {
-        makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); const lx = tx + 24;
-        prints.push((x, ink) => { x.fillStyle = ink; x.beginPath(); x.moveTo(lx + d * 5, ty); x.lineTo(lx - d * 5, ty - 6); x.lineTo(lx - d * 5, ty + 6); x.closePath(); x.fill(); });
-        tx += 62;
-      }
-      const rx = gx + gw - 92;
-      makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); kl(rx, 'RANDOM…');
+      for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) { makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); icon(tx, arrow(d)); tx += 56; }
+      const rx = gx + gw - 30;
+      makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); icon(rx, dice);
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
       // steps and browser, and the randomiser (rand.js) and its undo
