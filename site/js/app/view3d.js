@@ -77,9 +77,10 @@ const knobBase = knobVal;
 const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50 };
 const taper = { ...TAPER0 };
 try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
-const taperK = (id) => Math.max(0, Math.min(100, taper[id] || 0)) / 20;
-const valOf = (id, u) => { const k = taperK(id); u = Math.max(0, Math.min(1, u)); return k < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
-const posOf = (id, v) => { const k = taperK(id); v = Math.max(0, Math.min(1, v)); return k < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
+// v0.45.1 (Johnny: "the decay could do with a curve that bulges the opposite"): -100 .. 100, below 0 bends the other way (anti-log)
+const taperK = (id) => Math.max(-100, Math.min(100, taper[id] || 0)) / 20;
+const valOf = (id, u) => { const k = taperK(id); u = Math.max(0, Math.min(1, u)); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
+const posOf = (id, v) => { const k = taperK(id); v = Math.max(0, Math.min(1, v)); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
@@ -765,7 +766,7 @@ function openOptions3d() { opt.open(); }
 const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((it) => it.t === 'knob').map((it) => [it.id, b.n + ' ' + it.label])));
 const tp = sheet('TAPER');
 tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="240" height="160" style="display:block;width:240px;height:160px;margin:6px 0 10px"></canvas>
-  <div class="row" style="font-size:10px;letter-spacing:.08em"><b>LIN</b><input type="range" min="0" max="100" id="tp-r" aria-label="Taper, linear to logarithmic"><b>LOG</b><b class="val" id="tp-v"></b></div></div>
+  <div class="row" style="font-size:10px;letter-spacing:.08em"><b>ANTI</b><input type="range" min="-100" max="100" id="tp-r" aria-label="Taper, anti-log through linear to log" list="tp-mid"><datalist id="tp-mid"><option value="0"></datalist><b>LOG</b><b class="val" id="tp-v"></b></div></div>
   <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button></div>`;
 let tpId = null;
 const tpDraw = () => {
