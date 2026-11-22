@@ -74,13 +74,22 @@ const knobBase = knobVal;
 // a taper, 0 (linear) to 100 (strongly logarithmic, like an audio-taper pot): the value is (e^(k u) - 1) / (e^k - 1) of
 // the cap's position u, k = taper / 20. Right-click (or Ctrl-click) a slider for its TAPER pop-up. Kept in this browser
 // (shyoy.taper), not in presets. The mixer and the VCA level start as log pots, as on a real panel.
-const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: -60, release: -80 };   // v0.45.3: decay anti-log (Johnny: 2-40 ms took 40% of the slider; now about 13%, 0.4 s at 30%, 2 s half-way); v0.45.4: release more so (Johnny: not much release until 70% up), 0.24 s at 20%, 0.86 s at 30%, 3.6 s half-way
+const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: 'S', release: 'S' };   // v0.45.3-4 decay/release anti-log, v0.45.5 the 'S' curve (below)
 const taper = { ...TAPER0 };
 try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
+// v0.45.5: Johnny asked for the new decay/release curve, so it replaces whatever this browser had kept for those two, once
+try { if (localStorage.getItem('shyoy.taperv') !== '2') { taper.decay = taper.release = 'S'; localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '2'); } } catch (e) {}
 // v0.45.1 (Johnny: "the decay could do with a curve that bulges the opposite"): -100 .. 100, below 0 bends the other way (anti-log)
-const taperK = (id) => Math.max(-100, Math.min(100, taper[id] || 0)) / 20;
-const valOf = (id, u) => { const k = taperK(id); u = Math.max(0, Math.min(1, u)); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
-const posOf = (id, v) => { const k = taperK(id); v = Math.max(0, Math.min(1, v)); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
+const taperK = (id) => Math.max(-100, Math.min(100, +taper[id] || 0)) / 20;
+// v0.45.5 (Johnny: "we dont have to limit ourselves to realist pots, what about linear from 10s to 60ms over 95% of the travel
+// then down to 2ms in the last bit"): taper 'S', for the env times (0.002 * 5000^v s): the bottom 5% of travel runs 2 ms -> 60 ms
+// (evenly in log time), the rest 60 ms -> 10 s evenly in seconds
+const S_LO = 0.05, S_T = [0.002, 0.06, 10], S_V = (t) => Math.log(t / 0.002) / Math.log(5000);
+const sVal = (u) => S_V(u < S_LO ? S_T[0] * Math.pow(S_T[1] / S_T[0], u / S_LO) : S_T[1] + (u - S_LO) / (1 - S_LO) * (S_T[2] - S_T[1]));
+const sPos = (v) => { const t = 0.002 * Math.pow(5000, v); return t < S_T[1] ? S_LO * Math.log(t / S_T[0]) / Math.log(S_T[1] / S_T[0]) : S_LO + (1 - S_LO) * (t - S_T[1]) / (S_T[2] - S_T[1]); };
+const S_OK = (id) => id === 'decay' || id === 'release';
+const valOf = (id, u) => { const k = taperK(id); u = Math.max(0, Math.min(1, u)); if (taper[id] === 'S' && S_OK(id)) return Math.max(0, Math.min(1, sVal(u))); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
+const posOf = (id, v) => { const k = taperK(id); v = Math.max(0, Math.min(1, v)); if (taper[id] === 'S' && S_OK(id)) return Math.max(0, Math.min(1, sPos(v))); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
@@ -767,7 +776,7 @@ const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((
 const tp = sheet('TAPER');
 tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="240" height="160" style="display:block;width:240px;height:160px;margin:6px 0 10px"></canvas>
   <div class="row" style="font-size:10px;letter-spacing:.08em"><b>ANTI</b><input type="range" min="-100" max="100" id="tp-r" aria-label="Taper, anti-log through linear to log" list="tp-mid"><datalist id="tp-mid"><option value="0"></datalist><b>LOG</b><b class="val" id="tp-v"></b></div></div>
-  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
+  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button><button id="tp-s">LIN 60MS-10S</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
 let tpId = null;
 const tpDraw = () => {
   const id = tpId, c = tp.body.querySelector('#tp-cv'), x = c.getContext('2d'), w = c.width, h = c.height, ink = curInk;
@@ -775,13 +784,15 @@ const tpDraw = () => {
   x.beginPath(); x.moveTo(0, h); x.lineTo(w, 0); x.stroke(); x.globalAlpha = 1; x.lineWidth = 2.5; x.beginPath();
   for (let i = 0; i <= 60; i++) { const u = i / 60; x.lineTo(u * w, h - valOf(id, u) * h); } x.stroke();
   const u = posOf(id, knobVal(id)); x.fillStyle = ink; x.beginPath(); x.arc(u * w, h - knobVal(id) * h, 4, 0, 7); x.fill();
-  tp.body.querySelector('#tp-r').value = taper[id] || 0; tp.body.querySelector('#tp-v').textContent = taper[id] || 0;
+  tp.body.querySelector('#tp-r').value = +taper[id] || 0; tp.body.querySelector('#tp-v').textContent = taper[id] === 'S' ? 'LIN 60MS' : (taper[id] || 0);
+  const sb = tp.body.querySelector('#tp-s'); sb.hidden = !S_OK(id); sb.classList.toggle('lit', taper[id] === 'S');
   tp.body.querySelector('#tp-name').textContent = (KNOB_NAMES[id] || id).toUpperCase();
 };
-const tpSet = (v) => { taper[tpId] = Math.round(v); try { localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); } catch (e) {} for (const k of knobs) k.shown = null; dirty = true; tpDraw(); };
+const tpSet = (v) => { taper[tpId] = v === 'S' ? 'S' : Math.round(v); try { localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); } catch (e) {} for (const k of knobs) k.shown = null; dirty = true; tpDraw(); };
 tp.body.querySelector('#tp-r').oninput = (e) => tpSet(+e.target.value);
 tp.body.querySelector('#tp-lin').onclick = () => tpSet(0);
 tp.body.querySelector('#tp-def').onclick = () => tpSet(TAPER0[tpId] || 0);
+tp.body.querySelector('#tp-s').onclick = () => tpSet('S');
 // v0.45.2 (Johnny: "a copy button to give you defaults"): every slider's taper (non-zero ones) as JSON, to paste back to
 // Claude to become TAPER0
 tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(Object.fromEntries(Object.entries(taper).filter(([, v]) => v)));
