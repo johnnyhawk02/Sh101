@@ -32,6 +32,8 @@ function seqLen(k, n) { n = Math.max(1, Math.min(SEQ_N - state.seq.st[k], n | 0)
 function seqStart(k, a) { const e = state.seq.st[k] + state.seq.len[k]; a = Math.max(0, Math.min(e - 1, a | 0)); if (a === state.seq.st[k]) return; state.seq.st[k] = a; state.seq.len[k] = e - a; seqSend(); }
 // v0.43.10: slide a lane's whole loop, keeping its length
 function seqShift(k, a) { a = Math.max(0, Math.min(SEQ_N - state.seq.len[k], a | 0)); if (a === state.seq.st[k]) return; state.seq.st[k] = a; seqSend(); }
+// v0.43.16 (Johnny: "a reset loops button to set them all to 16 steps")
+function seqResetLoops() { for (const l of SEQ_LANES) { state.seq.st[l] = 0; state.seq.len[l] = SEQ_N; } seqSend(); }
 function seqRandom(k) {
   const r = Math.random;
   if (k === 'all') { for (const l of SEQ_LANES) seqRandom(l); seqRandom('len'); seqRandom('rt'); return; }

@@ -1,7 +1,7 @@
 // Offline support (same approach as the 303 app). The app's own code (the page, css/, js/) is fetched fresh when online,
 // so an update arrives as one consistent set, and served from cache when not. Icons and fonts are
 // cache-first. The cache name carries the version; every file of the app is cached on install so it works offline at once.
-const CACHE = 'kestrel-0.43.15';
+const CACHE = 'kestrel-0.43.16';
 const APP = ['css/shyoy.css', 'js/dsp/engine.js',
   ...['fit', 'notips', 'defs', 'state', 'audio', 'controls', 'bend', 'strip', 'tabs', 'presets', 'namer', 'sounds', 'rand', 'seq', 'keyboard', 'options', 'midi', 'app', 'pocket', 'view3d'].map((n) => `js/app/${n}.js`), 'js/vendor/three.module.min.js', 'js/vendor/RoomEnvironment.js'];
 const CORE = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/logo.png', './textures/scuffs.jpg', './textures/dents.jpg', ...APP];

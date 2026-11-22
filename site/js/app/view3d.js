@@ -461,7 +461,7 @@ for (const b of BOXES) {
       // v0.43.3: RANDOM printed once before its keys: ALL, GATES, ACC, SLIDES, OCTAVES, LENGTH, RETRIG
       const ty = y0 + 28 + SEQ_GH + 34, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
         ['GATES', 'rndOn', () => seqRandom('on')], ['ACC', 'rndA', () => seqRandom('a')], ['SLIDES', 'rndS', () => seqRandom('s')],
-        ['OCTAVES', 'rndO', () => seqRandom('o')], ['LENGTH', 'rndLen', () => seqRandom('len')], ['RETRIG', 'rndRt', () => seqRandom('rt')]];
+        ['OCTAVES', 'rndO', () => seqRandom('o')], ['LENGTH', 'rndLen', () => seqRandom('len')], ['RETRIG', 'rndRt', () => seqRandom('rt')], ['RESET LOOPS', 'loopsReset', () => seqResetLoops()]];   // v0.43.16 (Johnny): every lane back to steps 1-16
       { const rx = gx + 12 + 2 * 62 + 4; prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(rx, ty - 9, 64, 18); x.fillStyle = inkOf(ink); text(x, 'RANDOM', rx + 32, ty + 0.5, 10.5); }); }
       let tx = gx + 12, first = true;
       TK.forEach(([label, tag, press], k) => {
@@ -470,7 +470,7 @@ for (const b of BOXES) {
         prints.push((x, ink) => { x.fillStyle = ink;
           if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
           else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
-        tx += tri ? 62 : (gw + 84 - 2 * 62 - 24 - 96) / 7; if (tri && label === '▶') tx += 96;
+        tx += tri ? 62 : (gw + 84 - 2 * 62 - 24 - 96 - 110) / 7; if (label === 'RETRIG') tx = gx + gw + 84 - 104; if (tri && label === '▶') tx += 96;
       });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
@@ -507,18 +507,21 @@ function makeSeqGrid() {
         if (t === 'o' ? (st.o | 0) === v : !!st[t]) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
         x.globalAlpha = 1;
       });
-      if (i % 4 === 3 && i < SEQ_N - 1) { x.fillStyle = tone(0.55); x.fillRect(cx + cw - 0.75, 0, 1.5, G.h); }
+      // v0.43.16: the bar-of-four dividers run only beside each lane, not through the gaps
+      if (i % 4 === 3 && i < SEQ_N - 1) { x.fillStyle = tone(0.55); for (const [, r0, n] of SEQ_LANE_ROWS) x.fillRect(cx + cw - 0.75, G.rowY(r0), 1.5, n * rh); }
     }
     const DC = look.barCol || dragAuto(), grip = lum(DC) > 0.4 ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)';
     // v0.43.5 (Johnny): each lane's grab bar, at the end of its last step; drag it to set the lane's length
     for (const [k, r0, n] of SEQ_LANE_ROWS) {
-      const ly = G.rowY(r0), ax = Math.max(2, state.seq.st[k] * cw), bx = Math.min(G.w - 2, (state.seq.st[k] + state.seq.len[k]) * cw), y = ly + 2, h = n * rh - 4;
-      x.strokeStyle = DC; x.lineWidth = 2; x.strokeRect(ax - 1, ly - 2.5, bx - ax, n * rh + 5);   // v0.43.8 (Johnny): a spot-colour box round the lane; v0.43.9: from its start bar to its length bar
-      // v0.43.10 (Johnny: "thicker draggable bars at the top"): a thick bar along the top of the box; drag it to move the loop, keeping its length
-      x.fillStyle = DC; x.fillRect(ax - 1, ly - 11, bx - ax, 8);
-      x.fillStyle = grip; for (let d = -6; d <= 6; d += 3) x.fillRect((ax + bx) / 2 + d - 0.5, ly - 9, 1, 4);
-      for (const gx of [ax, bx]) { const hx = Math.max(4, Math.min(G.w - 4, gx)); x.fillStyle = DC; x.fillRect(gx - 1.5, y, 3, h); x.fillRect(hx - 4, y + h / 2 - 7, 8, 14);
-        x.fillStyle = grip; x.fillRect(hx - 2, y + h / 2 - 3, 4, 1); x.fillRect(hx - 2, y + h / 2, 4, 1); x.fillRect(hx - 2, y + h / 2 + 3, 4, 1); }
+      // v0.43.16 (Johnny: "tidy this up"): one solid frame, drawn as filled strips so the corners join: the thick top bar, a side bar at each end
+      // centred on the cell boundary, a thin bottom edge; each side bar carries a grip handle centred on it
+      const ly = G.rowY(r0), a = state.seq.st[k] * cw, b = (state.seq.st[k] + state.seq.len[k]) * cw;
+      const L = Math.max(0, a - 1.5), R = Math.min(G.w, b + 1.5), top = ly - 11, bot = ly + n * rh + 3, mid = ly + n * rh / 2;
+      x.fillStyle = DC; x.fillRect(L, top, R - L, 8); x.fillRect(L, top, 3, bot - top); x.fillRect(R - 3, top, 3, bot - top); x.fillRect(L, bot - 2, R - L, 2);
+      x.fillStyle = grip; for (let d = -6; d <= 6; d += 3) x.fillRect((L + R) / 2 + d - 0.5, top + 2, 1, 4);
+      for (const sx of [L + 1.5, R - 1.5]) { const hx = Math.max(4.5, Math.min(G.w - 4.5, sx));
+        x.fillStyle = DC; x.fillRect(hx - 4.5, mid - 9, 9, 18);
+        x.fillStyle = grip; for (const d of [-4, 0, 4]) x.fillRect(hx - 2.5, mid + d - 0.5, 5, 1); }
     }
     tex.needsUpdate = true; return true;
   };
