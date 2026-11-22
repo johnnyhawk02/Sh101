@@ -637,9 +637,8 @@ function logoFace(g) {
 function logoWobbleStep(now) {
   const w = logoWob, t = (now - w.t0) / 1000, e = Math.exp(-t * w.k) * (1 - Math.exp(-t * 25));   // eases in over ~0.1 s, then dies away
   if (t > 0.3 && e < 0.01 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; w.t0 = -1; logoGrin = 0; logoFace(0); shadowDirty = dirty = true; return; }
-  logoGrin = Math.min(1, e * 1.6); logoFace(logoGrin);   // v0.51.0: the smiley grins while the word wobbles
-  logoLayer.rotation.set(Math.sin(t * w.fx + w.px) * w.ax * e, Math.sin(t * w.fy + w.py) * w.ay * e, Math.sin(t * w.fz + w.pz) * w.az * e);
-  logoLayer.position.z = LOGO_Z + w.lift * e; shadowDirty = dirty = true;
+  logoGrin = Math.min(1, e * 1.6); logoFace(logoGrin); shadowDirty = dirty = true;   // v0.51.0: the smiley grins
+  // v0.51.1 (Johnny: "stop the text animation, its just the smiley that animates"): the word no longer tips or lifts
 }
 const logoClick = (ev) => {
   if (ev && (ev.metaKey || ev.ctrlKey)) return openOptions3d();
