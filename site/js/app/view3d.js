@@ -18,62 +18,13 @@ const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thicknes
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
 const root = document.documentElement;
 
-// ---------------------------------------------------------------- look (Options): panel colour, lighting, finish, lens
-const LOOK_KEY = 'shyoy.look3d';
-// defaults (v0.41.1): Johnny's own look from 21 Nov 2026 (COPY LOOK) — grey matt panel, overhead light, longer lens
-const LOOK0 = { colour: '#b9bbb8', light: 'top', bright: 0.81, finish: 'matt', lens: 0.8, tilt: 7.6, ksize: 1.296, kstyle: 'chicken', knobAll: '', knobCol: {}, oddOn: false, oddK: 27, ocd: 0.28, stickers: ['smile'], stkOn: true, stk: { one: { y: 117 } }, lv: 2, room: 0.26,
-  lights: [{ col: '#ffffff', int: 1.8, az: 90, el: 31 }, { col: '#e6ecff', int: 0.4, az: 160, el: 35 }, { col: '#fff0dc', int: 0.35, az: 20, el: 35 }] };
-const look = { ...LOOK0, lights: LOOK0.lights.map((l) => ({ ...l })) };
-// saved looks (v0.32.0): four slots in OPTIONS. 1 = the default above, 2 = the cream satin look of v0.31.3 (Johnny);
-// 3 and 4 start empty. SAVE then a slot stores the current look there (localStorage shyoy.looks3d).
-const copyLook = (l) => JSON.parse(JSON.stringify(l));
-const LOOK_SLOTS0 = [copyLook(LOOK0), { colour: '#e4e2da', light: 'studio', bright: 1, finish: 'satin', lens: 0.4, tilt: 0, ksize: 1, lv: 2,
-  lights: [{ col: '#ffffff', int: 1.7, az: 129, el: 55 }, { col: '#cfdcff', int: 0.35, az: 309, el: 30 }, { col: '#ffe2c0', int: 0.25, az: 39, el: 12 }] },
-  // factory LOOK 3 (v0.32.8, Johnny's screenshot): black panel, metal, warm peach side light
-  { colour: '#202122', light: 'studio', bright: 0.8, finish: 'metal', lens: Math.log(14 / 6) / Math.log(8), tilt: 2.1, ksize: 1.12, ocd: 0, stickers: ['smile'], lv: 2,
-    lights: [{ col: '#ffffff', int: 1.2, az: 129, el: 68 }, { col: '#d0dcfe', int: 0.2, az: 309, el: 55 }, { col: '#fee2c2', int: 1.38, az: 39, el: 43 }] }, null];
-const LOOKS_KEY = 'shyoy.looks3d';
-let lookSlots = LOOK_SLOTS0.map((l) => l && copyLook(l));
-try { const st = JSON.parse(localStorage.getItem(LOOKS_KEY) || 'null'); if (Array.isArray(st) && st.length === 4) lookSlots = st.map((l, i) => l || (LOOK_SLOTS0[i] && copyLook(LOOK_SLOTS0[i]))); } catch (e) {}
-const saveSlots = () => { try { localStorage.setItem(LOOKS_KEY, JSON.stringify(lookSlots)); } catch (e) {} };
-let lookSaving = false;
-try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
-if (typeof look.tilt !== 'number') look.tilt = LOOK0.tilt;
-if (typeof look.ksize !== 'number') look.ksize = LOOK0.ksize;
-if (typeof look.kstyle !== 'string') look.kstyle = 'yamaha';
-if (typeof look.oddOn !== 'boolean') look.oddOn = true; if (typeof look.oddK !== 'number') look.oddK = -1;   // -1 = the cutoff
-delete look.boxCol;   // v0.35.0's section backgrounds, dropped (Johnny meant knob colours)
-if (!look.knobCol || typeof look.knobCol !== 'object') look.knobCol = {};
-if (typeof look.knobAll !== 'string') look.knobAll = '';
-if (typeof look.barCol !== 'string') look.barCol = '';   // v0.43.12 (Johnny): the sequencer's drag areas colour ('' = the spot red)
-// v0.33.4 (Johnny): KNOB SIZE runs 0-100 over the real scale 0.9-1.5 (was 60-135%)
-const KSIZE = [0.9, 1.5], ksizeToUI = (k) => Math.max(0, Math.min(100, (k - KSIZE[0]) / (KSIZE[1] - KSIZE[0]) * 100));
-look.ksize = Math.max(KSIZE[0], Math.min(KSIZE[1], look.ksize));
-if (typeof look.ocd !== 'number') look.ocd = 0;
-if (!Array.isArray(look.stickers)) look.stickers = ['smile'];
-if (!look.stk || typeof look.stk !== 'object') look.stk = {};
-if (typeof look.stkOn !== 'boolean') look.stkOn = true;
-// v0.35.2 (Johnny): one sticker at a time, a choice of design; look.stickers = [that one], look.stk.one its size/place/turn
-function normStk(l) {
-  const ids = ['smile', 'wink', 'dizzy', 'heart', 'star'], id = ids.includes(l.stickers && l.stickers[0]) ? l.stickers[0] : 'smile';
-  l.stickers = [id]; if (!l.stk || typeof l.stk !== 'object') l.stk = {};
-  if (!l.stk.one) l.stk = l.stk[id] ? { one: l.stk[id] } : {}; else l.stk = { one: l.stk.one };
-}
-normStk(look);   // v0.33.1: SHOW STICKERS, on its own, OCD no longer takes them off   // v0.33.0: per-sticker { x, y (panel units), s (scale), r (degrees) }
-// three lights (v0.31.0): each { col, int, az (orbit round the panel, degrees, 0 = from the right, 90 = from the top),
-// el (height above the panel, degrees) }. All three cast shadows; 2 and 3 start low from the left and right. A lighting preset sets all three; then each
-// can be changed in OPTIONS. Older saved looks get theirs from their preset.
-const deg = (r) => Math.round(r * 180 / Math.PI);
-function presetLights(name) {
-  const L = LIGHTS[name] || LIGHTS.studio, [x, y, z] = L.dir, az = deg(Math.atan2(y, x)), hex = (c) => '#' + c.toString(16).padStart(6, '0');
-  return [
-    { col: hex(L.col), int: L.key, az: (az + 360) % 360, el: deg(Math.atan2(z, Math.hypot(x, y))) },
-    { col: L.fill || '#e6ecff', int: 0.4, az: 160, el: 35 },   // v0.31.4: from the left side, low, with its own shadows
-    { col: L.rim || '#fff0dc', int: 0.35, az: 20, el: 35 },      // and from the right (Johnny)
-  ];
-}
-const saveLook = () => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} };
-const SWATCHES = ['#e4e2da', '#f4f3ef', '#b9bbb8', '#6c6e70', '#202122', '#c4352b', '#df7a2c', '#e6c24a', '#4e7b56', '#2f5c88', '#ef9fbf'];
+// ---------------------------------------------------------------- the look
+// v0.44.0 (Johnny, 22 Nov 2026: "that's the look, no options"): the panel's one look, fixed. No look options, no
+// saved looks, no stickers.
+const LOOK0 = { colour: '#b9bbb8', light: 'studio', bright: 1, finish: 'matt', lens: 0.4, tilt: 2.1, ksize: 1.25, kstyle: 'yamaha', knobAll: '', knobCol: {},
+  oddOn: true, oddK: 26, ocd: 0.05, room: 0.26, barCol: '',
+  lights: [{ col: '#ffffff', int: 1.7, az: 129, el: 55 }, { col: '#e6ecff', int: 0.4, az: 160, el: 35 }, { col: '#fff0dc', int: 0.35, az: 20, el: 35 }] };
+const look = LOOK0;
 const LIGHTS = {
   studio: { name: 'STUDIO', dir: [-0.45, 0.55, 1], col: 0xffffff, key: 1.7, hemi: 0.75 },
   warm: { name: 'WARM', dir: [0.5, 0.6, 1], col: 0xffd2a0, key: 1.7, hemi: 0.7, hemiCol: 0xfff0dc },
@@ -81,7 +32,6 @@ const LIGHTS = {
   raking: { name: 'LOW SUN', dir: [-1, 0.22, 0.42], col: 0xfff3e2, key: 2.4, hemi: 0.45 },
   top: { name: 'OVERHEAD', dir: [0, 1, 0.6], col: 0xffffff, key: 1.8, hemi: 0.65 },
 };
-if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // lv 2: side lights
 const FINISH = { matt: { name: 'MATT', r: 0.95, m: 0, e: 0.25 }, satin: { name: 'SATIN', r: 0.55, m: 0, e: 0.6 }, metal: { name: 'METAL', r: 0.42, m: 0.7, e: 1.1, brushed: true } };
 const lensFov = (u) => 6 * Math.pow(8, Math.max(0, Math.min(1, u)));   // 6° (flat) .. 48° (wide)
 
@@ -474,7 +424,7 @@ for (const b of BOXES) {
       });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
-      // steps and browser, and the sticker's randomise and undo
+      // steps and browser, and the randomiser (rand.js) and its undo
       const dw = w * C - 40, dx = cx - dw / 2;
       makeDisplay(dx, y0 + 36, dw, 28, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
       const PK = [['PREV', 'pre-', () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click()], ['NEXT', 'pre+', () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click()],
@@ -565,155 +515,9 @@ const logoWear = logoWears[page];
 const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, depthWrite: false, roughness: 0.35, metalness: 0, envMapIntensity: 0.9, bumpMap: logoWear, bumpScale: PANEL_BUMP * 1.6 });
 const logoLayer = new THREE.Mesh(new THREE.PlaneGeometry(TITLE.w, TITLE.h), logoMat);
 logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 0.08)); logoLayer.renderOrder = 2; logoLayer.receiveShadow = true; scene.add(logoLayer);
-// stickers (v0.32.7, Johnny: the tape came off, a yellow smiley went on): vinyl stickers with a white die-cut border,
-// a bit glossy and a bit scuffed, each with its own spot on the panel, cut off where they run over an edge.
-// OPTIONS > STICKERS turns each on or off (look.stickers); OCD peels them off.
-const STICKER_BUMP = PANEL_BUMP * 1.6;
-const STICKERS = [
-  // v0.33.3 (Johnny): all about half as big again
-  { id: 'smile', name: 'SMILEY', cx: W - 50, cy: H - 46, size: 100, rot: 12 },
-  { id: 'wink', name: 'WINK', cx: 30, cy: H - 26, size: 76, rot: -18 },
-  { id: 'dizzy', name: 'DIZZY', cx: W - 22, cy: H * 0.56, size: 70, rot: 25 },
-  { id: 'heart', name: 'HEART', cx: W * 0.43, cy: H - 12, size: 66, rot: -10 },
-  { id: 'star', name: 'STAR', cx: 20, cy: 136, size: 70, rot: 8 },
-];
-function drawSticker(x, id, n, R) {   // on an n x n canvas
-  const c = n / 2, r = n * 0.40;
-  const face = (fill) => { x.fillStyle = '#ffffff'; x.beginPath(); x.arc(c, c, r + n * 0.055, 0, 7); x.fill(); x.fillStyle = fill; x.beginPath(); x.arc(c, c, r, 0, 7); x.fill(); x.strokeStyle = 'rgba(0,0,0,.85)'; x.lineWidth = n * 0.012; x.stroke(); };
-  const ink = () => { x.fillStyle = x.strokeStyle = '#111'; x.lineWidth = n * 0.035; x.lineCap = 'round'; };
-  const smile = () => { x.beginPath(); x.arc(c, c + r * 0.05, r * 0.6, 0.18 * Math.PI, 0.82 * Math.PI); x.stroke(); };
-  const eye = (ex) => { x.beginPath(); x.ellipse(ex, c - r * 0.25, r * 0.09, r * 0.2, 0, 0, 7); x.fill(); };
-  if (id === 'smile') { face('#ffd400'); ink(); eye(c - r * 0.32); eye(c + r * 0.32); smile(); }
-  if (id === 'wink') { face('#ffd400'); ink(); eye(c - r * 0.32); x.beginPath(); x.arc(c + r * 0.32, c - r * 0.18, r * 0.16, 1.1 * Math.PI, 1.9 * Math.PI); x.stroke(); smile(); }
-  if (id === 'dizzy') {
-    face('#ffd400'); ink();
-    for (const ex of [c - r * 0.32, c + r * 0.32]) { const ey = c - r * 0.25, d = r * 0.13; x.beginPath(); x.moveTo(ex - d, ey - d); x.lineTo(ex + d, ey + d); x.moveTo(ex + d, ey - d); x.lineTo(ex - d, ey + d); x.stroke(); }
-    x.beginPath(); x.moveTo(c - r * 0.45, c + r * 0.38); for (let i = 0; i <= 12; i++) x.lineTo(c - r * 0.45 + i * r * 0.075, c + r * 0.38 + (i % 2 ? -1 : 1) * r * 0.07); x.stroke();
-  }
-  const shape = (path, fill) => { path(); x.strokeStyle = '#fff'; x.lineWidth = n * 0.11; x.lineJoin = 'round'; x.stroke(); path(); x.fillStyle = fill; x.fill(); x.strokeStyle = 'rgba(0,0,0,.8)'; x.lineWidth = n * 0.012; x.stroke(); };
-  if (id === 'heart') shape(() => { x.beginPath(); x.moveTo(c, c + r * 0.85); x.bezierCurveTo(c - r * 1.25, c + r * 0.05, c - r * 0.75, c - r * 0.95, c, c - r * 0.35); x.bezierCurveTo(c + r * 0.75, c - r * 0.95, c + r * 1.25, c + r * 0.05, c, c + r * 0.85); x.closePath(); }, '#ff4f9a');
-  if (id === 'star') shape(() => { x.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; x.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr); } x.closePath(); }, '#ff7a1a');
-  // a shine and some scuffing
-  x.save(); x.globalCompositeOperation = 'source-atop';
-  const g = x.createLinearGradient(0, 0, n, n); g.addColorStop(0, 'rgba(255,255,255,.28)'); g.addColorStop(0.4, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, n, n);
-  for (let i = 0; i < 14; i++) { x.strokeStyle = `rgba(255,255,255,${0.15 + R() * 0.25})`; x.lineWidth = 1 + R() * 1.5; const px = R() * n, py = R() * n, a = R() * Math.PI, l = n * (0.05 + R() * 0.2); x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke(); }
-  for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(0,0,0,${R() * 0.08})`; x.fillRect(R() * n, R() * n, 2, 2); }
-  x.restore();
-}
-// v0.32.9 (Johnny): stickers wear too. The panel's own dents and scratches show through the vinyl (each sticker's
-// bump map is the page's wear map sampled under it, so it changes with the page), and each sticker has its own
-// wear and tear: nicked edges, sun-faded patches, ink rubbed thin, a crease and one edge lifting off the panel.
-const panelWearData = {};
-const wearData = (p) => panelWearData[p] || (panelWearData[p] = (() => { const c = wearOf(p).image; return { w: c.width, h: c.height, d: c.getContext('2d').getImageData(0, 0, c.width, c.height).data }; })());
-function stickerWear(x, n, R) {   // own wear on the colour canvas x; returns the sticker's own bump canvas
-  const c = n / 2, img0 = x.getImageData(0, 0, n, n).data, A = (u, v) => (u < 0 || v < 0 || u >= n || v >= n) ? 0 : img0[((v | 0) * n + (u | 0)) * 4 + 3];
-  const rim = (a) => { let r = 0; while (r < c && A(c + Math.cos(a) * r, c + Math.sin(a) * r) > 8) r++; return r; };   // distance to the die-cut edge
-  const b = document.createElement('canvas'); b.width = b.height = n; const bx = b.getContext('2d');
-  bx.fillStyle = '#808080'; bx.fillRect(0, 0, n, n);
-  if (scuffImg) { bx.globalAlpha = 0.45; bx.drawImage(scuffImg, R() * 600, R() * 600, 420, 420, 0, 0, n, n); bx.globalAlpha = 1; }
-  // nicks: little bites out of the edge
-  x.save(); x.globalCompositeOperation = 'destination-out';
-  for (let i = 0, k = 2 + (R() * 4 | 0); i < k; i++) {
-    const a = R() * 7, r = rim(a), s = n * (0.012 + R() * 0.025); x.beginPath();
-    for (let j = 0; j < 7; j++) { const t = j / 7 * 7, rr = s * (0.6 + R() * 0.7); x.lineTo(c + Math.cos(a) * r + Math.cos(t) * rr, c + Math.sin(a) * r + Math.sin(t) * rr); }
-    x.fill();
-  }
-  x.restore();
-  x.save(); x.globalCompositeOperation = 'source-atop';
-  // sun-faded patches
-  for (let i = 0, k = 2 + (R() * 3 | 0); i < k; i++) {
-    const px = c + (R() - 0.5) * n * 0.7, py = c + (R() - 0.5) * n * 0.7, r = n * (0.12 + R() * 0.2), g = x.createRadialGradient(px, py, 0, px, py, r);
-    g.addColorStop(0, `rgba(255,250,235,${0.18 + R() * 0.2})`); g.addColorStop(1, 'rgba(255,250,235,0)'); x.fillStyle = g; x.fillRect(0, 0, n, n);
-  }
-  // ink rubbed thin by fingers, mostly round the edge
-  for (let i = 0; i < 40; i++) {
-    const a = R() * 7, r = rim(a) * (0.55 + R() * 0.45), px = c + Math.cos(a) * r, py = c + Math.sin(a) * r, s = n * (0.008 + R() * 0.03);
-    x.fillStyle = `rgba(255,255,255,${0.12 + R() * 0.3})`; x.beginPath(); x.ellipse(px, py, s, s * (0.3 + R() * 0.5), R() * 3, 0, 7); x.fill();
-  }
-  // grime along the edge
-  const gr = x.createRadialGradient(c, c, n * 0.3, c, c, n * 0.5); gr.addColorStop(0, 'rgba(60,50,30,0)'); gr.addColorStop(1, 'rgba(60,50,30,.22)'); x.fillStyle = gr; x.fillRect(0, 0, n, n);
-  // a crease: a dark/light pair in the bump, a faint pale line in the colour
-  { const a = R() * 3, px = c + (R() - 0.5) * n * 0.4, py = c + (R() - 0.5) * n * 0.4, l = n * (0.25 + R() * 0.3), dx = Math.cos(a) * l / 2, dy = Math.sin(a) * l / 2;
-    bx.lineCap = 'round'; bx.lineWidth = n * 0.008;
-    for (const [o, col] of [[-1, 'rgba(255,255,255,.6)'], [1, 'rgba(0,0,0,.6)']]) { bx.strokeStyle = col; bx.beginPath(); bx.moveTo(px - dx - o * dy * 0.02, py - dy + o * dx * 0.02); bx.lineTo(px + dx - o * dy * 0.02, py + dy + o * dx * 0.02); bx.stroke(); }
-    x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = n * 0.006; x.beginPath(); x.moveTo(px - dx, py - dy); x.lineTo(px + dx, py + dy); x.stroke(); }
-  // one edge lifting: a raised ramp in the bump, and dirt caught under it
-  { const a = R() * 7, r = rim(a), px = c + Math.cos(a) * r, py = c + Math.sin(a) * r, s = n * (0.12 + R() * 0.08);
-    const g = bx.createRadialGradient(px, py, 0, px, py, s); g.addColorStop(0, 'rgba(255,255,255,.75)'); g.addColorStop(1, 'rgba(255,255,255,0)'); bx.fillStyle = g; bx.fillRect(0, 0, n, n);
-    const g2 = x.createRadialGradient(px, py, 0, px, py, s * 0.55); g2.addColorStop(0, 'rgba(40,32,20,.45)'); g2.addColorStop(1, 'rgba(40,32,20,0)'); x.fillStyle = g2; x.fillRect(0, 0, n, n); }
-  x.restore();
-  return b;
-}
-function stickerBump(st, own, p) {   // the page's wear under the sticker plus the sticker's own; st = placement { cx, cy, size, rot }
-  const n = own.width, a = -st.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), S = n / st.size, wd = wearData(p);
-  const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
-  const o = own.getContext('2d').getImageData(0, 0, n, n).data, img = x.createImageData(n, n), d = img.data;
-  for (let v = 0, i = 0; v < n; v++) for (let u = 0; u < n; u++, i += 4) {
-    const lx = u / S - st.size / 2, ly = v / S - st.size / 2, px = st.cx + lx * ca + ly * sa, py = st.cy - (lx * sa - ly * ca);
-    const wx = Math.max(0, Math.min(wd.w - 1, px / W * wd.w | 0)), wy = Math.max(0, Math.min(wd.h - 1, py / H * wd.h | 0));
-    const val = Math.max(0, Math.min(255, wd.d[(wy * wd.w + wx) * 4] + (o[i] - 128) * 0.9));
-    d[i] = d[i + 1] = d[i + 2] = val; d[i + 3] = 255;
-  }
-  x.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
-}
-// v0.33.0: each sticker can be resized, moved and turned in OPTIONS > STICKERS (look.stk); a move re-cuts it at the panel
-// edge and re-samples the wear under it.
-const stkPlace = () => { const q = look.stk.one || {}, d = STICKERS[0]; return { cx: q.x ?? d.cx, cy: q.y ?? d.cy, size: d.size * (q.s ?? 1), rot: q.r ?? d.rot }; };   // v0.35.2: one place for whichever sticker
-// v0.36.6 (Johnny: a spinning sticker lost its corners): the cut at the panel's edge was baked into the texture at the
-// sticker's resting angle, so it turned with the spin. Now four clipping planes at the panel's edges cut it, whatever
-// the angle.
-renderer.localClippingEnabled = true;
-const STK_CLIP = [new THREE.Plane(new THREE.Vector3(1, 0, 0), W / 2 - 0.5), new THREE.Plane(new THREE.Vector3(-1, 0, 0), W / 2 - 0.5),
-  new THREE.Plane(new THREE.Vector3(0, 1, 0), H / 2 - 0.5), new THREE.Plane(new THREE.Vector3(0, -1, 0), H / 2 - 0.5)];
-const stickers = STICKERS.map((st, k) => {
-  const n = 384, src = document.createElement('canvas'); src.width = src.height = n; const sx = src.getContext('2d');
-  const R = rng(777 + k); drawSticker(sx, st.id, n, R); const own = stickerWear(sx, n, R);
-  const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
-  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.32, metalness: 0, envMapIntensity: 0.9, bumpScale: STICKER_BUMP, clippingPlanes: STK_CLIP }));
-  m.renderOrder = 3; m.receiveShadow = true; scene.add(m);
-  const o = { id: st.id, m, bumps: null, key: '' };
-  o.place = () => {
-    const q = stkPlace(st), key = JSON.stringify(q); if (key === o.key) return; o.key = key;
-    x.clearRect(0, 0, n, n); x.drawImage(src, 0, 0); map.needsUpdate = true;   // the panel's edge is cut by STK_CLIP
-    if (o.bumps) o.bumps.synth.dispose();
-    o.bumps = { synth: stickerBump(q, own, 'synth') }; m.material.bumpMap = o.bumps[page]; m.material.needsUpdate = true;
-    m.position.copy(P(q.cx, q.cy, 0.25 + k * 0.01)); m.rotation.z = -q.rot * Math.PI / 180; m.scale.set(q.size, q.size, 1);
-  };
-  o.place(); return o;
-});
-// v0.34.0 (Johnny): clicking a sticker randomises the sound (rand.js); right-click or Shift-click steps back.
-// A hit is inside the die-cut circle of a shown sticker, top one first; the sticker gives a little wobble.
-function stickerAt(p) {
-  if (!p) return null;
-  for (let k = stickers.length - 1; k >= 0; k--) {
-    const st = stickers[k]; if (!st.m.visible) continue;
-    const q = stkPlace(STICKERS[k]); if (Math.hypot(p[0] - q.cx, p[1] - q.cy) < q.size * 0.42) return st;
-  }
-  return null;
-}
-// v0.36.5 (Johnny: show something is going on): while the new sound is measured the clicked sticker spins, then it
-// eases round to rest and gives its wobble
-const wobbles = new Map();
-const wobble = (st, spin) => { wobbles.set(st, { t0: performance.now(), mode: spin ? 'spin' : 'wob' }); dirty = true; };
-function wobbleStep(now) {
-  for (const [st, w] of wobbles) {
-    const k = STICKERS.findIndex((t) => t.id === st.id), base = -stkPlace(STICKERS[k]).rot * Math.PI / 180, t = (now - w.t0) / 1000;
-    let off = 0;
-    if (w.mode === 'spin') {
-      off = -t * 7;
-      if (!shyoyRand.spinning) { w.mode = 'settle'; w.a0 = off % (2 * Math.PI); w.t0 = now; }
-    } else if (w.mode === 'settle') {
-      const u = Math.min(1, t / 0.45), e = 1 - (1 - u) * (1 - u);
-      off = w.a0 + (-2 * Math.PI - w.a0) * e; if (u >= 1) { w.mode = 'wob'; w.t0 = now; off = 0; }
-    } else if (t > 0.7) { st.m.rotation.z = base; wobbles.delete(st); dirty = true; continue; }
-    else off = Math.sin(t * 34) * Math.exp(-t * 6) * 0.16;
-    st.m.rotation.z = base + off; dirty = true;
-  }
-}
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
-    const lw = 196, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;
+    const lw = 262, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
     const lx2 = logoCv.getContext('2d'); lx2.setTransform(1, 0, 0, 1, 0, 0); lx2.globalCompositeOperation = 'source-over'; lx2.clearRect(0, 0, logoCv.width, logoCv.height);
     lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
     // worn ink (v0.31.2): where the wear map dips (scuffs, scratches, dents) the ink is rubbed thin or through to the
@@ -726,10 +530,26 @@ prints.push((x, ink) => {
     lx2.putImageData(img, 0, 0);
     logoTex.needsUpdate = true;
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
-  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 98, 10, 'right');
+  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 122, 10, 'right');
 });
 const VER3D = ((document.getElementById('ver') || {}).textContent || '').replace(/^v/, '');
-addCtl({ kind: 'title', rect: [TITLE.x + 60, TITLE.y + 4, TITLE.w - 120, 78], press: () => openOptions3d(), sync: () => false });
+// v0.44.0 (Johnny: "clicking shyoy randomizes the sound, the word wobbles in 3 dimensions"; "command click opens options"):
+// a click on the word is a new random sound (rand.js) and the word wobbles; right-click or Shift-click steps back; Cmd/Ctrl-click opens OPTIONS
+const LOGO_Z = logoLayer.position.z, logoWob = { t0: -1 };
+const wobbleLogo = () => { logoWob.t0 = performance.now(); dirty = true; };
+function logoWobbleStep(now) {
+  const t = (now - logoWob.t0) / 1000;
+  if (t > 1.8 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; logoWob.t0 = -1; dirty = true; return; }
+  const e = Math.exp(-t * 2.6);
+  logoLayer.rotation.set(Math.sin(t * 17) * 0.38 * e, Math.sin(t * 13 + 1.2) * 0.32 * e, Math.sin(t * 21 + 2.1) * 0.07 * e);
+  logoLayer.position.z = LOGO_Z + 48 * e; dirty = true;
+}
+const logoClick = (ev) => {
+  if (ev && (ev.metaKey || ev.ctrlKey)) return openOptions3d();
+  if (ev && ev.shiftKey) { if (shyoyRand.back()) wobbleLogo(); return; }
+  shyoyRand.roll(); wobbleLogo();
+};
+addCtl({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 4, TITLE.w - 20, 104], press: logoClick, sync: () => false });
 
 // the readout while a knob turns: the value on a black slab where its label is
 const ro = (() => {
@@ -759,11 +579,9 @@ function applyLook() {
     lamp.position.set(Math.cos(a) * Math.cos(e) * 2500, Math.sin(a) * Math.cos(e) * 2500, Math.sin(e) * 2500); lamp.target.position.set(0, 0, 0);
   });
   curInk = lum(look.colour) < 0.2 ? '#ffffff' : '#000000';
-  // OCD (v0.32.6): 0 keeps every defect, 1 is spotless: wear depths, worn ink, tilt, the stickers and the odd knob
+  // OCD (v0.32.6): 0 keeps every defect, 1 is spotless: wear depths, worn ink, tilt and the odd knob
   const cl = look.ocd, w = 1 - cl;
   panelMat.bumpScale = PANEL_BUMP * w; edgeMat.bumpScale = EDGE_BUMP * w; print.material.bumpScale = logoMat.bumpScale = PANEL_BUMP * 1.6 * w;
-  // v0.33.1 (Johnny): stickers have their own SHOW STICKERS checkbox; OCD only smooths them (the odd knob still goes at 50)
-  for (const st of stickers) { st.place(); st.m.material.bumpScale = STICKER_BUMP * w; st.m.visible = look.stkOn && look.stickers.includes(st.id); }
   for (const k of knobs) { k.colour(); k.tilt(look.tilt * w); k.size(look.ksize); k.clean(cl); }
   camera.fov = lensFov(look.lens); fit();
   const bg = new THREE.Color(look.colour).multiplyScalar(0.28);
@@ -831,8 +649,6 @@ const slotPx = (c) => { const a = P(c.cx, c.cy - TRAVEL, CAP.d).project(camera),
   return Math.max(40, Math.hypot((a.x - b.x) / 2 * r.width, (a.y - b.y) / 2 * r.height)); };
 cv.addEventListener('pointerdown', (e) => {
   if (e.button === 2) return;
-  const sk = stickerAt(toPanel(e));
-  if (sk) { e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {} grabs.set(e.pointerId, { c: { kind: 'sticker', st: sk }, x: e.clientX, y: e.clientY, moved: false, back: e.shiftKey }); return; }
   const c = pick(e); if (!c) return;
   e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   boot();
@@ -863,12 +679,11 @@ function release(e) {
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if (c.kind === 'roll') c.up();
-  else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press();
-  else if (c.kind === 'sticker' && !g.moved && e.type === 'pointerup') { if (g.back) { if (shyoyRand.back()) wobble(c.st); } else { shyoyRand.roll(); wobble(c.st, true); } printDirty = true; }
+  else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press(e);
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
-cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const sk = stickerAt(toPanel(e)); if (sk) { if (shyoyRand.back()) wobble(sk); return; } });
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (e.ctrlKey) return; const c = pick(e); if (c && c.kind === 'title' && shyoyRand.back()) wobbleLogo(); });
 cv.addEventListener('wheel', (e) => {
   const c = pick(e); if (!c || c.kind !== 'knob') return; e.preventDefault(); boot();
   const id = c.cur(); setKnob(id, knobBase(id) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02));
@@ -886,32 +701,12 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
   box-shadow: inset 0 0 0 2px var(--v3d-ink), 0 20px 60px rgba(0,0,0,.55); padding: 34px 22px 16px; box-sizing: border-box; }
 .v3d-sheet h2 { position: absolute; top: 8px; left: 14px; margin: 0; font: 400 15px/1 ${DISPLAY}; letter-spacing: .04em; color: var(--v3d-paper); background: var(--v3d-ink); padding: 4px 9px 3px; }
 .v3d-sheet .x { position: absolute; top: 6px; right: 10px; width: 30px; height: 26px; }
-.v3d-sheet .lamp { display: grid; grid-template-columns: 16px 34px repeat(3, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 8px; font-size: 10px; letter-spacing: .06em; }
-.v3d-sheet .lamp input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
-.v3d-sheet .lamp label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .lamp label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
-.v3d-sheet .lamp label i { font-style: normal; grid-row: 1; grid-column: 2; }
-.v3d-sheet .otab3 { display: flex; flex-wrap: wrap; gap: 0; margin: 4px 0 16px; border-bottom: 2px solid var(--v3d-ink); }
-.v3d-sheet .otab3 button { background: none; color: var(--v3d-ink); border-radius: 3px 3px 0 0; padding: 8px 12px 7px; opacity: .6; }
-.v3d-sheet .otab3 button.lit { background: var(--v3d-ink); color: var(--v3d-paper); opacity: 1; }
-.v3d-sheet .stk { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 10px; align-items: center; margin: 0 0 10px; font-size: 10px; letter-spacing: .06em; }
-.v3d-sheet .stk.off label { opacity: .4; }
-.v3d-sheet .stk label { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; } .v3d-sheet .stk label input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; min-width: 0; }
-.v3d-sheet .stk label i { font-style: normal; grid-row: 1; grid-column: 2; }
 .v3d-sheet [hidden] { display: none !important; }
-.v3d-sheet .bxc { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 10px; }
-.v3d-sheet .bxc label { display: flex; align-items: center; gap: 7px; font-size: 10.5px; letter-spacing: .06em; cursor: pointer; }
-.v3d-sheet .bxc input[type=color] { width: 30px; height: 22px; flex: none; } .v3d-sheet .bxc span { flex: 1; }
-.v3d-sheet .bxc .clr { padding: 3px 7px; visibility: hidden; } .v3d-sheet .bxc .set .clr { visibility: visible; }
-.v3d-sheet .chk { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
-.v3d-sheet .chk input { width: 18px; height: 18px; accent-color: var(--v3d-ink); margin: 0; }
 .v3d-sheet .f { margin: 0 0 14px; } .v3d-sheet .hint { margin: 6px 0 0; font-size: 9px; letter-spacing: .06em; opacity: .6; } .v3d-sheet .f > span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .08em; margin-bottom: 6px; }
 .v3d-sheet .row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .v3d-sheet button { font: 600 11px ${MONO}; letter-spacing: .06em; color: #fff; background: #0c0c0c; border: 0; border-radius: 3px; padding: 7px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .v3d-sheet button i { width: 6px; height: 6px; border-radius: 50%; background: #3a0906; display: inline-block; }
 .v3d-sheet button.lit i { background: #ff2a14; box-shadow: 0 0 6px #ff2a14; }
-.v3d-sheet button.arm { outline: 2px dashed #ff2a14; outline-offset: 1px; }
-.v3d-sheet .sw { width: 28px; height: 28px; padding: 0; border-radius: 3px; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.35); }
-.v3d-sheet .sw.lit { outline: 2px solid var(--v3d-ink); outline-offset: 2px; }
 .v3d-sheet input[type=range] { flex: 1; min-width: 120px; accent-color: var(--v3d-ink); }
 .v3d-sheet input[type=color] { width: 40px; height: 28px; border: 0; padding: 0; background: none; }
 .v3d-sheet b.val { font-size: 11px; min-width: 42px; text-align: right; }
@@ -952,145 +747,11 @@ function sheet(title) {
   return { el, body: el.querySelector('.body'), open() { sheetVars(); el.classList.add('open'); }, close };
 }
 const opt = sheet('OPTIONS');
-// v0.33.0 (Johnny): OPTIONS in tabs
-const OPT_TABS = [['look', 'LOOK'], ['light', 'LIGHT'], ['colours', 'COLOURS'], ['knobs', 'SLIDERS'], ['stickers', 'STICKERS'], ['wear', 'WEAR'], ['more', 'MORE']];
-let optTab = 'look'; try { optTab = localStorage.getItem('shyoy.opttab3d') || 'look'; } catch (e) {}
-opt.body.innerHTML = `
-  <div class="otab3">${OPT_TABS.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}</div>
-  <div class="pane" data-pane="look">
-  <div class="f"><span>LOOKS</span><div class="row" id="o3-looks">${[0, 1, 2, 3].map((i) => `<button data-look="${i}"><i></i>LOOK ${i + 1}</button>`).join('')}<button id="o3-lsave">SAVE…</button><button id="o3-lcopy">COPY LOOK</button></div></div>
-  <div class="f"><span>PANEL COLOUR</span><div class="row" id="o3-sw">${SWATCHES.map((c) => `<button class="sw" data-c="${c}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}<input type="color" id="o3-col" aria-label="Any colour"></div></div>
-  <div class="f"><span>FINISH</span><div class="row" id="o3-fin">${Object.entries(FINISH).map(([k, f]) => `<button data-f="${k}"><i></i>${f.name}</button>`).join('')}</div></div>
-  </div>
-  <div class="pane" data-pane="light">
-  <div class="f"><span>LIGHTING</span><div class="row" id="o3-light">${Object.entries(LIGHTS).map(([k, l]) => `<button data-l="${k}"><i></i>${l.name}</button>`).join('')}</div>
-    <div class="row" style="margin-top:8px"><input type="range" min="40" max="160" id="o3-bright" aria-label="Brightness"><b class="val" id="o3-brightv"></b></div></div>
-  <div class="f"><span>LIGHTS</span>${[0, 1, 2].map((i) => `<div class="lamp" data-i="${i}"><b class="n">${i + 1}</b><input type="color" data-k="col" aria-label="Light ${i + 1} colour">
-    <label>LEVEL<input type="range" data-k="int" min="0" max="300" aria-label="Light ${i + 1} intensity"><i></i></label>
-    <label>ORBIT<input type="range" data-k="az" min="0" max="359" aria-label="Light ${i + 1} orbit"><i></i></label>
-    <label>HEIGHT<input type="range" data-k="el" min="3" max="90" aria-label="Light ${i + 1} height"><i></i></label></div>`).join('')}</div>
-  <div class="f"><span>LENS / DEPTH</span><div class="row"><input type="range" min="0" max="100" id="o3-lens" aria-label="Lens, long to wide"><b class="val" id="o3-lensv"></b></div></div>
-  </div>
-  <div class="pane" data-pane="colours">
-  <div class="f"><span>ALL SLIDERS</span><div class="bxc"><label id="o3-kall"><input type="color" aria-label="All slider caps colour"><span>EVERY CAP</span><button class="clr" aria-label="Clear">×</button></label></div></div>
-  ${['synth'].map((pg) => `<div class="f"><span>SECTIONS</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
-  <div class="row"><button id="o3-bxall">ALL BLACK</button></div>
-  <div class="f"><span>SEQUENCER</span><div class="bxc"><label id="o3-drag"><input type="color" aria-label="Sequencer drag areas colour"><span>DRAG AREAS</span><button class="clr" aria-label="Back to automatic">×</button></label></div></div>
-  </div>
-  <div class="pane" data-pane="knobs">
-  <div class="f"><span>CAP SIZE</span><div class="row"><input type="range" min="0" max="100" id="o3-ksize" aria-label="Slider cap size"><b class="val" id="o3-ksizev"></b></div></div>
-  <div class="f"><div class="row"><label class="chk"><input type="checkbox" id="o3-odd"> REPLACED CAP</label><button id="o3-oddrnd">RANDOM CAP</button><button id="o3-oddcut">BACK ON CUTOFF</button></div></div>
-  </div>
-  <div class="pane" data-pane="stickers">
-  <div class="f"><label class="chk"><input type="checkbox" id="o3-stkon"> SHOW STICKERS</label></div>
-  <div class="f"><span>RANDOM AMOUNT</span><div class="row"><input type="range" min="0" max="100" id="o3-rnd" aria-label="How far a sticker click moves the sound"><b class="val" id="o3-rndv"></b></div>
-    <p class="hint">CLICK A STICKER FOR A NEW SOUND. RIGHT-CLICK OR SHIFT-CLICK ONE TO GO BACK.</p></div>
-  <div class="f" id="o3-stklist"><span>STICKER</span><div class="row">${STICKERS.map((st) => `<button data-st="${st.id}"><i></i>${st.name}</button>`).join('')}</div>
-    <div class="stk one" style="margin-top:12px">
-    <label>SIZE<input type="range" data-k="s" min="40" max="300" aria-label="Sticker size"><i></i></label>
-    <label>ACROSS<input type="range" data-k="x" min="0" max="${W}" aria-label="Sticker across"><i></i></label>
-    <label>HEIGHT<input type="range" data-k="y" min="0" max="${H}" aria-label="Sticker up or down"><i></i></label>
-    <label>TURN<input type="range" data-k="r" min="-180" max="180" aria-label="Sticker turn"><i></i></label></div>
-    <div class="row"><button id="o3-stkreset">RESET PLACE</button></div></div>
-  </div>
-  <div class="pane" data-pane="wear">
-  <div class="f"><span>OCD</span><div class="row"><input type="range" min="0" max="100" id="o3-ocd" aria-label="OCD: 0 every defect, 100 spotless"><b class="val" id="o3-ocdv"></b></div></div>
-  </div>
-  <div class="pane" data-pane="more">
-  <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
-  </div>`;
+// v0.44.0: no look options; OPTIONS keeps MIDI and ABOUT
+opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI</button><button id="o3-about">ABOUT</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'barCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
-function drawOpt() {
-  const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
-  opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
-  $o('#o3-lsave').classList.toggle('lit', lookSaving); $o('#o3-lsave').textContent = lookSaving ? 'PICK A SLOT' : 'SAVE…';
-  opt.body.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('lit', b.dataset.c.toLowerCase() === look.colour.toLowerCase()));
-  opt.body.querySelectorAll('[data-l]').forEach((b) => b.classList.toggle('lit', b.dataset.l === look.light));
-  opt.body.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('lit', b.dataset.f === look.finish));
-  $o('#o3-col').value = look.colour; $o('#o3-bright').value = Math.round(look.bright * 100); $o('#o3-brightv').textContent = Math.round(look.bright * 100) + '%';
-  opt.body.querySelectorAll('.lamp').forEach((d) => {
-    const l = look.lights[+d.dataset.i];
-    d.querySelectorAll('[data-k]').forEach((inp) => {
-      const k = inp.dataset.k; inp.value = k === 'int' ? Math.round(l.int * 100) : l[k];
-      if (inp.type === 'range') inp.nextElementSibling.textContent = k === 'int' ? Math.round(l.int * 100) + '%' : l[k] + '°';
-    });
-  });
-  opt.body.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('lit', b.dataset.tab === optTab));
-  opt.body.querySelectorAll('[data-pane]').forEach((d) => { d.hidden = d.dataset.pane !== optTab; });
-  opt.body.querySelectorAll('[data-st]').forEach((b) => b.classList.toggle('lit', look.stickers.includes(b.dataset.st)));
-  $o('#o3-stkon').checked = look.stkOn; $o('#o3-stklist').style.opacity = look.stkOn ? '' : '.45';
-  opt.body.querySelectorAll('.stk').forEach((d) => {
-    const q = stkPlace();
-    const vals = { s: Math.round(q.size / STICKERS[0].size * 100), x: Math.round(q.cx), y: Math.round(H - q.cy), r: Math.round(q.rot) };
-    d.querySelectorAll('[data-k]').forEach((inp) => { inp.value = vals[inp.dataset.k]; inp.nextElementSibling.textContent = inp.dataset.k === 's' ? vals.s + '%' : inp.dataset.k === 'r' ? vals.r + '°' : vals[inp.dataset.k]; });
-  });
-  $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
-  $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
-  $o('#o3-drag input').value = look.barCol || dragAuto(); $o('#o3-drag').classList.toggle('set', !!look.barCol);
-  $o('#o3-kall input').value = look.knobAll || '#0e0e0e'; $o('#o3-kall').classList.toggle('set', !!look.knobAll);
-  opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || look.knobAll || '#0e0e0e'; l.classList.toggle('set', !!c); });
-  $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
-  $o('#o3-odd').checked = look.oddOn;
-  $o('#o3-lens').value = Math.round(look.lens * 100); $o('#o3-lensv').textContent = Math.round(lensFov(look.lens)) + '°';
-  sheetVars();
-}
-const setLook = (k, v) => { look[k] = v; saveLook(); applyLook(); drawOpt(); };
-opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
-  const i = +b.dataset.look;
-  if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
-  if (!lookSlots[i]) return;
-  // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, barCol: '', oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look);
-  if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // looks saved with the v0.35.5-0.36.2 lights
-  saveLook(); applyLook(); drawOpt();
-});
-$o('#o3-lsave').onclick = () => { lookSaving = !lookSaving; drawOpt(); };
-// v0.41.0 (Johnny: "have copy setting for look for default"): the current look as text, to paste back to Claude to
-// become the default (LOOK0)
-$o('#o3-lcopy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(look);
-  try { await navigator.clipboard.writeText(t); b.textContent = 'COPIED'; } catch (er) { prompt('Copy this look', t); }
-  setTimeout(() => { b.textContent = 'COPY LOOK'; }, 1500); };
-opt.body.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => setLook('colour', b.dataset.c));
-$o('#o3-col').oninput = (e) => setLook('colour', e.target.value);
-opt.body.querySelectorAll('[data-l]').forEach((b) => b.onclick = () => { look.lights = presetLights(b.dataset.l); setLook('light', b.dataset.l); });
-opt.body.querySelectorAll('.lamp [data-k]').forEach((inp) => inp.oninput = () => {
-  const l = look.lights[+inp.closest('.lamp').dataset.i], k = inp.dataset.k;
-  l[k] = k === 'col' ? inp.value : k === 'int' ? inp.value / 100 : +inp.value; setLook('lights', look.lights);
-});
-opt.body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => setLook('finish', b.dataset.f));
-$o('#o3-bright').oninput = (e) => setLook('bright', e.target.value / 100);
-$o('#o3-lens').oninput = (e) => setLook('lens', e.target.value / 100);
-opt.body.querySelectorAll('[data-st]').forEach((b) => b.onclick = () => setLook('stickers', [b.dataset.st]));
-opt.body.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => { optTab = b.dataset.tab; try { localStorage.setItem('shyoy.opttab3d', optTab); } catch (e) {} drawOpt(); });
-opt.body.querySelectorAll('.stk [data-k]').forEach((inp) => inp.oninput = () => {
-  const k = inp.dataset.k, q = { ...(look.stk.one || {}) };
-  q[k] = k === 's' ? inp.value / 100 : k === 'y' ? H - inp.value : +inp.value;
-  setLook('stk', { one: q });
-});
-$o('#o3-rnd').oninput = (e) => { shyoyRand.amount = e.target.value / 100; $o('#o3-rndv').textContent = e.target.value; };
-$o('#o3-stkon').onchange = (e) => setLook('stkOn', e.target.checked);
-$o('#o3-stkreset').onclick = () => setLook('stk', {});
-$o('#o3-ocd').oninput = (e) => setLook('ocd', e.target.value / 100);
-opt.body.querySelectorAll('[data-bk]').forEach((l) => {
-  l.querySelector('input').oninput = (e) => setLook('knobCol', { ...look.knobCol, [l.dataset.bk]: e.target.value });
-  l.querySelector('.clr').onclick = (e) => { e.preventDefault(); const c = { ...look.knobCol }; delete c[l.dataset.bk]; setLook('knobCol', c); };
-});
-$o('#o3-bxall').onclick = () => { look.knobAll = ''; setLook('knobCol', {}); };
-$o('#o3-kall input').oninput = (e) => setLook('knobAll', e.target.value);
-$o('#o3-drag input').oninput = (e) => setLook('barCol', e.target.value);
-$o('#o3-drag .clr').onclick = (e) => { e.preventDefault(); setLook('barCol', ''); };
-$o('#o3-kall .clr').onclick = (e) => { e.preventDefault(); setLook('knobAll', ''); };
-$o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
-$o('#o3-odd').onchange = (e) => setLook('oddOn', e.target.checked);
-$o('#o3-oddrnd').onclick = () => {   // a different synth-page knob each time
-  const pool = knobs.map((k, i) => i).filter((i) => knobs[i].page === 'synth' && i !== oddKi());
-  look.oddOn = true; setLook('oddK', pool[Math.random() * pool.length | 0]);
-};
-$o('#o3-oddcut').onclick = () => setLook('oddK', -1);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-$o('#o3-reset').onclick = () => { Object.assign(look, LOOK0, { lights: LOOK0.lights.map((l) => ({ ...l })) }); saveLook(); applyLook(); drawOpt(); };
-function openOptions3d() { drawOpt(); opt.open(); }
+function openOptions3d() { opt.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
 const pb = sheet('PRESETS');
@@ -1132,7 +793,7 @@ let live = true, drawn = 0;
 function frame() {
   if (!live) return;
   for (const c of ctls) if (c.sync()) dirty = true;
-  if (wobbles.size) wobbleStep(performance.now());
+  if (logoWob.t0 >= 0) logoWobbleStep(performance.now());
   const sig = printSigNow(); if (sig !== printSig) { printSig = sig; printDirty = true; }
   if (printDirty) { printDirty = false; repaintPrint(); dirty = true; }
   if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; dirty = true; }

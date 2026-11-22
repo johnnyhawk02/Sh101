@@ -1,7 +1,5 @@
-// Shyoy: the sticker randomiser (v0.34.0, Johnny: clicking a sticker randomises the sound; every sticker does the same).
-// One click = a new synth voice, drawn from musical ranges, at the RANDOM AMOUNT set in
-// OPTIONS > STICKERS (0 = no change, 1 = a whole new sound; in between each knob moves that far towards its new value
-// and each switch flips with that chance). Tuning, accent, the bender,
+// Shyoy: the randomiser (v0.34.0 on the stickers; v0.44.0, Johnny: "clicking shyoy randomizes the sound", the stickers
+// are gone). One click on the shyoy word (or PRESET > RANDOM) = a whole new synth voice, drawn from musical ranges. Tuning, accent, the bender,
 // the bend board and the bridges never change; the VCA Level is set to keep it as loud as a plain sound (below). It loads like a preset does (applySound + pushAll), so the engine
 // gets nothing it doesn't already get from a preset load. Each click keeps the sound before it (20 back) for undo.
 const shyoyRand = (() => {
@@ -9,7 +7,7 @@ const shyoyRand = (() => {
   const pick = (w) => { let r = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < w.length; i++) if ((r -= w[i]) < 0) return i; return w.length - 1; };
   const chance = (p) => Math.random() < p;
   const clamp = (v) => Math.max(0, Math.min(1, v));
-  let amount = clamp(store.get('rndAmount', 1));
+  let amount = 1;   // v0.44.0: always a whole new sound (the RANDOM AMOUNT option went with the stickers)
   // a whole new sound: { f: knob targets, s: switch targets }
   function draw() {
     const f = {}, s = {};
@@ -96,7 +94,7 @@ const shyoyRand = (() => {
   return {
     roll, back,
     get amount() { return amount; },
-    set amount(v) { amount = clamp(v); store.set('rndAmount', amount); },
+    set amount(v) { amount = clamp(v); },
     get depth() { return undo.length; },
     get last() { return last; },
     get working() { return false; },

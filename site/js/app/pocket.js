@@ -1,7 +1,7 @@
 // Shyoy: the pocket screen (v0.37.0, Johnny: "in phone mode, just have a screen with randomise and save, and also
 // generate new pattern and pattern density"; v0.40.0: the pattern part went with the sequencer). On a phone (short side under 600 px, touch) the app opens on this one
-// plain page instead of the panel: the sound's name, a big sticker that randomises the sound (rand.js, the same as
-// clicking a sticker on the 3D panel; UNDO steps back) and SAVE. Every
+// plain page instead of the panel: the sound's name, the shyoy word, which randomises the sound (rand.js, the same as
+// clicking the word on the 3D panel; UNDO steps back) and SAVE. Every
 // button (and 🎲, another invented name for the save) works through the app's own controls (#prj-save), so nothing new reaches
 // the engine. FULL PANEL goes to the panel and a small POCKET key comes back; the choice is kept (shyoy.pocket).
 // Open it anywhere with ?pocket=1 (and ?pocket=0 to stay off).
@@ -25,11 +25,11 @@ html.pocket #pocket { display: block; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 46px; box-shadow: inset 0 2px 6px rgba(0,0,0,.6); }
 #pocket .pk-box { border: 2px solid #141414; border-radius: 6px; padding: 20px 14px 14px; position: relative; display: flex; flex-direction: column; gap: 14px; }
 #pocket .pk-box > h2 { position: absolute; top: -11px; left: 12px; margin: 0; background: #141414; color: #b9bbb8; font: 400 13px "Archivo Black", "Arial Black", sans-serif; letter-spacing: .1em; padding: 2px 8px; border-radius: 3px; }
-#pocket .pk-rnd { align-self: center; width: min(38vw, 23vh, 165px); aspect-ratio: 1; border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-#pocket .pk-rnd svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); transition: transform .12s; }
-#pocket .pk-rnd:active svg { transform: scale(.94); }
-#pocket .pk-rnd.spin svg { animation: pk-spin .55s linear infinite; }
-@keyframes pk-spin { to { transform: rotate(-360deg); } }
+#pocket .pk-rnd { align-self: center; width: min(60vw, 40vh, 260px); aspect-ratio: 547 / 200; border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+#pocket .pk-rnd .pk-rlogo { width: 100%; height: 100%; display: block; background: #141414; -webkit-mask: url(icons/logo.png) center / contain no-repeat; mask: url(icons/logo.png) center / contain no-repeat; transition: transform .12s; }
+#pocket .pk-rnd:active .pk-rlogo { transform: scale(.94); }
+#pocket .pk-rnd.spin .pk-rlogo { animation: pk-wob .5s ease-in-out infinite; }
+@keyframes pk-wob { 50% { transform: perspective(300px) rotateX(18deg) rotateY(-14deg); } }
 #pocket .pk-cap { text-align: center; font-size: 11px; opacity: .7; margin-top: 6px; }
 #pocket .pk-pair { display: flex; justify-content: space-evenly; align-items: flex-start; gap: 12px; }
 #pocket .pk-pair > div { display: flex; flex-direction: column; align-items: center; }
@@ -57,16 +57,13 @@ html.pocket-able:not(.pocket) #pk-back { display: block; }
   #pocket .pk-box.rz { grid-column: 1; grid-row: 2 / 5; gap: 12px; }
   #pocket .pk-box.snd { grid-column: 2; grid-row: 2; gap: 10px; }
   #pocket .pk-full { grid-column: 2; grid-row: 4; margin: 0; align-self: end; justify-self: end; }
-  #pocket .pk-rnd { width: min(30vh, 140px); }
+  #pocket .pk-rnd { width: min(50vh, 220px); }
   #pocket .pk-key { min-height: 42px; }
   #pocket .pk-name { height: 42px; }
 }`;
   document.head.appendChild(css);
-  // the smiley, drawn as on the panel's sticker: yellow face on a white die-cut border
-  const SMILE = `<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="48" fill="#fff"/><circle cx="50" cy="50" r="41" fill="#ffd400" stroke="rgba(0,0,0,.8)" stroke-width="1.2"/>
-<ellipse cx="37" cy="40" rx="3.8" ry="8" fill="#151515"/><ellipse cx="63" cy="40" rx="3.8" ry="8" fill="#151515"/>
-<path d="M27 57 A24 24 0 0 0 73 57" fill="none" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
-<path d="M18 30 A38 38 0 0 1 40 13" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="4" stroke-linecap="round"/></svg>`;
+  // v0.44.0: the stickers are gone; the randomise key is the shyoy word, as on the panel
+  const SMILE = '<span class="pk-rlogo"></span>';
   const el = document.createElement('div'); el.id = 'pocket'; el.setAttribute('role', 'main');
   el.innerHTML = `<div class="pk-in">
   <div class="pk-top"><span class="pk-logo" role="img" aria-label="Shyoy"></span><span class="pk-ver"></span></div>
