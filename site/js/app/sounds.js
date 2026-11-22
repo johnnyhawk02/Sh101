@@ -6,6 +6,11 @@ function soundSnap() { return { params: clone(state.params), bend: clone(state.b
 // v0.46.0 (Johnny: "the sequencer needs to be saved with the presets"): it holds the octave sequencer's pattern too (seq.js):
 // every step, each lane's start, length and RETRIG. A preset saved without one (the factory ones) leaves the pattern as it is
 function projectSnap() { return { sound: soundSnap(), seq: clone(state.seq) }; }
+// v0.56.0 (Johnny: "modify old presets to include the seq on straight settings"): a preset saved before presets held a pattern (the
+// factory ones, older ones of your own, imports) gets a straight one: a gate on every step, octave 0, no slides or accents, every
+// lane looping 1-16, no RETRIG, no recorded notes, no cycles
+const SEQ_STRAIGHT = () => ({ steps: Array.from({ length: 16 }, () => ({ on: true, o: 0, s: false, a: false })), len: { o: 16, on: 16, s: 16, a: 16 },
+  st: { o: 0, on: 0, s: 0, a: 0 }, rt: { o: false, on: false, s: false, a: false }, notes: [], loop: 0, adv: 'gate', cyc: 0 });
 function applySound(x) {
   if (!x || typeof x !== 'object') return;
   state.params = { ...defaults, ...knownParams(x.params) }; state.bend = { ...stockBend(), ...(x.bend || {}) };
@@ -19,7 +24,7 @@ function applyPreset(x) {
   if (!x || typeof x !== 'object') return;
   boot();
   if (x.sound) applySound(x.sound);
-  if (x.seq) seqLoad(x.seq);
+  seqLoad(x.seq || SEQ_STRAIGHT());
   pushAll(); save();
 }
 // Factory presets, in the shape of an Export all file's projectPresets ({ "Name": project, ... }): paste one in here.
@@ -35,7 +40,9 @@ const FACTORY_PRESETS = {
 const PROJECT_BUILTIN = {};
 for (const name of Object.keys(PRESETS)) { const st = presetState(name); PROJECT_BUILTIN[name] = { sound: { params: st.params, bend: st.bend, br: st.br } }; }
 for (const [name, x] of Object.entries(FACTORY_PRESETS)) if (x && typeof x === 'object') PROJECT_BUILTIN[name] = x;
+for (const x of Object.values(PROJECT_BUILTIN)) if (!x.seq) x.seq = SEQ_STRAIGHT();
 const prjBar = presetBar('prj', 'projectPresets', PROJECT_BUILTIN, projectSnap, applyPreset, (taken) => NAMER(taken));
+{ let n = 0; for (const x of Object.values(prjBar.user)) if (x && typeof x === 'object' && !x.seq) { x.seq = SEQ_STRAIGHT(); n++; } if (n) prjBar.save(); }
 const download = (name, obj) => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));

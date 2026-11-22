@@ -940,7 +940,29 @@ const seqMenu = { isOpen: () => sm.el.classList.contains('open'), toggle() { if 
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
 const pb = sheet('PRESETS');
-pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-roll" aria-label="Suggest another name">🎲</button><button id="pb-save">SAVE</button></div></div><div class="list" id="pb-list"></div>`;
+pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-roll" aria-label="Suggest another name">🎲</button><button id="pb-save">SAVE</button></div>
+  <div class="row pb-mg"><button id="pb-ren">RENAME</button><button id="pb-dup">DUPLICATE</button><button id="pb-del">DELETE</button><button id="pb-res">RESTORE</button></div>
+  <div class="row pb-mg"><button id="pb-exp">EXPORT</button><button id="pb-expall">EXPORT ALL</button><button id="pb-imp">IMPORT</button></div></div><div class="list" id="pb-list"></div>`;
+// v0.56.0 (Johnny: "add preset management to presets"): on the chosen preset, with the name in the box: RENAME (your own presets),
+// DUPLICATE (any preset, as one of your own), DELETE (press twice; a factory one is only hidden, RESTORE brings them back), EXPORT
+// (the chosen preset as a file), EXPORT ALL (all of your own) and IMPORT (a file of either kind; sounds.js)
+const pbName = () => pb.body.querySelector('#pb-name').value.trim().slice(0, 40);
+const pbFree = (n) => { let m = n, k = 2; while (m in prjBar.user) m = `${n} ${k++}`; return m; };
+const pbSrc = () => { const v = prjSel.value; if (!v) return null; const nm = v.slice(2); return { v, nm, x: v[0] === 'u' ? prjBar.user[nm] : PROJECT_BUILTIN[nm] }; };
+pb.body.querySelector('#pb-ren').onclick = () => { const s = pbSrc(), n = pbName(); if (!s || s.v[0] !== 'u' || !n || n === s.nm) return;
+  const m = pbFree(n); prjBar.user[m] = prjBar.user[s.nm]; delete prjBar.user[s.nm]; prjBar.save(); prjBar.render('u:' + m); drawBrowser(); dirty = true; };
+pb.body.querySelector('#pb-dup').onclick = () => { const s = pbSrc(); if (!s || !s.x) return; const m = pbFree(pbName() && pbName() !== s.nm ? pbName() : s.nm);
+  prjBar.user[m] = JSON.parse(JSON.stringify(s.x)); prjBar.save(); prjBar.render('u:' + m); drawBrowser(); dirty = true; };
+let pbDelArm = 0; const pbDel = pb.body.querySelector('#pb-del');
+pbDel.onclick = () => { const s = pbSrc(); if (!s) return;
+  if (performance.now() - pbDelArm > 3000) { pbDelArm = performance.now(); pbDel.textContent = 'SURE?'; setTimeout(() => { pbDel.textContent = 'DELETE'; }, 3000); return; }
+  pbDelArm = 0; pbDel.textContent = 'DELETE'; prjBar.remove(s.v); drawBrowser(); dirty = true; };
+pb.body.querySelector('#pb-res').onclick = () => { prjBar.restore(); drawBrowser(); };
+pb.body.querySelector('#pb-exp').onclick = () => { const s = pbSrc(); if (!s || !s.x) return;
+  download(s.nm.replace(/[^\w .-]+/g, '_') + '.json', { app: 'kestrel-ms1', kind: 'project', version: 1, project: s.x }); };
+pb.body.querySelector('#pb-expall').onclick = () => document.getElementById('prj-export').click();
+pb.body.querySelector('#pb-imp').onclick = () => document.getElementById('prj-import').click();
+document.getElementById('prj-file').addEventListener('change', () => setTimeout(() => { if (pb.el.classList.contains('open')) drawBrowser(); }, 300));
 pb.body.querySelector('#pb-roll').onclick = () => {
   prjBar.suggest(true);
   pb.body.querySelector('#pb-name').value = document.getElementById('prj-name').value || '';
