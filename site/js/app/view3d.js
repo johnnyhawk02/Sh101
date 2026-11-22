@@ -74,22 +74,31 @@ const knobBase = knobVal;
 // a taper, 0 (linear) to 100 (strongly logarithmic, like an audio-taper pot): the value is (e^(k u) - 1) / (e^k - 1) of
 // the cap's position u, k = taper / 20. Right-click (or Ctrl-click) a slider for its TAPER pop-up. Kept in this browser
 // (shyoy.taper), not in presets. The mixer and the VCA level start as log pots, as on a real panel.
-const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: 'S', release: 'S' };   // v0.45.3-4 decay/release anti-log, v0.45.5 the 'S' curve (below)
-const taper = { ...TAPER0 };
+// v0.45.6 (Johnny: "can we use linear segments to get our cake and eat it?"): a taper can also be a list of points
+// [[u, x], ...], u the cap's position 0..1 and x the slider's own quantity (seconds for decay and release, else the value
+// 0..1), joined by straight lines in x. The TAPER pop-up's SEGMENTS key turns it on; drag the points on its drawing, click
+// the line to add one, double-click a point to take it away.
+const SEG_ENV = () => [[0, 0.002], [0.05, 0.06], [0.4, 1], [0.7, 3], [1, 10]];
+const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: SEG_ENV(), release: SEG_ENV() };
+const taper = JSON.parse(JSON.stringify(TAPER0));
 try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
-// v0.45.5: Johnny asked for the new decay/release curve, so it replaces whatever this browser had kept for those two, once
-try { if (localStorage.getItem('shyoy.taperv') !== '2') { taper.decay = taper.release = 'S'; localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '2'); } } catch (e) {}
+// v0.45.6: Johnny asked for the segment curves on decay and release, so they replace whatever this browser had kept for those two, once
+try { if (localStorage.getItem('shyoy.taperv') !== '3') { taper.decay = SEG_ENV(); taper.release = SEG_ENV(); localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '3'); } } catch (e) {}
+for (const k in taper) if (taper[k] === 'S') taper[k] = SEG_ENV();   // v0.45.5's 'S' curve
 // v0.45.1 (Johnny: "the decay could do with a curve that bulges the opposite"): -100 .. 100, below 0 bends the other way (anti-log)
 const taperK = (id) => Math.max(-100, Math.min(100, +taper[id] || 0)) / 20;
-// v0.45.5 (Johnny: "we dont have to limit ourselves to realist pots, what about linear from 10s to 60ms over 95% of the travel
-// then down to 2ms in the last bit"): taper 'S', for the env times (0.002 * 5000^v s): the bottom 5% of travel runs 2 ms -> 60 ms
-// (evenly in log time), the rest 60 ms -> 10 s evenly in seconds
-const S_LO = 0.05, S_T = [0.002, 0.06, 10], S_V = (t) => Math.log(t / 0.002) / Math.log(5000);
-const sVal = (u) => S_V(u < S_LO ? S_T[0] * Math.pow(S_T[1] / S_T[0], u / S_LO) : S_T[1] + (u - S_LO) / (1 - S_LO) * (S_T[2] - S_T[1]));
-const sPos = (v) => { const t = 0.002 * Math.pow(5000, v); return t < S_T[1] ? S_LO * Math.log(t / S_T[0]) / Math.log(S_T[1] / S_T[0]) : S_LO + (1 - S_LO) * (t - S_T[1]) / (S_T[2] - S_T[1]); };
-const S_OK = (id) => id === 'decay' || id === 'release';
-const valOf = (id, u) => { const k = taperK(id); u = Math.max(0, Math.min(1, u)); if (taper[id] === 'S' && S_OK(id)) return Math.max(0, Math.min(1, sVal(u))); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
-const posOf = (id, v) => { const k = taperK(id); v = Math.max(0, Math.min(1, v)); if (taper[id] === 'S' && S_OK(id)) return Math.max(0, Math.min(1, sPos(v))); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
+// a slider's own quantity x for its value v, and back
+const ENV_IDS = { decay: 1, release: 1 };
+const toX = (id, v) => ENV_IDS[id] ? 0.002 * Math.pow(5000, v) : v;
+const fromX = (id, x) => ENV_IDS[id] ? Math.log(Math.max(0.002, x) / 0.002) / Math.log(5000) : x;
+const segOf = (id) => Array.isArray(taper[id]) && taper[id].length >= 2 ? taper[id] : null;
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const valOf = (id, u) => { u = clamp01(u); const P = segOf(id);
+  if (P) { let i = 0; while (i < P.length - 2 && u > P[i + 1][0]) i++; const [u0, x0] = P[i], [u1, x1] = P[i + 1]; return clamp01(fromX(id, x0 + (x1 - x0) * (u1 > u0 ? (u - u0) / (u1 - u0) : 0))); }
+  const k = taperK(id); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
+const posOf = (id, v) => { v = clamp01(v); const P = segOf(id);
+  if (P) { const x = toX(id, v); let i = 0; while (i < P.length - 2 && x > P[i + 1][1]) i++; const [u0, x0] = P[i], [u1, x1] = P[i + 1]; return clamp01(u0 + (u1 - u0) * (x1 !== x0 ? (x - x0) / (x1 - x0) : 0)); }
+  const k = taperK(id); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
@@ -774,28 +783,60 @@ function openOptions3d() { opt.open(); }
 // the TAPER pop-up (v0.45.0): one slider's taper, with its curve drawn (cap position across, value up)
 const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((it) => it.t === 'knob').map((it) => [it.id, b.n + ' ' + it.label])));
 const tp = sheet('TAPER');
-tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="240" height="160" style="display:block;width:240px;height:160px;margin:6px 0 10px"></canvas>
+tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="600" height="360" style="display:block;width:300px;height:180px;margin:6px 0 4px;touch-action:none;cursor:crosshair"></canvas>
+  <p class="tp-pts" id="tp-pts" style="margin:0 0 10px;font-size:9.5px;letter-spacing:.04em;min-height:12px"></p>
   <div class="row" style="font-size:10px;letter-spacing:.08em"><b>ANTI</b><input type="range" min="-100" max="100" id="tp-r" aria-label="Taper, anti-log through linear to log" list="tp-mid"><datalist id="tp-mid"><option value="0"></datalist><b>LOG</b><b class="val" id="tp-v"></b></div></div>
-  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button><button id="tp-s">LIN 60MS-10S</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
-let tpId = null;
+  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-seg">SEGMENTS</button><button id="tp-def">DEFAULT</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
+let tpId = null, tpDrag = -1;
+const TPW = 300, TPH = 180, tpCv = tp.body.querySelector('#tp-cv');
+const tpXY = (id, [u, x]) => [u * TPW, TPH - fromX(id, x) * TPH];
 const tpDraw = () => {
-  const id = tpId, c = tp.body.querySelector('#tp-cv'), x = c.getContext('2d'), w = c.width, h = c.height, ink = curInk;
-  x.clearRect(0, 0, w, h); x.strokeStyle = ink; x.globalAlpha = 0.3; x.lineWidth = 1; x.strokeRect(0.5, 0.5, w - 1, h - 1);
+  const id = tpId, x = tpCv.getContext('2d'), w = TPW, h = TPH, ink = curInk, P = segOf(id);
+  x.setTransform(2, 0, 0, 2, 0, 0); x.clearRect(0, 0, w, h); x.strokeStyle = x.fillStyle = ink; x.globalAlpha = 0.3; x.lineWidth = 1; x.strokeRect(0.5, 0.5, w - 1, h - 1);
   x.beginPath(); x.moveTo(0, h); x.lineTo(w, 0); x.stroke(); x.globalAlpha = 1; x.lineWidth = 2.5; x.beginPath();
-  for (let i = 0; i <= 60; i++) { const u = i / 60; x.lineTo(u * w, h - valOf(id, u) * h); } x.stroke();
-  const u = posOf(id, knobVal(id)); x.fillStyle = ink; x.beginPath(); x.arc(u * w, h - knobVal(id) * h, 4, 0, 7); x.fill();
-  tp.body.querySelector('#tp-r').value = +taper[id] || 0; tp.body.querySelector('#tp-v').textContent = taper[id] === 'S' ? 'LIN 60MS' : (taper[id] || 0);
-  const sb = tp.body.querySelector('#tp-s'); sb.hidden = !S_OK(id); sb.classList.toggle('lit', taper[id] === 'S');
+  for (let i = 0; i <= 150; i++) { const u = i / 150; x.lineTo(u * w, h - valOf(id, u) * h); } x.stroke();
+  if (P) P.forEach((p, i) => { const [px, py] = tpXY(id, p); x.fillStyle = i === tpDrag ? '#ff2a14' : ink; x.fillRect(px - 4.5, py - 4.5, 9, 9); });
+  const u = posOf(id, knobVal(id)); x.fillStyle = ink; x.beginPath(); x.arc(u * w, h - knobVal(id) * h, 3.5, 0, 7); x.fill();
+  if (P && tpDrag >= 0) { const p = P[tpDrag], [px, py] = tpXY(id, p), t = `${Math.round(p[0] * 100)}% → ${knobText(id, fromX(id, p[1]))}`;
+    x.font = `600 11px ${MONO}`; x.textAlign = px > w / 2 ? 'right' : 'left'; x.fillStyle = ink; x.fillText(t, px + (px > w / 2 ? -10 : 10), Math.max(14, Math.min(h - 6, py - 8))); }
+  tp.body.querySelector('#tp-pts').textContent = P ? P.map((p) => `${Math.round(p[0] * 100)}% ${knobText(id, fromX(id, p[1]))}`).join('  ·  ') : '';
+  tp.body.querySelector('#tp-r').value = +taper[id] || 0; tp.body.querySelector('#tp-v').textContent = P ? 'SEGMENTS' : (taper[id] || 0);
+  tp.body.querySelector('#tp-seg').classList.toggle('lit', !!P);
   tp.body.querySelector('#tp-name').textContent = (KNOB_NAMES[id] || id).toUpperCase();
 };
-const tpSet = (v) => { taper[tpId] = v === 'S' ? 'S' : Math.round(v); try { localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); } catch (e) {} for (const k of knobs) k.shown = null; dirty = true; tpDraw(); };
+const tpSave = () => { try { localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); } catch (e) {} for (const k of knobs) k.shown = null; dirty = true; tpDraw(); };
+const tpSet = (v) => { taper[tpId] = Array.isArray(v) ? v.map((p) => [...p]) : Math.round(v); tpSave(); };
 tp.body.querySelector('#tp-r').oninput = (e) => tpSet(+e.target.value);
 tp.body.querySelector('#tp-lin').onclick = () => tpSet(0);
 tp.body.querySelector('#tp-def').onclick = () => tpSet(TAPER0[tpId] || 0);
-tp.body.querySelector('#tp-s').onclick = () => tpSet('S');
+// SEGMENTS: the curve as it stands, as five points (the env times get their 2 ms .. 10 s set)
+tp.body.querySelector('#tp-seg').onclick = () => { if (segOf(tpId)) return; tpSet(ENV_IDS[tpId] ? SEG_ENV() : [0, 0.25, 0.5, 0.75, 1].map((u) => [u, +valOf(tpId, u).toFixed(4)])); };
+// editing the points on the drawing
+const tpAt = (e) => { const r = tpCv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * TPW, (e.clientY - r.top) / r.height * TPH]; };
+const tpNear = (q) => { const P = segOf(tpId); if (!P) return -1; let best = -1, bd = 10; P.forEach((p, i) => { const [px, py] = tpXY(tpId, p), d = Math.hypot(px - q[0], py - q[1]); if (d < bd) { bd = d; best = i; } }); return best; };
+const rnd4 = (x) => +x.toPrecision(4);
+tpCv.addEventListener('pointerdown', (e) => {
+  const P = segOf(tpId); if (!P) return; const q = tpAt(e); let i = tpNear(q);
+  if (i < 0) {   // a click on the line adds a point there
+    const u = clamp01(q[0] / TPW); if (u <= P[0][0] || u >= P[P.length - 1][0]) return;
+    i = P.findIndex((p) => p[0] > u); P.splice(i, 0, [rnd4(u), rnd4(toX(tpId, valOf(tpId, u)))]);
+  }
+  tpDrag = i; try { tpCv.setPointerCapture(e.pointerId); } catch (er) {} tpSave();
+});
+tpCv.addEventListener('pointermove', (e) => {
+  const P = segOf(tpId); if (!P || tpDrag < 0) return; const q = tpAt(e), i = tpDrag, last = i === P.length - 1;
+  const lo = i > 0 ? P[i - 1] : null, hi = !last ? P[i + 1] : null;
+  // the end points keep their place across (0% and 100%); the others stay between their neighbours, both ways
+  const u = i === 0 ? 0 : last ? 1 : Math.max(lo[0] + 0.005, Math.min(hi[0] - 0.005, q[0] / TPW));
+  let x = toX(tpId, clamp01(1 - q[1] / TPH)); if (lo) x = Math.max(lo[1], x); if (hi) x = Math.min(hi[1], x);
+  P[i] = [rnd4(u), rnd4(x)]; tpSave();
+});
+const tpUp = () => { if (tpDrag >= 0) { tpDrag = -1; tpDraw(); } };
+tpCv.addEventListener('pointerup', tpUp); tpCv.addEventListener('pointercancel', tpUp);
+tpCv.addEventListener('dblclick', (e) => { const P = segOf(tpId); if (!P) return; const i = tpNear(tpAt(e)); if (i > 0 && i < P.length - 1) { P.splice(i, 1); tpDrag = -1; tpSave(); } });
 // v0.45.2 (Johnny: "a copy button to give you defaults"): every slider's taper (non-zero ones) as JSON, to paste back to
 // Claude to become TAPER0
-tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(Object.fromEntries(Object.entries(taper).filter(([, v]) => v)));
+tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(Object.fromEntries(Object.entries(taper).filter(([, v]) => Array.isArray(v) || v)));
   try { await navigator.clipboard.writeText(t); b.textContent = 'COPIED'; } catch (er) { prompt('Copy the tapers', t); }
   setTimeout(() => { b.textContent = 'COPY ALL TAPERS'; }, 1500); };
 function openTaper(id) { tpId = id; tpDraw(); tp.open(); }
