@@ -110,7 +110,7 @@ const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's 
 // v0.43.14 (Johnny: "make the drag bars a bit lighter than the panel colour"): the panel colour, a third of the way to white
 const dragAuto = () => '#' + [1, 3, 5].map((i) => { const v = parseInt(look.colour.slice(i, i + 2), 16); return Math.round(v + (255 - v) * 0.35).toString(16).padStart(2, '0'); }).join('');
 const SEQ_LANE_ROWS = [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]];   // lane, first row, rows
-const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
+const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'GATE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
@@ -430,7 +430,7 @@ for (const b of BOXES) {
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84, gy = y0 + 28, gh = SEQ_GH;
+      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84 - 8, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
       const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
@@ -438,12 +438,12 @@ for (const b of BOXES) {
         rowY: (ri) => TOP + ri * rowH0 + laneOf(ri) * LGAP,   // a row's top, from the grid's top
         rowAt: (dy) => { for (let ri = 0; ri < SEQ_ROWS.length; ri++) { const t = TOP + ri * rowH0 + laneOf(ri) * LGAP; if (dy >= t - LGAP / 2 && dy < t + rowH0) return ri; } return -1; } };
       SEQ_ROWS.forEach((r, ri) => { const yy = gy + seqGrid.rowY(ri) + 0.5 * seqGrid.rowH;
-        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 8, yy + 0.5, 9.5, 'right'); }); });
+        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 14, yy + 0.5, 9.5, "right"); }); });
       for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 9);
       makeSeqGrid();
       // v0.43.0 (Johnny: "a step length on the RHS for each lane - try a number box"): drag up or down, or press the
       // top half for one more and the bottom half for one fewer. The octave lane's box sits across its three rows
-      const rh = seqGrid.rowH, nx = gx + gw + 10;
+      const rh = seqGrid.rowH, nx = gx + gw + 18;   // v0.43.18: room for the wider draggers
       prints.push((x, ink) => { x.fillStyle = ink; text(x, 'LEN', nx + 15, gy - 6, 9, 'center'); text(x, 'RETRIG', nx + 54, gy - 6, 9, 'center'); });
       SEQ_LANE_ROWS.forEach(([k, r0, n]) => {
         const ly0 = gy + seqGrid.rowY(r0), by = ly0 + (n * rh - (rh - 3)) / 2, bh = rh - 3;
@@ -470,7 +470,7 @@ for (const b of BOXES) {
         prints.push((x, ink) => { x.fillStyle = ink;
           if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
           else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
-        tx += tri ? 62 : (gw + 84 - 2 * 62 - 24 - 96 - 110) / 7; if (label === 'RETRIG') tx = gx + gw + 84 - 104; if (tri && label === '▶') tx += 96;
+        tx += tri ? 62 : (gw + 92 - 2 * 62 - 24 - 96 - 110) / 7; if (label === 'RETRIG') tx = gx + gw + 92 - 104; if (tri && label === '▶') tx += 96;
       });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
@@ -488,15 +488,15 @@ for (const b of BOXES) {
 let modHeld = false;
 // ---- the sequencer's note grid (v0.42.1), drawn on its own layer over the print
 function makeSeqGrid() {
-  const G = seqGrid, c = document.createElement('canvas'); c.width = Math.ceil(G.w * 3); c.height = Math.ceil(G.h * 3); const x = c.getContext('2d');
+  const G = seqGrid, PAD = 12, c = document.createElement('canvas'); c.width = Math.ceil((G.w + 2 * PAD) * 3); c.height = Math.ceil(G.h * 3); const x = c.getContext("2d");   // v0.43.18: PAD each side for the draggers
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(G.w, G.h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(G.w + 2 * PAD, G.h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
   m.position.copy(P(G.x + G.w / 2, G.y + G.h / 2, 0.08)); m.renderOrder = 1; grp.add(m);
   let sig = '';
   const draw = () => {
     const ink = curInk, light = ink === '#000000', s2 = JSON.stringify(state.seq) + ink + look.barCol + look.colour + seqPos + JSON.stringify(seqLanePos); if (s2 === sig) return false; sig = s2;
     const tone = (a) => light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`, cw = G.colW, rh = G.rowH;
-    x.setTransform(3, 0, 0, 3, 0, 0); x.clearRect(0, 0, G.w, G.h);
+    x.setTransform(3, 0, 0, 3, 3 * PAD, 0); x.clearRect(-PAD, 0, G.w + 2 * PAD, G.h);
     for (let i = 0; i < SEQ_N; i++) {
       const st = state.seq.steps[i], cx = i * cw;
       SEQ_ROWS.forEach(([t, v], ri) => {
@@ -516,12 +516,11 @@ function makeSeqGrid() {
       // v0.43.16 (Johnny: "tidy this up"): one solid frame, drawn as filled strips so the corners join: the thick top bar, a side bar at each end
       // centred on the cell boundary, a thin bottom edge; each side bar carries a grip handle centred on it
       const ly = G.rowY(r0), a = state.seq.st[k] * cw, b = (state.seq.st[k] + state.seq.len[k]) * cw;
-      const L = Math.max(0, a - 1.5), R = Math.min(G.w, b + 1.5), top = ly - 11, bot = ly + n * rh + 3, mid = ly + n * rh / 2;
-      x.fillStyle = DC; x.fillRect(L, top, R - L, 8); x.fillRect(L, top, 3, bot - top); x.fillRect(R - 3, top, 3, bot - top); x.fillRect(L, bot - 2, R - L, 2);
+      // v0.43.18 (Johnny: "make the draggers themselves wider"): each side is a 10 px dragger, 1.5 px inside the loop and the rest outside it
+      const DW = 10, L = a + 1.5 - DW, R = b - 1.5 + DW, top = ly - 11, bot = ly + n * rh + 3, mid = ly + n * rh / 2;
+      x.fillStyle = DC; x.fillRect(L, top, R - L, 8); x.fillRect(L, top, DW, bot - top); x.fillRect(R - DW, top, DW, bot - top); x.fillRect(L, bot - 2, R - L, 2);
       x.fillStyle = grip; for (let d = -6; d <= 6; d += 3) x.fillRect((L + R) / 2 + d - 0.5, top + 2, 1, 4);
-      for (const sx of [L + 1.5, R - 1.5]) { const hx = Math.max(4.5, Math.min(G.w - 4.5, sx));
-        x.fillStyle = DC; x.fillRect(hx - 4.5, mid - 9, 9, 18);
-        x.fillStyle = grip; for (const d of [-4, 0, 4]) x.fillRect(hx - 2.5, mid + d - 0.5, 5, 1); }
+      for (const hx of [L + DW / 2, R - DW / 2]) for (const d of [-4, 0, 4]) x.fillRect(hx - 2.5, mid + d - 0.5, 5, 1);
     }
     tex.needsUpdate = true; return true;
   };
@@ -546,7 +545,7 @@ function makeSeqGrid() {
     const out = Math.max(14, G.colW * 0.5);
     if (p[0] >= bx - 4 && p[0] <= bx + out) return { k, end: true };
     if (p[0] >= ax - out && p[0] <= ax + 4) return { k, end: false }; return null; };
-  addCtl({ kind: 'roll', rect: [G.x - 30, G.y, G.w + 38, G.h], sync: draw,
+  addCtl({ kind: 'roll', rect: [G.x - 30, G.y, G.w + 46, G.h], sync: draw,
     down(p) { const tk = topAt(p); if (tk) { lenDrag = { k: tk, move: true, c0: (p[0] - G.x) / G.colW, a0: state.seq.st[tk] }; return; }
       const b = barAt(p); if (b) { lenDrag = b; return; }
       const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
