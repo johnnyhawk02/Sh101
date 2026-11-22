@@ -1,0 +1,9 @@
+Shyoy for Windows (64-bit)
+
+VST3: copy the Shyoy.vst3 folder to C:\Program Files\Common Files\VST3\ and rescan plug-ins in your DAW.
+Standalone: Shyoy.exe runs on its own (pick the audio and MIDI devices in Options).
+
+The panel is drawn by Microsoft Edge WebView2, which comes with Windows 10 and 11. If the window stays blank, install
+the "Evergreen WebView2 Runtime" from Microsoft.
+Windows may warn that the plug-in is from an unknown publisher (it is not code-signed).
+Looks, presets and options are shared by every Shyoy instance (in %APPDATA%\Shyoy); each sound is saved in your project.

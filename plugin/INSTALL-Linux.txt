@@ -1,0 +1,10 @@
+Shyoy for Linux (x86-64)
+
+VST3: copy the Shyoy.vst3 folder to ~/.vst3/ and rescan plug-ins in your DAW (Bitwig, Reaper, Ardour...).
+Standalone: ./Shyoy-standalone
+
+The panel needs WebKitGTK 4.1 (or 4.0):
+  Debian/Ubuntu: sudo apt install libwebkit2gtk-4.1-0
+  Fedora:        sudo dnf install webkit2gtk4.1
+  Arch:          sudo pacman -S webkit2gtk-4.1
+Looks, presets and options are shared by every Shyoy instance (~/.config/Shyoy); each sound is saved in your project.

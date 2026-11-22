@@ -1,0 +1,9 @@
+Shyoy for macOS 11 or later (Apple silicon and Intel)
+
+VST3: copy Shyoy.vst3 to ~/Library/Audio/Plug-Ins/VST3/
+AU:   copy Shyoy.component to ~/Library/Audio/Plug-Ins/Components/
+Standalone: Shyoy.app
+
+The build is not notarised, so macOS quarantines it. After copying, run in Terminal:
+  xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Shyoy.vst3 ~/Library/Audio/Plug-Ins/Components/Shyoy.component
+Looks, presets and options are shared by every Shyoy instance (~/Library/Shyoy); each sound is saved in your project.

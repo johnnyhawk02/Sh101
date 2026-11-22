@@ -1,0 +1,29 @@
+diff --git a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+index f2e8a95..a30d041 100644
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -499,7 +499,7 @@ public:
+ 
+         auto json = JSON::toString (var (obj.get()));
+ 
+-        auto jsonLength = static_cast<size_t> (json.length());
++        auto jsonLength = static_cast<size_t> (json.getNumBytesAsUTF8());   // Shyoy patch: bytes, not characters
+         auto len        = sizeof (size_t) + jsonLength;
+ 
+         HeapBlock<char> buffer (len);
+@@ -552,6 +552,15 @@ private:
+                 if (bytesThisTime != 0 && errno == EINTR)
+                     continue;
+ 
++                // Shyoy patch: a large message (a resource the web view asked for) arrives in pieces. On a non-blocking
++                // pipe, stopping half way lost the rest and the next read took message bytes for a length.
++                if (bytesThisTime != 0 && pos != 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
++                {
++                    pollfd pfd { inChannel, POLLIN, 0 };
++                    poll (&pfd, 1, 1000);
++                    continue;
++                }
++
+                 break;
+             }
+ 

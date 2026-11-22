@@ -1,0 +1,94 @@
+# Builds the Shyoy plugin (plugin/) for Windows, macOS and Linux, checks that its engine renders bit for bit what the web
+# app's engine renders on each platform, runs the VST3 in a test host on Linux, and publishes the VST3s to the
+# "plugin-latest" release.
+name: Plugin
+on:
+  push:
+    paths: ['site/**', 'plugin/**', '.github/workflows/plugin.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: plugin-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022, name: Windows }
+          - { os: macos-14, name: macOS }
+          - { os: ubuntu-22.04, name: Linux }
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libasound2-dev libfreetype-dev libfontconfig1-dev libcurl4-openssl-dev ninja-build xvfb xdotool imagemagick
+      - name: WebView2 SDK (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/nuget/Microsoft.Web.WebView2.1.0.1901.177"
+          curl -sSL -o "$RUNNER_TEMP/webview2.zip" https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.1901.177
+          unzip -q "$RUNNER_TEMP/webview2.zip" -d "$RUNNER_TEMP/nuget/Microsoft.Web.WebView2.1.0.1901.177"
+      - name: Configure
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            cmake -S plugin -B build -G "Visual Studio 17 2022" -A x64 -DJUCE_WEBVIEW2_PACKAGE_LOCATION="$RUNNER_TEMP/nuget"
+          elif [ "$RUNNER_OS" = macOS ]; then
+            cmake -S plugin -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          else
+            cmake -S plugin -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSHYOY_HOST_TEST=ON
+          fi
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+      - name: Sample match with the web app's engine
+        shell: bash
+        run: |
+          R=$(find build/shyoy_render_artefacts -type f \( -name shyoy_render -o -name shyoy_render.exe \) | head -1)
+          node plugin/tools/match.mjs "$R"
+      - name: Test the VST3 in a host (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1280x720x24" build/shyoy_host_test_artefacts/Release/shyoy_host_test build/Shyoy_artefacts/Release/VST3/Shyoy.vst3 shyoy-linux.png
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist/Shyoy
+          cp -R build/Shyoy_artefacts/Release/VST3/Shyoy.vst3 dist/Shyoy/
+          if [ "$RUNNER_OS" = macOS ]; then for b in VST3/Shyoy.vst3 AU/Shyoy.component Standalone/Shyoy.app; do codesign --force --deep -s - "build/Shyoy_artefacts/Release/$b"; done; fi
+          if [ "$RUNNER_OS" = macOS ]; then cp -R build/Shyoy_artefacts/Release/AU/Shyoy.component dist/Shyoy/; cp -R build/Shyoy_artefacts/Release/Standalone/Shyoy.app dist/Shyoy/; fi
+          if [ "$RUNNER_OS" = Windows ]; then cp build/Shyoy_artefacts/Release/Standalone/Shyoy.exe dist/Shyoy/; fi
+          if [ "$RUNNER_OS" = Linux ]; then cp build/Shyoy_artefacts/Release/Standalone/Shyoy dist/Shyoy/Shyoy-standalone; fi
+          cp plugin/INSTALL-${{ matrix.name }}.txt dist/Shyoy/INSTALL.txt
+          cd dist
+          if [ "$RUNNER_OS" = Windows ]; then 7z a -tzip ../Shyoy-${{ matrix.name }}.zip Shyoy > /dev/null; else zip -qry ../Shyoy-${{ matrix.name }}.zip Shyoy; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shyoy-${{ matrix.name }}
+          path: |
+            Shyoy-${{ matrix.name }}.zip
+            shyoy-linux.png
+          if-no-files-found: ignore
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - name: Publish to the plugin-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          ls -la out
+          NOTES="Built from ${GITHUB_SHA::7} on ${GITHUB_REF_NAME}. Windows and Linux: VST3 (+ standalone). macOS: VST3, AU and standalone app. See INSTALL.txt inside each zip."
+          gh release delete plugin-latest --repo "$REPO" --yes --cleanup-tag || true
+          gh release create plugin-latest out/Shyoy-*.zip --repo "$REPO" --target "$GITHUB_SHA" --prerelease --title "Shyoy plugin (latest build)" --notes "$NOTES"
