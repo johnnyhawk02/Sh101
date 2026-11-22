@@ -4,17 +4,26 @@
 const SEQ_N = 16;
 // v0.42.1 (Johnny: "remove the tempo, as it'll soon be a VST"): a fixed 120 BPM here; the host will set it. Steps gain accent (a)
 const SEQ0 = () => ({ steps: [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1].map((on, i) => ({ on: !!on, o: [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1][i], s: i === 4 || i === 12, a: i % 4 === 0 })) });
-if (!state.seq || !Array.isArray(state.seq.steps) || state.seq.steps.length !== SEQ_N) state.seq = SEQ0();
 // v0.43.0 (Johnny): each lane (octave, note, slide, accent) has its own length, 1-16
 const SEQ_LANES = ['o', 'on', 's', 'a'];
-state.seq.len = Object.assign({ o: SEQ_N, on: SEQ_N, s: SEQ_N, a: SEQ_N }, state.seq.len || {});
-// v0.43.1 (Johnny): a RETRIG tick per lane: a key played while it runs starts that lane again from step 1
-// v0.43.9 (Johnny: "a dragger at the front of the boxes too"): each lane also has a start step, so it loops from st to st + len - 1
-state.seq.st = Object.assign({ o: 0, on: 0, s: 0, a: 0 }, state.seq.st || {});
-for (const k of SEQ_LANES) { state.seq.st[k] = Math.max(0, Math.min(SEQ_N - 1, state.seq.st[k] | 0)); state.seq.len[k] = Math.max(1, Math.min(SEQ_N - state.seq.st[k], state.seq.len[k] | 0)); }
-state.seq.rt = Object.assign({ o: false, on: false, s: false, a: false }, state.seq.rt || {});
-// v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note; a v0.42.0-1 pattern (-1..1) moves up one
-if (state.seq.steps.some((s) => s.o < 0)) state.seq.steps.forEach((s) => { s.o = (s.o | 0) + 1; });
+// a pattern as saved (the session, or a preset since v0.46.0), checked and filled in
+function seqTidy(q) {
+  q = q && typeof q === 'object' && Array.isArray(q.steps) && q.steps.length === SEQ_N ? JSON.parse(JSON.stringify(q)) : SEQ0();
+  q.steps = q.steps.map((s) => ({ on: !!(s && s.on), o: Math.max(0, Math.min(2, (s && s.o) | 0)), s: !!(s && s.s), a: !!(s && s.a) }));
+  q.len = Object.assign({ o: SEQ_N, on: SEQ_N, s: SEQ_N, a: SEQ_N }, q.len || {});
+  // v0.43.1 (Johnny): a RETRIG tick per lane: a key played while it runs starts that lane again from step 1
+  // v0.43.9 (Johnny: "a dragger at the front of the boxes too"): each lane also has a start step, so it loops from st to st + len - 1
+  q.st = Object.assign({ o: 0, on: 0, s: 0, a: 0 }, q.st || {});
+  for (const k of SEQ_LANES) { q.st[k] = Math.max(0, Math.min(SEQ_N - 1, q.st[k] | 0)); q.len[k] = Math.max(1, Math.min(SEQ_N - q.st[k], q.len[k] | 0)); }
+  q.rt = Object.assign({ o: false, on: false, s: false, a: false }, q.rt || {});
+  return q;
+}
+// v0.42.2: a v0.42.0-1 pattern (octaves -1..1) moves up one before it's tidied
+if (state.seq && Array.isArray(state.seq.steps) && state.seq.steps.some((s) => s && s.o < 0)) state.seq.steps.forEach((s) => { s.o = (s.o | 0) + 1; });
+state.seq = seqTidy(state.seq);
+// v0.46.0: a preset's pattern (sounds.js applyPreset); the playheads carry on where they are
+function seqLoad(q) { state.seq = seqTidy(q); seqSend(); }
+// v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note
 let seqOn = false, seqPos = -1, seqLanePos = null;
 const seqBpm = () => 120;
 const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len }, st: { ...state.seq.st }, rt: { ...state.seq.rt } } });

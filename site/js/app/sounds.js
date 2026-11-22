@@ -3,7 +3,9 @@
 const clone = o => JSON.parse(JSON.stringify(o));
 function soundSnap() { return { params: clone(state.params), bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) }; }
 // v0.40.0 (Johnny: "remove the sequencer"): a preset is the sound alone; one saved with a pattern loads its sound
-function projectSnap() { return { sound: soundSnap() }; }
+// v0.46.0 (Johnny: "the sequencer needs to be saved with the presets"): it holds the octave sequencer's pattern too (seq.js):
+// every step, each lane's start, length and RETRIG. A preset saved without one (the factory ones) leaves the pattern as it is
+function projectSnap() { return { sound: soundSnap(), seq: clone(state.seq) }; }
 function applySound(x) {
   if (!x || typeof x !== 'object') return;
   state.params = { ...defaults, ...knownParams(x.params) }; state.bend = { ...stockBend(), ...(x.bend || {}) };
@@ -17,6 +19,7 @@ function applyPreset(x) {
   if (!x || typeof x !== 'object') return;
   boot();
   if (x.sound) applySound(x.sound);
+  if (x.seq) seqLoad(x.seq);
   pushAll(); save();
 }
 // Factory presets, in the shape of an Export all file's projectPresets ({ "Name": project, ... }): paste one in here.
