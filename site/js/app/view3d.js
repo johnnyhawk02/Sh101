@@ -793,9 +793,9 @@ const printSigNow = () => curInk;
 function fit() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
-  const small = Math.min(w, h) < 600, padX = small ? 6 : 48, padY = small ? 6 : 48;
+  const small = Math.min(w, h) < 600, padX = small ? 4 : 10, padY = small ? 4 : 10;   // v0.43.13 (Johnny: "why do we have space above and below"): was 48 px each side
   const fx = (w - 2 * padX) / w, fy = (h - 2 * padY) / h, t = Math.tan(camera.fov * Math.PI / 360);
-  const d = Math.max((H / 2) / (t * fy), (W / 2) / (t * camera.aspect * fx)) + 20;
+  const d = Math.max((H / 2) / (t * fy), (W / 2) / (t * camera.aspect * fx));
   camera.near = d / 20; camera.far = d * 4;
   camera.position.set(0, 0, d); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
   shadowDirty = dirty = true;
