@@ -10,7 +10,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
-const C = 70, R = 150, M = 8, COLS = 18, ROWS = 4;   // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
+const C = 66, R = 150, M = 8, COLS = 19, ROWS = 3;   // v0.54.0 (Johnny: "try to get all the synth sliders on two lines"): 19 columns of 66 (was 18 of 70), two rows of sliders and the sequencer
+// v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
 const SEQ_GH = 240;   // v0.43.10: the sequencer grid's height
 const SEQ_TOOLS = 96 + SEQ_GH - 154;   // v0.42.4: the strip of keys under the sequencer's grid
 const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
@@ -41,21 +42,21 @@ for (const b of BENDER) DEF[b.f] = b;
 const K = (id, label) => ({ t: 'knob', id, label });
 const S = (id, label, opts, w = 1) => ({ t: 'sw', id, label, opts, w });
 // v0.39.0 (Johnny: "simplify shyoy, remove fx") took out the FX rows, v0.40.0 the sequencer page: three rows of sliders
-const ROW_VCF = 1, ROW_BENDER = 2;
+const ROW_VCF = 1, ROW_BENDER = 1;
 const BOXES = [
   { r: 0, c: 0, s: 2, n: 'LFO', it: [K('lfoRate', 'RATE'), S('lfoWave', 'WAVE', ['TRI', 'SQR', 'RND', 'NOISE'])] },
   { r: 0, c: 2, s: 6, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV']), K('drift', 'DRIFT')] },
-  { r: 0, c: 8, s: 6, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
-  { r: ROW_VCF, c: 0, s: 8, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
-  { r: ROW_VCF, c: 8, s: 7, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
-  { r: ROW_VCF, c: 15, s: 3, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
-  { r: ROW_BENDER, c: 10, s: 8, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
-  { r: ROW_BENDER, c: 0, s: 10, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
+  { r: 0, c: 8, s: 5, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
+  { r: ROW_VCF, c: 0, s: 7, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
+  { r: ROW_VCF, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
+  { r: 0, c: 13, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
+  { r: ROW_BENDER, c: 16, s: 3, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
+  { r: ROW_BENDER, c: 12, s: 4, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
   // v0.53.1 (Johnny: "dont need these - i have them on my keyboard"): no BEND lever or MOD key on the panel; MIDI pitch bend and mod still work
   // v0.53.0 (Johnny: "should just be the preset name and clicking on it opens the preset popup / it should be moved under the word
   // shyoy"): no PRESET box; the name sits under the logo (see TITLE below), and BENDER and PERFORM share the row
   // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
-  { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'grid', w: 18 }] },   // v0.49.0: PLAY moved under the grid
+  { r: 2, c: 0, s: 19, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'grid', w: 19 }] },   // v0.49.0: PLAY moved under the grid
 ];
 let seqGrid = null;
 const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's highlights)
@@ -63,7 +64,7 @@ const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's 
 const dragAuto = () => '#' + [1, 3, 5].map((i) => { const v = parseInt(look.colour.slice(i, i + 2), 16); return Math.round(v + (255 - v) * 0.35).toString(16).padStart(2, '0'); }).join('');
 const SEQ_LANE_ROWS = [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]];   // lane, first row, rows
 const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'GATE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
-const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
+const TITLE = { x: M + 15 * C, y: M, w: 4 * C, h: R };
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
@@ -587,7 +588,7 @@ logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 10)); lo
 logoMat.shadowSide = THREE.DoubleSide; logoMat.alphaTest = 0.04; scene.add(logoLayer);   // the shadow pass copies map + alphaTest, so it casts the letters
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
-    const lw = 262, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 6;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
+    const lw = Math.min(262, TITLE.w - 16), lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 6;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
     const lx2 = logoCv.getContext('2d'); lx2.setTransform(1, 0, 0, 1, 0, 0); lx2.globalCompositeOperation = 'source-over'; lx2.clearRect(0, 0, logoCv.width, logoCv.height);
     lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
     // worn ink (v0.31.2): where the wear map dips (scuffs, scratches, dents) the ink is rubbed thin or through to the
