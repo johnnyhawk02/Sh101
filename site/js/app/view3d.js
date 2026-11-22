@@ -536,13 +536,16 @@ const VER3D = ((document.getElementById('ver') || {}).textContent || '').replace
 // v0.44.0 (Johnny: "clicking shyoy randomizes the sound, the word wobbles in 3 dimensions"; "command click opens options"):
 // a click on the word is a new random sound (rand.js) and the word wobbles; right-click or Shift-click steps back; Cmd/Ctrl-click opens OPTIONS
 const LOGO_Z = logoLayer.position.z, logoWob = { t0: -1 };
-const wobbleLogo = () => { logoWob.t0 = performance.now(); dirty = true; };
+// v0.44.1 (Johnny: "it does the same animation each time - randomise it"): each click draws its own wobble: how far it tips
+// on each axis, how fast each axis swings and from where, how quickly it settles and how far it lifts
+const wobbleLogo = () => { const U = (a, b) => a + Math.random() * (b - a), sg = () => (Math.random() < 0.5 ? -1 : 1);
+  Object.assign(logoWob, { t0: performance.now(), ax: sg() * U(0.12, 0.5), ay: sg() * U(0.1, 0.45), az: sg() * U(0.02, 0.14),
+    fx: U(10, 24), fy: U(8, 20), fz: U(12, 28), px: U(0, 6.3), py: U(0, 6.3), pz: U(0, 6.3), k: U(1.8, 3.6), lift: U(25, 70) }); dirty = true; };
 function logoWobbleStep(now) {
-  const t = (now - logoWob.t0) / 1000;
-  if (t > 1.8 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; logoWob.t0 = -1; dirty = true; return; }
-  const e = Math.exp(-t * 2.6);
-  logoLayer.rotation.set(Math.sin(t * 17) * 0.38 * e, Math.sin(t * 13 + 1.2) * 0.32 * e, Math.sin(t * 21 + 2.1) * 0.07 * e);
-  logoLayer.position.z = LOGO_Z + 48 * e; dirty = true;
+  const w = logoWob, t = (now - w.t0) / 1000, e = Math.exp(-t * w.k) * (1 - Math.exp(-t * 25));   // eases in over ~0.1 s, then dies away
+  if (t > 0.3 && e < 0.01 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; w.t0 = -1; dirty = true; return; }
+  logoLayer.rotation.set(Math.sin(t * w.fx + w.px) * w.ax * e, Math.sin(t * w.fy + w.py) * w.ay * e, Math.sin(t * w.fz + w.pz) * w.az * e);
+  logoLayer.position.z = LOGO_Z + w.lift * e; dirty = true;
 }
 const logoClick = (ev) => {
   if (ev && (ev.metaKey || ev.ctrlKey)) return openOptions3d();
