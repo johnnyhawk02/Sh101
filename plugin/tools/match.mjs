@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const renderBin = process.argv[2];
 if (!renderBin) { console.error('usage: node plugin/tools/match.mjs path/to/shyoy_render'); process.exit(2); }
@@ -18,7 +19,7 @@ async function jsEngine(sr) {
   globalThis.registerProcessor = (_, c) => { Proc = c; };
   const f = join(dir, `engine-${sr}-${Math.random().toString(36).slice(2)}.mjs`);
   writeFileSync(f, readFileSync(new URL('../../site/js/dsp/engine.js', import.meta.url), 'utf8'));
-  await import(f);
+  await import(pathToFileURL(f).href);
   return new Proc();
 }
 async function renderJs(script) {
@@ -50,6 +51,13 @@ const SCRIPTS = {
 };
 
 import { writeFileSync as wf } from "node:fs";
+// The plugin computes Math.sin as V8's fdlibm does (as Node on Linux and Windows does). Node on macOS uses another
+// sine (it differs in the last bit for about 3% of inputs). Only the hum on the FINGER bend node goes through Math.sin
+// per sample, so on such a Node the bent-circuit test can drift apart without either engine being wrong: it is
+// reported, not failed.
+const SIN_PROBE = [[-7.3224671197493452, -0.86204044383781209], [-0.50812388628872895, -0.48653902076267852], [2.1740825697870587, 0.82347560932038955], [8.225251261414396, 0.93186747742004195], [-2.5688768091991596, -0.54191652785335864], [-0.95093536819670099, -0.81395923673833503]];
+const fdlibmSin = SIN_PROBE.every(([x, y]) => Math.sin(x) === y);
+if (!fdlibmSin) console.log("note: this Node's Math.sin is not V8's fdlibm one, so the FINGER (hum) test is informational here");
 let worst = 0, fail = false;
 for (const [name, script] of Object.entries(SCRIPTS)) {
   const a = await renderJs(script), b = renderCpp(name.replace(/\W+/g, '-'), script);
@@ -58,9 +66,10 @@ for (const [name, script] of Object.entries(SCRIPTS)) {
   let max = 0, at = -1, exact = 0, pk = 0;
   for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - b[i]); if (d > max) { max = d; at = i; } if (d === 0) exact++; pk = Math.max(pk, Math.abs(a[i])); }
   const db = max > 0 ? (20 * Math.log10(max)).toFixed(1) + ' dBFS' : 'none';
+  const usesSin = JSON.stringify(script.events).includes('FINGER>');
   const ok = max < 1e-5;   // -100 dBFS
-  if (!ok) fail = true; worst = Math.max(worst, max);
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}: ${a.length} samples, peak ${pk.toFixed(3)}, ${(100 * exact / a.length).toFixed(2)}% bit-identical, largest difference ${db}${at >= 0 && max > 0 ? ` at sample ${at}` : ''}`);
+  if (!ok && (fdlibmSin || !usesSin)) fail = true; worst = Math.max(worst, max);
+  console.log(`${ok ? 'ok  ' : fdlibmSin || !usesSin ? 'FAIL' : 'info'} ${name}: ${a.length} samples, peak ${pk.toFixed(3)}, ${(100 * exact / a.length).toFixed(2)}% bit-identical, largest difference ${db}${at >= 0 && max > 0 ? ` at sample ${at}` : ''}`);
 }
 console.log(fail ? 'SAMPLE MATCH FAILED' : `sample match ok (largest difference ${worst ? (20 * Math.log10(worst)).toFixed(1) + ' dBFS' : 'none'})`);
 process.exit(fail ? 1 : 0);
