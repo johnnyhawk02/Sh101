@@ -380,7 +380,7 @@ for (const b of BOXES) {
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84 - 8, gy = y0 + 28, gh = SEQ_GH;
+      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 52, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
       const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
@@ -391,20 +391,13 @@ for (const b of BOXES) {
         prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 14, yy + 0.5, 9.5, "right"); }); });
       for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 9);
       makeSeqGrid();
-      // v0.43.0 (Johnny: "a step length on the RHS for each lane - try a number box"): drag up or down, or press the
-      // top half for one more and the bottom half for one fewer. The octave lane's box sits across its three rows
-      const rh = seqGrid.rowH, nx = gx + gw + 18;   // v0.43.18: room for the wider draggers
-      prints.push((x, ink) => { x.fillStyle = ink; text(x, 'LEN', nx + 15, gy - 6, 9, 'center'); text(x, 'RETRIG', nx + 54, gy - 6, 9, 'center'); });
+      // v0.44.3 (Johnny: "dont need the len numboxes any more - its all visual these days"): only each lane's RETRIG tick
+      // (v0.43.1) to the right of the grid; lengths are set with the draggers
+      const rh = seqGrid.rowH, tx0 = gx + gw + 26;
+      prints.push((x, ink) => { x.fillStyle = ink; text(x, 'RETRIG', tx0, gy - 6, 9, 'center'); });
       SEQ_LANE_ROWS.forEach(([k, r0, n]) => {
-        const ly0 = gy + seqGrid.rowY(r0), by = ly0 + (n * rh - (rh - 3)) / 2, bh = rh - 3;
-        if (n > 1) prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(nx - 5, ly0 + 4, 1.2, n * rh - 8); });
-        const d = makeDisplay(nx, by, 30, bh, () => String(state.seq.len[k]), { tag: 'len:' + k });
-        let g0 = null; d.kind = 'roll';
-        d.down = (p) => { g0 = { y: p ? p[1] : 0, v: state.seq.len[k], moved: false, top: p && p[1] < by + bh / 2 }; };
-        d.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; seqLen(k, g0.v + dv); };
-        d.up = () => { if (g0 && !g0.moved) seqLen(k, state.seq.len[k] + (g0.top ? 1 : -1)); g0 = null; };
-        // v0.43.1 (Johnny): its RETRIG tick, to the right
-        makeKey(nx + 54, by + bh / 2, 15, 10, { on: () => !!state.seq.rt[k], press: () => { state.seq.rt[k] = !state.seq.rt[k]; seqSend(); }, pad: 3, tag: 'rt:' + k });
+        const cy = gy + seqGrid.rowY(r0) + n * rh / 2;
+        makeKey(tx0, cy, 15, 10, { on: () => !!state.seq.rt[k], press: () => { state.seq.rt[k] = !state.seq.rt[k]; seqSend(); }, pad: 3, tag: 'rt:' + k });
       });
       // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
       // slides and octaves
@@ -420,7 +413,7 @@ for (const b of BOXES) {
         prints.push((x, ink) => { x.fillStyle = ink;
           if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
           else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
-        tx += tri ? 62 : (gw + 92 - 2 * 62 - 24 - 96 - 110) / 7; if (label === 'RETRIG') tx = gx + gw + 92 - 104; if (tri && label === '▶') tx += 96;
+        tx += tri ? 62 : (gw + 52 - 2 * 62 - 24 - 96 - 110) / 7; if (label === 'RETRIG') tx = gx + gw + 52 - 104; if (tri && label === '▶') tx += 96;
       });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
@@ -495,7 +488,7 @@ function makeSeqGrid() {
     const out = Math.max(14, G.colW * 0.5);
     if (p[0] >= bx - 4 && p[0] <= bx + out) return { k, end: true };
     if (p[0] >= ax - out && p[0] <= ax + 4) return { k, end: false }; return null; };
-  addCtl({ kind: 'roll', rect: [G.x - 30, G.y, G.w + 46, G.h], sync: draw,
+  addCtl({ kind: 'roll', rect: [G.x - 30, G.y, G.w + 42, G.h], sync: draw,
     down(p) { const tk = topAt(p); if (tk) { lenDrag = { k: tk, move: true, c0: (p[0] - G.x) / G.colW, a0: state.seq.st[tk] }; return; }
       const b = barAt(p); if (b) { lenDrag = b; return; }
       const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
