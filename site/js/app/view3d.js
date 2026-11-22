@@ -455,37 +455,48 @@ for (const b of BOXES) {
       // the gate seq"); v0.49.0 (Johnny: "bring play down into the bottom section - also use icons"): under the grid, left to right:
       // PLAY ▶ and RECORD ●, the NOTES window, nudge ← →, and the dice key that opens the RANDOM menu (seqMenu; shortcuts in seq.js SEQ_RND)
       const ty = y0 + 28 + SEQ_GH + 34;
-      const icon = (kx, draw) => prints.push((x, ink) => { x.fillStyle = ink; x.strokeStyle = ink; x.lineWidth = 1.6; x.lineJoin = x.lineCap = 'round'; x.beginPath(); draw(x, kx + 26, ty); });
       const play = (x, ix, iy) => { x.moveTo(ix - 4, iy - 6.5); x.lineTo(ix + 6.5, iy); x.lineTo(ix - 4, iy + 6.5); x.closePath(); x.fill(); };
       const rec = (x, ix, iy) => { x.arc(ix + 1, iy, 5.5, 0, 7); x.fill(); };
       const arrow = (d) => (x, ix, iy) => { x.moveTo(ix - 6 * d, iy); x.lineTo(ix + 6 * d, iy); x.moveTo(ix + 1.5 * d, iy - 4.5); x.lineTo(ix + 6 * d, iy); x.lineTo(ix + 1.5 * d, iy + 4.5); x.stroke(); };
       const dice = (x, ix, iy) => { x.lineWidth = 1.4; x.roundRect ? x.roundRect(ix - 6, iy - 6, 12, 12, 2.5) : x.rect(ix - 6, iy - 6, 12, 12); x.stroke();
         for (const [a, c] of [[-3, -3], [0, 0], [3, 3]]) { x.beginPath(); x.arc(ix + a, iy + c, 1.25, 0, 7); x.fill(); } };
-      let tx = gx0 - 50;
-      makeKey(tx, ty, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 6, tag: 'play' }); icon(tx, play); tx += 56;
-      makeKey(tx, ty, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 6, tag: 'rec' }); icon(tx, rec);
-      // v0.50.0 (Johnny: "dont show the notes in the seq, show number of notes and have a loop numbox. also the next note to be played
-      // every can be incremented by either the gate seq or the next 1/16th beat"): the count of notes, the LOOP box (drag up/down or click
-      // its top/bottom half; how many of them it plays round) and NEXT NOTE: GATE (each gate) or 1/16 (every step)
-      const lab = (lx, t) => prints.push((x, ink) => { x.fillStyle = ink; text(x, t, lx, ty + 0.5, 10.5, 'left'); });
-      const nx = tx + 44, NW = 40;
-      makeDisplay(nx, ty - 12, NW, 24, () => String(state.seq.notes.length)); lab(nx + NW + 8, 'NOTES');
+      // v0.55.1 (Johnny: "reorganise the bottom section use icons where possible"): four framed groups, icons instead of words.
+      // Transport: ▶ play, ● record. Notes (v0.47.0-v0.52.0): ♪ how many notes are recorded, ↻ NOTE CYCLE (after this many notes
+      // back to note 1), and what moves to the next note: a gate (pulse) or every step (ticks). Steps: ↻ STEP CYCLE (after this many
+      // steps every lane starts again; OFF = never) and nudge ← →. Then the die: the RANDOM menu (seq.js SEQ_RND, keys 1-7 and 0)
+      const at = (ix, draw) => prints.push((x, ink) => { x.fillStyle = ink; x.strokeStyle = ink; x.lineWidth = 1.6; x.lineJoin = x.lineCap = 'round'; x.beginPath(); draw(x, ix, ty); });
+      const note = (x, ix, iy) => { x.ellipse(ix - 2.5, iy + 4.5, 3.6, 2.6, -0.4, 0, 7); x.fill(); x.beginPath(); x.moveTo(ix + 0.8, iy + 4); x.lineTo(ix + 0.8, iy - 7.5); x.quadraticCurveTo(ix + 2, iy - 3, ix + 5.5, iy - 1.5); x.stroke(); };
+      const cyc = (x, ix, iy) => { const r = 6, a0 = -0.6 * Math.PI, a1 = 1.05 * Math.PI; x.arc(ix, iy, r, a0, a1); x.stroke();   // ↻: round, with a head where it ends
+        const ex = ix + r * Math.cos(a1), ey = iy + r * Math.sin(a1), tx = -Math.sin(a1), tyy = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
+        x.beginPath(); x.moveTo(ex + tx * 4.5, ey + tyy * 4.5); x.lineTo(ex - nx * 3.2, ey - ny * 3.2); x.lineTo(ex + nx * 3.2, ey + ny * 3.2); x.closePath(); x.fill(); };
+      const pulse = (x, ix, iy) => { x.moveTo(ix - 8, iy + 4.5); x.lineTo(ix - 3.5, iy + 4.5); x.lineTo(ix - 3.5, iy - 4.5); x.lineTo(ix + 3.5, iy - 4.5); x.lineTo(ix + 3.5, iy + 4.5); x.lineTo(ix + 8, iy + 4.5); x.stroke(); };
+      const ticks = (x, ix, iy) => { x.lineWidth = 1.4; for (let k = 0; k < 4; k++) { x.moveTo(ix - 7.5 + k * 5, iy - 4.5); x.lineTo(ix - 7.5 + k * 5, iy + 4.5); } x.stroke(); };
+      const frame = (x0, x1) => prints.push((x, ink) => { x.save(); x.globalAlpha = 0.45; x.strokeStyle = ink; x.lineWidth = 1; x.beginPath();
+        x.roundRect ? x.roundRect(x0, ty - 16, x1 - x0, 32, 5) : x.rect(x0, ty - 16, x1 - x0, 32); x.stroke(); x.restore(); });
+      const NW = 40;
       // a number box: drag up/down, or click its top half for one more and its bottom half for one fewer
       const numBox = (bx, show, get, set, tag) => { const d = makeDisplay(bx, ty - 12, NW, 24, show, { tag }); let g0 = null; d.kind = 'roll';
         d.down = (p) => { g0 = { y: p ? p[1] : 0, v: get(), moved: false, top: p && p[1] < ty }; };
         d.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; set(g0.v + dv); };
         d.up = () => { if (g0 && !g0.moved) set(get() + (g0.top ? 1 : -1)); g0 = null; }; };
-      // v0.52.0 (Johnny: "loop is note seq retrigger, we need a retrigger numbox for the gate seq - think of names for these that are short
-      // and snappy"): NOTE CYCLE (was LOOP: after this many notes, back to note 1) and STEP CYCLE (after this many steps every lane of the
-      // grid starts again from its loop start; OFF = never)
-      const lx = nx + NW + 76; numBox(lx, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop'); lab(lx + NW + 8, 'NOTE CYCLE');
-      let ax = lx + NW + 124; lab(ax - 12, 'NEXT'); ax += 34;
-      for (const [a, t] of [['gate', 'GATE'], ['step', '1/16']]) { makeKey(ax, ty, 24, 14, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), pad: 6, tag: 'adv:' + a }); lab(ax + 20, t); ax += 70; }
-      const cx2 = ax + 4; numBox(cx2, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc'); lab(cx2 + NW + 8, 'STEP CYCLE');
-      tx = cx2 + NW + 124;
-      for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) { makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); icon(tx, arrow(d)); tx += 56; }
-      const rx = gx + gw - 30;
-      makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); icon(rx, dice);
+      const key = (kx, o, draw) => { makeKey(kx, ty, 24, 14, { pad: 6, ...o }); at(kx + 27, draw); };
+      // the groups spread evenly from the left edge to the die at the right
+      const L0 = gx0 - 72, rx = gx + gw - 30, GAP = (rx - 22 - L0 - (124 + 296 + 196)) / 3;
+      // transport
+      let x0 = L0; frame(x0, x0 + 124);
+      key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
+      // notes
+      x0 += 124 + GAP; frame(x0, x0 + 296);
+      at(x0 + 15, note); makeDisplay(x0 + 28, ty - 12, NW, 24, () => String(state.seq.notes.length));
+      at(x0 + 90, cyc); numBox(x0 + 103, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop');
+      for (const [a, k, draw] of [['gate', 178, pulse], ['step', 238, ticks]]) key(x0 + k, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), tag: 'adv:' + a }, draw);
+      // steps
+      x0 += 296 + GAP; frame(x0, x0 + 196);
+      at(x0 + 15, cyc); numBox(x0 + 28, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc');
+      for (const [d, tag, k] of [[-1, 'nudgeL', 102], [1, 'nudgeR', 158]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNudge(d); }, tag }, arrow(d));
+      // random
+      frame(rx - 22, rx + 42);
+      key(rx, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), tag: 'rndMenu' }, dice);
     }
     col += w;
   }
