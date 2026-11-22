@@ -110,7 +110,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.hold = false;   // MIDI sustain: the gate stays open after the last key is let go
     // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): 16 steps, each { on, o: -1/0/+1, s: slide }.
     // Every step plays one note (C3, or the last key played while it runs), or 1 or 2 octaves above it; a slide step glides into the next.
-    this.seq = { steps: [], bpm: 120 }; this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.root = -1;
+    this.seq = { steps: [], bpm: 120 }; this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 };
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
@@ -137,7 +137,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'mode': if ('hold' in m) this.hold = !!m.hold; break;
       case 'seq': Object.assign(this.seq, m.seq); break;
       case 'run':
-        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; }
+        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 }; }
         else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.port.postMessage({ type: 'step', i: -1 }); }
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
@@ -187,7 +187,12 @@ class KestrelProcessor extends AudioWorkletProcessor {
   gateOff() { if (this.gate) { this.gate = false; this.stage = 3; } }
   keyOn(n, acc) {
     n += this.P.transpose * 12;
-    if (this.running) { this.root = n - 12; return; }   // a key played while the sequencer runs moves it to that note (the note the key plays)
+    if (this.running) {   // a key played while the sequencer runs moves it to that note (the note the key plays)
+      this.root = n - 12;
+      // v0.43.1 (Johnny): a lane with RETRIG ticked starts again from its step 1 on the next step
+      const rt = this.seq.rt || {}; for (const k in this.laneAt) if (rt[k]) this.laneAt[k] = this.stepIdx;
+      return;
+    }
     const legato = this.keys.length > 0 && this.gate;
     this.keys = this.keys.filter(k => k !== n); this.keys.push(n);
     const gm = this.P.glideMode;
@@ -209,7 +214,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
   seqStep() {
     // v0.43.0 (Johnny: "a step length on the RHS for each lane"): octave, note, slide and accent each loop at their own length
     const S = this.seq, N = this.stepIdx, L = S.len || {}, n16 = Math.max(1, S.steps.length || 1);
-    const lane = (k) => S.steps[N % Math.max(1, Math.min(n16, L[k] || n16))] || {};
+    const pos = {}; for (const k in this.laneAt) { const len = Math.max(1, Math.min(n16, L[k] || n16)); pos[k] = ((N - this.laneAt[k]) % len + len) % len; }
+    const lane = (k) => S.steps[pos[k]] || {};
     const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N, dur = this.fs * 60 / S.bpm / 4;
     this.nextStepAt += dur;
     if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
@@ -219,7 +225,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(!!st.a); }
       this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
     }
-    this.port.postMessage({ type: 'step', i });
+    this.port.postMessage({ type: 'step', i, p: pos });
     this.stepIdx = (N + 1) % 720720;   // a count every lane length divides
   }
 

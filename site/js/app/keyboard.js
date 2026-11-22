@@ -2,7 +2,7 @@
 // ---------- engine feedback ----------
 function onEngineMsg(e) {
   const m = e.data;
-  if (m.type === 'step') { seqPos = m.i; return; }
+  if (m.type === 'step') { seqPos = m.i; seqLanePos = m.p || null; return; }
   if (m.type === 'meters') {
     NODES.forEach((n, i) => { volts[n].textContent = (m.node[i] >= 0 ? '+' : '') + m.node[i].toFixed(2) + 'V'; });
     document.getElementById('psu').textContent = `Battery ${m.vIn.toFixed(2)} V · rail ${Math.round(m.rail * 100)}%`;

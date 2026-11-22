@@ -8,13 +8,15 @@ if (!state.seq || !Array.isArray(state.seq.steps) || state.seq.steps.length !== 
 // v0.43.0 (Johnny): each lane (octave, note, slide, accent) has its own length, 1-16
 const SEQ_LANES = ['o', 'on', 's', 'a'];
 state.seq.len = Object.assign({ o: SEQ_N, on: SEQ_N, s: SEQ_N, a: SEQ_N }, state.seq.len || {});
+// v0.43.1 (Johnny): a RETRIG tick per lane: a key played while it runs starts that lane again from step 1
+state.seq.rt = Object.assign({ o: false, on: false, s: false, a: false }, state.seq.rt || {});
 // v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note; a v0.42.0-1 pattern (-1..1) moves up one
 if (state.seq.steps.some((s) => s.o < 0)) state.seq.steps.forEach((s) => { s.o = (s.o | 0) + 1; });
-let seqOn = false, seqPos = -1;
+let seqOn = false, seqPos = -1, seqLanePos = null;
 const seqBpm = () => 120;
-const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len } } });
+const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len }, rt: { ...state.seq.rt } } });
 function seqSend() { post(seqMsg()); save(); }
-async function seqRun(on = !seqOn) { await boot(); seqOn = on; if (!on) seqPos = -1; post(seqMsg()); post({ type: 'run', on }); }
+async function seqRun(on = !seqOn) { await boot(); seqOn = on; if (!on) { seqPos = -1; seqLanePos = null; } post(seqMsg()); post({ type: 'run', on }); }
 // v0.42.4 (Johnny): nudge the whole pattern a step (d -1 = left, 1 = right), and randomise one part of every step
 // v0.43.0: each lane turns round within its own length
 function seqNudge(d) {
