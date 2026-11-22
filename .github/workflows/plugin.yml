@@ -18,7 +18,7 @@ jobs:
       matrix:
         include:
           - { os: windows-2022, name: Windows }
-          - { os: macos-14, name: macOS }
+          - { os: macos-latest, name: macOS }
           - { os: ubuntu-22.04, name: Linux }
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}

@@ -154,7 +154,10 @@ void ShyoyProcessor::setStateInformation (const void* data, int size) {
     auto* md = new juce::DynamicObject(); md->setProperty ("type", "mode"); md->setProperty ("hold", sHold);
     shyoy::parse (juce::var (md), cmds);
     queue (std::move (cmds));
-    if (auto* ed = dynamic_cast<ShyoyEditor*> (getActiveEditor())) ed->reloadPage();
+    // an open panel starts again with the loaded sound (on the message thread: hosts call this from anywhere)
+    juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<juce::AudioProcessorEditor> (getActiveEditor())] {
+        if (auto* ed = dynamic_cast<ShyoyEditor*> (safe.getComponent())) ed->reloadPage();
+    });
 }
 
 // ---------------- localStorage ----------------
