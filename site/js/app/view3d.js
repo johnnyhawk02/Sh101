@@ -447,17 +447,19 @@ for (const b of BOXES) {
       });
       // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
       // slides and octaves
-      const ty = y0 + R + 10, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['RANDOM ALL', 'rndAll', () => seqRandom('all')],
-        ['RANDOM GATES', 'rndOn', () => seqRandom('on')], ['RANDOM ACC', 'rndA', () => seqRandom('a')],
-        ['RANDOM SLIDES', 'rndS', () => seqRandom('s')], ['RANDOM OCTAVES', 'rndO', () => seqRandom('o')]];
-      let tx = gx + 12;
+      // v0.43.3: RANDOM printed once before its keys: ALL, GATES, ACC, SLIDES, OCTAVES, LENGTH, RETRIG
+      const ty = y0 + R + 10, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
+        ['GATES', 'rndOn', () => seqRandom('on')], ['ACC', 'rndA', () => seqRandom('a')], ['SLIDES', 'rndS', () => seqRandom('s')],
+        ['OCTAVES', 'rndO', () => seqRandom('o')], ['LENGTH', 'rndLen', () => seqRandom('len')], ['RETRIG', 'rndRt', () => seqRandom('rt')]];
+      { const rx = gx + 12 + 2 * 62 + 4; prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(rx, ty - 9, 64, 18); x.fillStyle = inkOf(ink); text(x, 'RANDOM', rx + 32, ty + 0.5, 10.5); }); }
+      let tx = gx + 12, first = true;
       TK.forEach(([label, tag, press], k) => {
         makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); press(); }, pad: 6, tag });
         const tri = label === '◀' || label === '▶', lx = tx + 20;
         prints.push((x, ink) => { x.fillStyle = ink;
           if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
           else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
-        tx += tri ? 62 : (gw + 84 - 2 * 62 - 24) / 5;
+        tx += tri ? 62 : (gw + 84 - 2 * 62 - 24 - 96) / 7; if (tri && label === '▶') tx += 96;
       });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset

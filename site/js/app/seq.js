@@ -26,8 +26,11 @@ function seqNudge(d) {
 }
 function seqLen(k, n) { n = Math.max(1, Math.min(SEQ_N, n | 0)); if (state.seq.len[k] === n) return; state.seq.len[k] = n; seqSend(); }
 function seqRandom(k) {
-  if (k === 'all') { for (const l of SEQ_LANES) seqRandom(l); return; }
   const r = Math.random;
+  if (k === 'all') { for (const l of SEQ_LANES) seqRandom(l); seqRandom('len'); seqRandom('rt'); return; }
+  // v0.43.3 (Johnny): lane lengths (16 about a third of the time, else a short loop that runs against it) and retrig ticks
+  if (k === 'len') { for (const l of SEQ_LANES) state.seq.len[l] = r() < 0.35 ? SEQ_N : [3, 4, 5, 6, 7, 8, 12][Math.floor(r() * 7)]; return seqSend(); }
+  if (k === 'rt') { for (const l of SEQ_LANES) state.seq.rt[l] = r() < 0.35; return seqSend(); }
   for (const st of state.seq.steps) {
     if (k === 'on') st.on = r() < 0.7;
     else if (k === 'a') st.a = r() < 0.25;
