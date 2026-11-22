@@ -36,7 +36,8 @@ function seqRandom(k) {
   const r = Math.random;
   if (k === 'all') { for (const l of SEQ_LANES) seqRandom(l); seqRandom('len'); seqRandom('rt'); return; }
   // v0.43.3 (Johnny): lane lengths (16 about a third of the time, else a short loop that runs against it) and retrig ticks
-  if (k === 'len') { for (const l of SEQ_LANES) state.seq.len[l] = Math.min(SEQ_N - state.seq.st[l], r() < 0.35 ? SEQ_N : [3, 4, 5, 6, 7, 8, 12][Math.floor(r() * 7)]); return seqSend(); }
+  // v0.43.15 (Johnny: "randomise all rnd the start of the draggable boxes"): each loop also starts somewhere random
+  if (k === 'len') { for (const l of SEQ_LANES) { const n = r() < 0.35 ? SEQ_N : [3, 4, 5, 6, 7, 8, 12][Math.floor(r() * 7)]; state.seq.len[l] = n; state.seq.st[l] = Math.floor(r() * (SEQ_N - n + 1)); } return seqSend(); }
   if (k === 'rt') { for (const l of SEQ_LANES) state.seq.rt[l] = r() < 0.35; return seqSend(); }
   for (const st of state.seq.steps) {
     if (k === 'on') st.on = r() < 0.7;
