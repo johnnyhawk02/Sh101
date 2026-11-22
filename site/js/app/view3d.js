@@ -49,9 +49,10 @@ const BOXES = [
   { r: ROW_VCF, c: 0, s: 8, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
   { r: ROW_VCF, c: 8, s: 7, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
   { r: ROW_VCF, c: 15, s: 3, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
-  { r: ROW_BENDER, c: 7, s: 4, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
-  { r: ROW_BENDER, c: 0, s: 7, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
-  { r: ROW_BENDER, c: 11, s: 7, n: 'PRESET', it: [{ t: 'preset', w: 7 }] },
+  { r: ROW_BENDER, c: 11, s: 7, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
+  { r: ROW_BENDER, c: 0, s: 11, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
+  // v0.53.0 (Johnny: "should just be the preset name and clicking on it opens the preset popup / it should be moved under the word
+  // shyoy"): no PRESET box; the name sits under the logo (see TITLE below), and BENDER and PERFORM share the row
   // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
   { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'grid', w: 18 }] },   // v0.49.0: PLAY moved under the grid
 ];
@@ -482,15 +483,6 @@ for (const b of BOXES) {
       for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) { makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); icon(tx, arrow(d)); tx += 56; }
       const rx = gx + gw - 30;
       makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); icon(rx, dice);
-    } else if (it.t === 'preset') {
-      // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
-      // steps and browser, and the randomiser (rand.js) and its undo
-      const dw = w * C - 40, dx = cx - dw / 2;
-      makeDisplay(dx, y0 + 36, dw, 28, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser() });
-      const PK = [['PREV', 'pre-', () => document.querySelector('#prj-bar .pm-step[data-d="-1"]').click()], ['NEXT', 'pre+', () => document.querySelector('#prj-bar .pm-step[data-d="1"]').click()],
-        ['BROWSE', 'browse', () => openBrowser()], ['RANDOM', 'rand', () => shyoyRand.roll()], ['UNDO', 'undo', () => shyoyRand.back()]];
-      PK.forEach(([label, tag, press], k) => { const kx = dx + dw * (k + 0.5) / PK.length;
-        makeKey(kx, y0 + KEYY, 24, 14, { on: () => false, press, pad: 8, tag }); labelAt(() => label, kx, ly); });
     }
     col += w;
   }
@@ -593,7 +585,7 @@ logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 10)); lo
 logoMat.shadowSide = THREE.DoubleSide; logoMat.alphaTest = 0.04; scene.add(logoLayer);   // the shadow pass copies map + alphaTest, so it casts the letters
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
-    const lw = 262, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 10;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
+    const lw = 262, lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 6;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
     const lx2 = logoCv.getContext('2d'); lx2.setTransform(1, 0, 0, 1, 0, 0); lx2.globalCompositeOperation = 'source-over'; lx2.clearRect(0, 0, logoCv.width, logoCv.height);
     lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
     // worn ink (v0.31.2): where the wear map dips (scuffs, scratches, dents) the ink is rubbed thin or through to the
@@ -609,7 +601,7 @@ prints.push((x, ink) => {
     logoGeom = { lx, ly, sc: lw / logo.naturalWidth, ink }; logoFace(logoGrin);
     logoTex.needsUpdate = true; shadowDirty = true;   // v0.44.2: the logo casts a shadow
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
-  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 122, 10, 'right');
+  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 142, 9, 'right');   // v0.53.0: under the preset name
 });
 const VER3D = ((document.getElementById('ver') || {}).textContent || '').replace(/^v/, '');
 // v0.44.0 (Johnny: "clicking shyoy randomizes the sound, the word wobbles in 3 dimensions"; "command click opens options"):
@@ -649,7 +641,9 @@ const logoClick = (ev) => {
   if (ev && ev.shiftKey) { if (shyoyRand.back()) wobbleLogo(); return; }
   shyoyRand.roll(); wobbleLogo();
 };
-addCtl({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 4, TITLE.w - 20, 104], press: logoClick, sync: () => false });
+addCtl({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 4, TITLE.w - 20, 100], press: logoClick, sync: () => false });
+// v0.53.0 (Johnny): the preset's name under the word; a click opens the preset browser (the rolling name while a random sound is drawn)
+makeDisplay(TITLE.x + 14, TITLE.y + 108, TITLE.w - 28, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser(), tag: 'presetName' });
 
 // the readout while a knob turns: the value on a black slab where its label is
 const ro = (() => {
@@ -779,7 +773,7 @@ function release(e) {
   else if (c.kind === 'key') { c.down = false; if (c.hold) c.hold(false); }
   else if (c.kind === 'lever') { c.held = false; setLever(0); }
   else if (c.kind === 'roll') c.up();
-  else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup') c.press(e);
+  else if ((c.kind === 'display' || c.kind === 'title') && !g.moved && e.type === 'pointerup' && c.press) c.press(e);
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
