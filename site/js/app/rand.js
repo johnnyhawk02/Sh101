@@ -38,75 +38,28 @@ const shyoyRand = (() => {
     f.level = 0.7;
     return { f, s };
   }
-  // ---- loudness (v0.34.1, Johnny: randomised sounds came out very loud) ----
-  // Before a new sound goes on, a copy of the engine (the same worklet code, run in a Web Worker, so the page doesn't
-  // stall and nothing is heard) plays a short riff with it for 2 s, and with a plain reference sound. The VCA
-  // sound's output is then trimmed to match the reference (see levelled). The live engine is not changed; it only gets
-  // the finished sound, as from a preset.
-  const REF = { saw: 0.8, pulse: 0, sub: 0.4, noise: 0, range: 1, cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, drive: 0.4, decay: 0.4, sustain: 0, release: 0.3, attack: 0, level: 0.7 };
+  // ---- loudness ----
+  // v0.43.2 (Johnny: "do we need the auto leveller? ... surely you can work out roughly what the level should be"):
+  // with the effects gone, a sound's loudness follows a handful of controls, so Level is worked out from them straight
+  // away instead of playing each sound in a hidden copy of the engine first (v0.34.1-v0.43.1). The formula was fitted to
+  // 400 random sounds measured that way (a riff of eighth notes, Level 0.7): it comes within about 2 dB for 9 in 10.
+  // Each term is the change in output level, in dB: the mixer, resonance (which thins the sound, then rings),
+  // the filter's drive, cutoff, and how long the envelope holds the note up.
+  const estDb = (p) => -38.63 + 2.81 * p.saw + 6.43 * p.pulse + 4.57 * p.sub - 0.93 * p.noise
+    - 20.30 * p.reso + 10.95 * p.reso * p.reso + 24.56 * p.drive - 11.51 * p.drive * p.drive
+    - 7.35 * p.cutoff + 4.78 * p.cutoff * p.cutoff + 11.42 * p.decay + 3.09 * p.sustain + 4.43 * p.release + 1.89 * (p.vcaMode | 0);
+  // the level a plain saw + sub patch plays at, +7 dB (v0.41.2: so a typical sound lands near Level 0.4-0.8)
+  const TARGET_DB = -33.87 + 7;
   const TRIMS = ['level'];
-  // v0.41.2 (Johnny: Level always ended up very low): random sounds came out 8-15 dB louder than the plain reference, so
-  // Level was trimmed to 0.1-0.25. The target is now the reference +7 dB, so a typical sound lands near 0.4-0.8
-  const REF_LIFT = 10 ** (7 / 20);
-  let worker = null, jobs = 0; const waiting = new Map();
-  async function meterWorker() {
-    if (worker) return worker;
-    const code = await dspCode;
-    const src = `let Proc; class AudioWorkletProcessor { constructor() { this.port = { postMessage() {}, onmessage: null }; } }
-const registerProcessor = (_, c) => { Proc = c; }; const sampleRate = 48000;
-${code}
-onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
-  for (const ms of msgs) {
-    const p = new Proc(); for (const m of ms) p.onMsg(m);
-    const L = new Float32Array(128), R = new Float32Array(128), n = Math.floor(48000 * sec / 128), skip = Math.floor(48000 * 0.3 / 128);
-    let ss = 0, cnt = 0, pk = 0;
-    for (let b = 0, r = 0; b < n; b++) { while (r < riff.length && riff[r][0] <= b) p.onMsg(riff[r++][1]); p.process([], [[L, R]]); if (b < skip) continue; for (let j = 0; j < 128; j++) { const v = (L[j] + R[j]) / 2; ss += v * v; const a = Math.max(Math.abs(L[j]), Math.abs(R[j])); if (a > pk) pk = a; } cnt += 128; }
-    out.push({ rms: Math.sqrt(ss / Math.max(1, cnt)), peak: pk });
-  }
-  postMessage({ id, out }); };`;
-    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })));
-    worker.onmessage = (e) => { const r = waiting.get(e.data.id); if (r) { waiting.delete(e.data.id); r(e.data.out); } };
-    return worker;
-  }
-  // what the engine is sent for a sound (as pushAll does)
-  const msgsFor = (snap) => [{ type: 'params', p: snap.params }, { type: 'bend', b: bendPhysical(snap.bend) }, { type: 'bridges', br: snap.br }];
-  // v0.40.0 (no sequencer): the riff it is played with, eighth notes at 120 BPM, as [block of 128 samples, engine message]
-  const RIFF = [0, 0, 7, 0, 3, 0, 10, 5].flatMap((d, i) => { const b = Math.round(i * 0.25 * 48000 / 128), n = 48 + d;
-    return [[b, { type: 'noteOn', n, acc: i % 2 === 0 }], [b + 23, { type: 'noteOff', n }]]; });
-  async function meter(snaps) {
-    const w = await meterWorker(), id = ++jobs;
-    return new Promise((res) => { waiting.set(id, res); w.postMessage({ id, sec: 2, riff: RIFF, msgs: snaps.map((s) => msgsFor(s)) }); });
-  }
-  // the reference: a plain saw + sub patch, played with the same riff, transpose and accent
-  const refSnap = () => { const q = state.params, p = { ...defaults, ...REF, transpose: q.transpose, tune: q.tune, accent: q.accent }; return { params: p, bend: stockBend(), br: {} }; };
-  const dB = (r) => 20 * Math.log10(Math.max(1e-6, r));
-  // the VCA Level (0.1-1) moves, found by halving (six tries at most, stopping within 1 dB)
-  async function trim(snap, knob, lo, hi, ref, m) {
-    const p = snap.params; let best = { e: dB(ref.rms / m.rms), v: p[knob], m };
-    if (Math.abs(best.e) < 1) return best;
-    let L = lo, H = hi; if (best.e < 0) H = p[knob]; else L = p[knob];
-    for (let i = 0; i < 6; i++) {
-      const v = (L + H) / 2; p[knob] = v; const [r] = await meter([snap]); const e = dB(ref.rms / Math.max(1e-9, r.rms));
-      if (Math.abs(e) < Math.abs(best.e)) best = { e, v, m: r };
-      if (Math.abs(e) < 1) break; if (e < 0) H = v; else L = v;
-    }
-    p[knob] = best.v; return best;
-  }
-  async function levelled(snap) {
-    try {
-      const [ref0, first] = await meter([refSnap(), snap]), ref = { ...ref0, rms: ref0.rms * REF_LIFT };
-      if (ref.rms < 1e-4 || first.rms < 1e-5) return snap;
-      let r = { e: dB(ref.rms / first.rms), m: first };
-      if (Math.abs(r.e) >= 1.5) r = await trim(snap, 'level', 0.1, 1, ref, r.m);
-      last = { ref: dB(ref.rms), got: dB(first.rms), now: dB(r.m.rms), level: snap.params.level };
-    } catch (e) { console.warn('sticker loudness', e); }
+  function levelled(snap) {
+    const p = snap.params, est = estDb(p);
+    p.level = Math.max(0.1, Math.min(1, 0.7 * 10 ** ((TARGET_DB - est) / 20)));
+    last = { est, level: p.level };
     return snap;
   }
-  // the fade (Johnny: fade low, then bring it up): the new sound goes on with Level at 0 while it is measured, then
-  // Level rises to the matched value
-  let fadeTok = 0, curP = null, reel = [], reelTok = 0, pend = false;
   const hush = () => { post({ type: 'param', id: 'level', v: 0 }); return new Promise((r) => setTimeout(r, 90)); };
   function fadeTo(tok, id, to) {
+    fadeTo.tok = tok; fadeTo.to = to;
     const from = state.params[id], t0 = performance.now(), T = 700;
     const step = () => {
       if (tok !== fadeTok) return;
@@ -116,7 +69,7 @@ onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
     };
     step();
   }
-  let last = null, busy = false;
+  let last = null, busy = false, fadeTok = 0, pend = false;   // the fade (Johnny: fade low, then bring it up): the new sound goes on at Level 0, then Level rises to its value
   const undo = [];
   let name = '';
   const prjSel = document.getElementById('prj-preset'), nameEl = document.getElementById('prj-name');
@@ -129,7 +82,7 @@ onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
   async function roll1() {
     const before = soundSnap(), entry = { snap: before, name, sel: prjSel.value }; undo.push(entry); if (undo.length > 20) undo.shift();
     // clicked again before the last sound finished fading in: its undo copy gets the level it was heading for
-    if (curP) curP.then((f) => { for (const q of TRIMS) before.params[q] = f.params[q]; });
+    if (fadeTo.to != null && fadeTo.tok === fadeTok) before.params.level = fadeTo.to;
     const a = amount, t = draw(), p = clone(state.params);
     for (const k in t.f) p[k] = clamp(p[k] + (t.f[k] - p[k]) * a);
     for (const k in t.s) if (chance(a)) p[k] = t.s[k];
@@ -145,18 +98,14 @@ onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
     // a new name from the namer, shown unsaved; SAVE stores it under that name
     name = NAMER(prjBar.user); nameEl.value = name;
     prjSel.value = ''; prjSel.dispatchEvent(new Event('sync')); const c = curEl(); if (c) c.textContent = name + ' *';
-    // while it is measured the PRESET display runs names past like a slot machine (v0.36.5, Johnny: show something is
-    // going on); view3d.js reads shyoyRand.reel and spins the sticker while shyoyRand.working
-    reel = [name, ...Array.from({ length: 11 }, () => NAMER(prjBar.user))]; reelTok = tok; pend = false;
-    busy = false;   // a new click may start now; this one's fade is dropped if so
-    const P = curP = levelled(clone(snap)), fin = await P; if (curP === P) curP = null; if (tok !== fadeTok) return;
-    reelTok = 0;
+    pend = false; busy = false;
+    const fin = levelled(clone(snap));
     for (const q of TRIMS) if (q !== trim && fin.params[q] !== state.params[q]) { state.params[q] = fin.params[q]; post({ type: 'param', id: q, v: fin.params[q] }); if (ui[q]) ui[q](fin.params[q]); }
     fadeTo(tok, trim, fin.params[trim]);
   }
   function back() {
     const u = undo.pop(); if (!u) return false;
-    const tok = ++fadeTok; curP = null; boot(); const lv = u.snap.params.level;
+    const tok = ++fadeTok; boot(); const lv = u.snap.params.level;
     hush().then(() => { if (tok !== fadeTok) return; load({ ...u.snap, params: { ...u.snap.params, level: 0 } }); fadeTo(tok, 'level', lv); });
     name = u.name;
     prjSel.value = u.sel; prjSel.dispatchEvent(new Event('sync'));
@@ -170,12 +119,12 @@ onmessage = (e) => { const { id, msgs, sec, riff } = e.data; const out = [];
     get amount() { return amount; },
     set amount(v) { amount = clamp(v); store.set('rndAmount', amount); },
     get depth() { return undo.length; },
-    get last() { return last; }, meter,
-    get working() { return reelTok !== 0 && reelTok === fadeTok; },
-    get spinning() { return pend || this.working; },   // from the click (audio may still be starting) to the fade
-    get reel() { return this.working ? reel[Math.floor(performance.now() / 85) % reel.length] : null; },
+    get last() { return last; },
+    get working() { return false; },
+    get spinning() { return pend; },   // from the click until the audio is running
+    get reel() { return null; },
     // for tests: a whole new sound, drawn but not played
     sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) }; },
-    refSnap,
+    estDb,
   };
 })();
