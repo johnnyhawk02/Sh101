@@ -855,10 +855,10 @@ function sheet(title) {
   return { el, body: el.querySelector('.body'), open() { sheetVars(); el.classList.add('open'); }, close };
 }
 const opt = sheet('OPTIONS');
-// v0.44.0: no look options; OPTIONS keeps MIDI and ABOUT
-opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI</button><button id="o3-about">ABOUT</button></div></div>`;
+// v0.44.0: no look options; OPTIONS keeps MIDI and ABOUT. v0.55.0: AUDIO (oversampling) between them
+opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI</button><button id="o3-audio">AUDIO</button><button id="o3-about">ABOUT</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
-for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
+for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-audio', 'audio'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 function openOptions3d() { opt.open(); }
 // the TAPER pop-up (v0.45.0): one slider's taper, with its curve drawn (cap position across, value up)
 const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((it) => it.t === 'knob').map((it) => [it.id, b.n + ' ' + it.label])));

@@ -43,6 +43,19 @@ const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
   send({ type: 'bend', b: { tempC: 60 } }); const hot = hz(render(p, 1));
   assert.ok(hot !== cold && Math.abs(1200 * Math.log2(hot / cold)) < 30, `hot expo converter: ${cold.toFixed(1)} -> ${hot.toFixed(1)} Hz`);
 }
+// v0.55.0: every oversampling choice plays in tune, finite, at the same level as 2x
+{
+  const lv = {};
+  for (const os of [1, 2, 4]) {
+    const [p, send] = make(); send({ type: 'os', n: os });
+    send({ type: 'params', p: { saw: 1, sub: 0, cutoff: 1, reso: 0, vcaMode: 1, kybd: 0, vcfEnv: 0, drift: 0 } });
+    send({ type: 'noteOn', n: 69 + 12 }); const b = render(p, 1);
+    assert.ok(finite(b), `os ${os} finite`);
+    const got = hz(b); assert.ok(Math.abs(1200 * Math.log2(got / 440)) < 10, `os ${os}: ${got.toFixed(1)} Hz`);
+    lv[os] = 20 * Math.log10(Math.sqrt(b.reduce((s, v) => s + v * v, 0) / b.length));
+  }
+  assert.ok(Math.abs(lv[1] - lv[2]) < 1 && Math.abs(lv[4] - lv[2]) < 1, `os levels ${JSON.stringify(lv)}`);
+}
 // filter self-oscillates at full resonance
 {
   const [p, send] = make();

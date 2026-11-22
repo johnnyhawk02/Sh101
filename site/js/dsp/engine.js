@@ -2,7 +2,7 @@
 //
 // Every stage is written in physical units (volts, amps, farads, ohms, kelvin)
 // and integrated in time, so changing a component value changes the sound the
-// way it would on the bench. The audio path runs 2x oversampled.
+// way it would on the bench. The audio path runs 2x oversampled (Options > AUDIO can set 1x, 2x or 4x).
 //
 //  VCO  : exponential converter (Vt-dependent) sets a charging current into a
 //         timing cap; a comparator at Vth fires a reset transistor that
@@ -62,7 +62,7 @@ function bq(f, x) { const y = f.b0 * x + f.z1; f.z1 = f.b1 * x - f.a1 * y + f.z2
 class KestrelProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    const fs = sampleRate; this.fs = fs; this.os = 2; this.fso = fs * 2; this.dto = 1 / this.fso;
+    const fs = sampleRate; this.fs = fs; this.setOS(2);
     this.t = 0;
     // panel (mapped) targets
     this.P = {
@@ -105,7 +105,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.load = 0; this.rail = 1;
     // output
     this.dcx = 0; this.dcy = 0;
-    this.dec1 = biquadLP(0.42 * fs, this.fso, 0.5412); this.dec2 = biquadLP(0.42 * fs, this.fso, 1.3066);
     this.keys = [];
     this.hold = false;   // MIDI sustain: the gate stays open after the last key is let go
     // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): 16 steps, each { on, o: -1/0/+1, s: slide }.
@@ -118,6 +117,19 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.inj = new Float64Array(INJ.length);
     this.y4 = 0; this.y2 = 0; this.out = 0; this.fcLast = 1000;
     this.port.onmessage = (e) => this.onMsg(e.data);
+  }
+
+  // v0.55.0 (Johnny: "add a 1x 2x 4x .. current x menu item"): the oversampling factor of the audio path (VCO, noise,
+  // mixer, VCF, VCA). 2x is the stock rate and is unchanged; at 1x and 4x the per-tick constants (mixer coupling cap,
+  // noise pinking, noise level in band) are rescaled so the sound stays the same, and 1x needs no decimation filter.
+  setOS(n) {
+    n = n === 1 || n === 4 ? n : 2;
+    const fs = this.fs; this.os = n; this.fso = fs * n; this.dto = 1 / this.fso;
+    this.dec1 = biquadLP(0.42 * fs, this.fso, 0.5412); this.dec2 = biquadLP(0.42 * fs, this.fso, 1.3066);
+    this.hpK = n === 2 ? 0.9997 : 1 - 0.0003 * 2 / n;
+    this.pinkA = n === 2 ? 0.7 : Math.pow(0.7, 2 / n);
+    this.pinkB = n === 2 ? 0.3 : (1 - this.pinkA) * Math.sqrt(n / 2) * 0.3 / (1 - 0.7);
+    this.wMax = Math.min(fs * 0.5, this.fso * 0.45);   // VCF poles: below fs/2 of the output rate (and below the tick rate's Nyquist)
   }
 
   rand() { let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0; return (this.rng / 2147483648) - 1; }
@@ -143,6 +155,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
         else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.port.postMessage({ type: 'step', i: -1 }); }
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
+      case 'os': this.setOS(m.n | 0); break;
       case 'reset': this.vc = 0; this.s.fill(0); this.tl.fill(1); this.ve = 0; this.ltri = 0; break;
     }
   }
@@ -246,7 +259,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
 
   process(inputs, outputs) {
     const out = outputs[0], L = out[0], R = out[1], n = L.length;
-    const fs = this.fs, dt = 1 / fs, dto = this.dto, fso = this.fso;
+    const fs = this.fs, dt = 1 / fs, dto = this.dto, fso = this.fso, os = this.os, hpK = this.hpK, pinkA = this.pinkA, pinkB = this.pinkB, wMax = this.wMax;
     const P = this.P, C = this.C, sm = this.sm, smc = this.smc;
     const node = this.node, inj = this.inj, br = this.bridges, s = this.s, tl = this.tl, g = this.g;
     const accUp = 1 - Math.exp(-1 / (0.02 * fs)), accDn = 1 - Math.exp(-1 / (0.15 * fs));
@@ -353,7 +366,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const fcBase = 1000 * Math.pow(2, fcOct * (1 + (tsc - 1) * VCF_TC)) * rail;
       if ((this.t & 1) === 0 || Math.abs(fcBase - this.fcLast) > this.fcLast * 0.02) {
         this.fcLast = fcBase;
-        for (let i = 0; i < 4; i++) { const w = Math.PI * Math.min(fcBase * CF_NOM / C.cf[i], fso * 0.25) / fso; g[i] = w < 0.3 ? w * (1 + w * w * (1 / 3 + w * w * 2 / 15)) : Math.tan(w); }
+        for (let i = 0; i < 4; i++) { const w = Math.PI * Math.min(fcBase * CF_NOM / C.cf[i], wMax) / fso; g[i] = w < 0.3 ? w * (1 + w * w * (1 / 3 + w * w * 2 / 15)) : Math.tan(w); }
       }
       // The IR3109's OTAs run out of bandwidth near the top of the range (spec: 10 Hz..20 kHz), so the resonance
       // loop gain falls away there and the real filter stops self-oscillating. Without this roll-off, cutoff and
@@ -379,7 +392,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       const vdd = 5 * rail;
 
       let y = 0;
-      for (let o = 0; o < 2; o++) {
+      for (let o = 0; o < os; o++) {
         // ===== VCO core =====
         // naive values for this tick, plus BLEP corrections (1-tick delay)
         let ev = -1, evH = 0, evP = 0, evS = 0;
@@ -430,12 +443,12 @@ class KestrelProcessor extends AudioWorkletProcessor {
         this.oSaw = vc; this.oPul = cmpNow * V_PULSE * rail; this.oSub = subNow;
 
         // ===== noise (reverse-biased junction, amplified, pinked) =====
-        this.pink = this.pink * 0.7 + this.rand() * 0.3;
+        this.pink = this.pink * pinkA + this.rand() * pinkB;
 
         // ===== mixer: inverting summer, rails, coupling cap =====
         let mix = (outSaw - VTH / 2) * 0.5 * lvSaw + (outPul - V_PULSE * rail * 0.5) * (5 / V_PULSE) * lvPul + (outSub - vdd * 0.5) * lvSub + this.pink * 3 * lvNoi;
         mix = railV * tanh(-mix / railV);
-        const hp = mix - this.hpx + 0.9997 * this.hpy; this.hpx = mix; this.hpy = hp;
+        const hp = mix - this.hpx + hpK * this.hpy; this.hpx = mix; this.hpy = hp;
 
         // ===== VCF: OTA-C ladder =====
         const xin = hp * att / (2 * VT0) + offN + vcfInj;
@@ -463,7 +476,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
         // sees VCFout/151; in OTA units (2Vt) that is y4 * OTA_DIV / 151. R140 47k loads the current output.
         const vcaIn = y4 * VCA_IN;
         const v = tanh(vcaIn * tsc) * gain * VCA_OUT;
-        y = bq(this.dec2, bq(this.dec1, v));
+        y = os > 1 ? bq(this.dec2, bq(this.dec1, v)) : v;
       }
       // node voltages for bend bridges (volts)
       node[0] = this.oSaw; node[1] = this.oPul; node[2] = this.oSub; node[3] = this.pink;

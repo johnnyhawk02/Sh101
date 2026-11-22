@@ -24,4 +24,5 @@ async function boot() {
   return booting;
 }
 const post = (m) => { if (node) node.port.postMessage(m); };
-function pushAll() { post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); if (typeof seqMsg === 'function') post(seqMsg()); }
+const osFactor = () => { const n = typeof store === 'object' ? store.get('os', 2) : 2; return n === 1 || n === 4 ? n : 2; };   // Options › Audio
+function pushAll() { post({ type: 'os', n: osFactor() }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); if (typeof seqMsg === 'function') post(seqMsg()); }

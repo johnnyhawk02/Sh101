@@ -85,3 +85,10 @@ const showLook = () => { for (const i of lookBox.querySelectorAll('input')) { co
 lookBox.addEventListener('input', (e) => { const i = e.target; if (!i.dataset?.look) return; look[i.dataset.look] = +i.value; applyLook(); showLook(); });
 document.getElementById('lcd-look-reset').onclick = () => { Object.assign(look, LOOK0); applyLook(); showLook(); };
 showLook(); applyLook();
+
+// ---------- Options › Audio (v0.55.0): the engine's oversampling, 1x / 2x (stock) / 4x, saved as kestrel.os and sent to the
+// engine at boot (pushAll in audio.js) and when changed ----------
+const osSeg = document.getElementById('os-seg');
+const showOS = () => { const n = osFactor(); for (const b of osSeg.children) b.setAttribute('aria-pressed', +b.dataset.os === n); };
+osSeg.addEventListener('click', (e) => { const b = e.target.closest('[data-os]'); if (!b) return; store.set('os', +b.dataset.os); post({ type: 'os', n: osFactor() }); showOS(); });
+showOS();
