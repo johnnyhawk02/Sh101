@@ -78,12 +78,13 @@ const knobBase = knobVal;
 // [[u, x], ...], u the cap's position 0..1 and x the slider's own quantity (seconds for decay and release, else the value
 // 0..1), joined by straight lines in x. The TAPER pop-up's SEGMENTS key turns it on; drag the points on its drawing, click
 // the line to add one, double-click a point to take it away.
-const SEG_ENV = () => [[0, 0.002], [0.05, 0.06], [0.4, 1], [0.7, 3], [1, 10]];
+// v0.45.8: Johnny's own decay curve (22 Nov 2026), with a straight run from 38% (357 ms) to 10 s
+const SEG_ENV = () => [[0, 0.002], [0.02, 0.013], [0.22, 0.128], [0.27, 0.2], [0.38, 0.357], [1, 10]];
 const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: SEG_ENV(), release: SEG_ENV() };
 const taper = JSON.parse(JSON.stringify(TAPER0));
 try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
 // v0.45.6: Johnny asked for the segment curves on decay and release, so they replace whatever this browser had kept for those two, once
-try { if (localStorage.getItem('shyoy.taperv') !== '3') { taper.decay = SEG_ENV(); taper.release = SEG_ENV(); localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '3'); } } catch (e) {}
+try { if (localStorage.getItem('shyoy.taperv') !== '4') { taper.decay = SEG_ENV(); taper.release = SEG_ENV(); localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '4'); } } catch (e) {}
 for (const k in taper) if (taper[k] === 'S') taper[k] = SEG_ENV();   // v0.45.5's 'S' curve
 // v0.45.1 (Johnny: "the decay could do with a curve that bulges the opposite"): -100 .. 100, below 0 bends the other way (anti-log)
 const taperK = (id) => Math.max(-100, Math.min(100, +taper[id] || 0)) / 20;
@@ -106,17 +107,25 @@ function monoTan(P) {
   }
   return m;
 }
-const segX = (P, u) => {
-  let i = 0; while (i < P.length - 2 && u > P[i + 1][0]) i++;
-  const [u0, x0] = P[i], [u1, x1] = P[i + 1], hh = Math.max(1e-9, u1 - u0), t = clamp01((u - u0) / hh), m = monoTan(P);
+// v0.45.8 (Johnny: "the main part up to 10s could be straight"): the curve is drawn through the points as they sit on the
+// TAPER drawing (the slider's value, so log time for decay and release), and the last stretch, to 100%, is a straight line there
+const segV = (id, P, u) => {
+  const Q = P.map(([pu, px]) => [pu, fromX(id, px)]), n = Q.length;
+  let i = 0; while (i < n - 2 && u > Q[i + 1][0]) i++;
+  const [u0, y0] = Q[i], [u1, y1] = Q[i + 1], hh = Math.max(1e-9, u1 - u0), t = clamp01((u - u0) / hh);
+  if (i === n - 2) return y0 + (y1 - y0) * t;
+  const m = monoTan(Q);
+  if (i + 1 === n - 2) {   // run into the straight line without a kink (as far as staying monotone allows)
+    const dl = (Q[n - 1][1] - Q[n - 2][1]) / Math.max(1e-9, Q[n - 1][0] - Q[n - 2][0]), dp = (y1 - y0) / hh;
+    m[i + 1] = dp <= 0 ? 0 : Math.min(dl, 3 * dp); }
   const t2 = t * t, t3 = t2 * t;
-  return (2 * t3 - 3 * t2 + 1) * x0 + (t3 - 2 * t2 + t) * hh * m[i] + (-2 * t3 + 3 * t2) * x1 + (t3 - t2) * hh * m[i + 1];
+  return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * hh * m[i] + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * hh * m[i + 1];
 };
 const valOf = (id, u) => { u = clamp01(u); const P = segOf(id);
-  if (P) return clamp01(fromX(id, segX(P, u)));
+  if (P) return clamp01(segV(id, P, u));
   const k = taperK(id); return Math.abs(k) < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
 const posOf = (id, v) => { v = clamp01(v); const P = segOf(id);
-  if (P) { const x = toX(id, v); let lo = 0, hi = 1; for (let j = 0; j < 30; j++) { const mid = (lo + hi) / 2; if (segX(P, mid) < x) lo = mid; else hi = mid; } return (lo + hi) / 2; }
+  if (P) { let lo = 0, hi = 1; for (let j = 0; j < 30; j++) { const mid = (lo + hi) / 2; if (segV(id, P, mid) < v) lo = mid; else hi = mid; } return (lo + hi) / 2; }
   const k = taperK(id); return Math.abs(k) < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
@@ -828,7 +837,7 @@ const tpSet = (v) => { taper[tpId] = Array.isArray(v) ? v.map((p) => [...p]) : M
 tp.body.querySelector('#tp-r').oninput = (e) => tpSet(+e.target.value);
 tp.body.querySelector('#tp-lin').onclick = () => tpSet(0);
 tp.body.querySelector('#tp-def').onclick = () => tpSet(TAPER0[tpId] || 0);
-// SEGMENTS: the curve as it stands, as five points (the env times get their 2 ms .. 10 s set)
+// SEGMENTS: the curve as it stands, as five points (the env times get Johnny's set)
 tp.body.querySelector('#tp-seg').onclick = () => { if (segOf(tpId)) return; tpSet(ENV_IDS[tpId] ? SEG_ENV() : [0, 0.25, 0.5, 0.75, 1].map((u) => [u, +valOf(tpId, u).toFixed(4)])); };
 // editing the points on the drawing
 const tpAt = (e) => { const r = tpCv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * TPW, (e.clientY - r.top) / r.height * TPH]; };
