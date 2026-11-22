@@ -49,8 +49,9 @@ const BOXES = [
   { r: ROW_VCF, c: 0, s: 8, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
   { r: ROW_VCF, c: 8, s: 7, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
   { r: ROW_VCF, c: 15, s: 3, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
-  { r: ROW_BENDER, c: 11, s: 7, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
-  { r: ROW_BENDER, c: 0, s: 11, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), { t: 'lever', w: 2 }, { t: 'key', k: 'mod', label: 'MOD' }, S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
+  { r: ROW_BENDER, c: 10, s: 8, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
+  { r: ROW_BENDER, c: 0, s: 10, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
+  // v0.53.1 (Johnny: "dont need these - i have them on my keyboard"): no BEND lever or MOD key on the panel; MIDI pitch bend and mod still work
   // v0.53.0 (Johnny: "should just be the preset name and clicking on it opens the preset popup / it should be moved under the word
   // shyoy"): no PRESET box; the name sits under the logo (see TITLE below), and BENDER and PERFORM share the row
   // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): see seq.js
