@@ -50,26 +50,13 @@ const shyoyRand = (() => {
     - 7.35 * p.cutoff + 4.78 * p.cutoff * p.cutoff + 11.42 * p.decay + 3.09 * p.sustain + 4.43 * p.release + 1.89 * (p.vcaMode | 0);
   // the level a plain saw + sub patch plays at, +7 dB (v0.41.2: so a typical sound lands near Level 0.4-0.8)
   const TARGET_DB = -33.87 + 7;
-  const TRIMS = ['level'];
   function levelled(snap) {
     const p = snap.params, est = estDb(p);
     p.level = Math.max(0.1, Math.min(1, 0.7 * 10 ** ((TARGET_DB - est) / 20)));
     last = { est, level: p.level };
     return snap;
   }
-  const hush = () => { post({ type: 'param', id: 'level', v: 0 }); return new Promise((r) => setTimeout(r, 90)); };
-  function fadeTo(tok, id, to) {
-    fadeTo.tok = tok; fadeTo.to = to;
-    const from = state.params[id], t0 = performance.now(), T = 700;
-    const step = () => {
-      if (tok !== fadeTok) return;
-      const u = Math.min(1, (performance.now() - t0) / T), v = from + (to - from) * u * u;
-      state.params[id] = v; post({ type: 'param', id, v });
-      if (u < 1) setTimeout(step, 25); else { if (ui[id]) ui[id](to); save(); }
-    };
-    step();
-  }
-  let last = null, busy = false, fadeTok = 0, pend = false;   // the fade (Johnny: fade low, then bring it up): the new sound goes on at Level 0, then Level rises to its value
+  let last = null, busy = false, pend = false;
   const undo = [];
   let name = '';
   const prjSel = document.getElementById('prj-preset'), nameEl = document.getElementById('prj-name');
@@ -81,39 +68,31 @@ const shyoyRand = (() => {
   }
   async function roll1() {
     const before = soundSnap(), entry = { snap: before, name, sel: prjSel.value }; undo.push(entry); if (undo.length > 20) undo.shift();
-    // clicked again before the last sound finished fading in: its undo copy gets the level it was heading for
-    if (fadeTo.to != null && fadeTo.tok === fadeTok) before.params.level = fadeTo.to;
     const a = amount, t = draw(), p = clone(state.params);
     for (const k in t.f) p[k] = clamp(p[k] + (t.f[k] - p[k]) * a);
     for (const k in t.s) if (chance(a)) p[k] = t.s[k];
     // the musical limits hold however far it moved
     if (p.reso > 0.75) p.cutoff = Math.min(p.cutoff, 0.7);
     const m = Math.max(p.saw, p.pulse, p.sub); if (m < 0.5) { const k = ['saw', 'pulse', 'sub'].find((k) => p[k] === m); p[k] = 0.5; }
-    const snap = { params: p, bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) }, tok = ++fadeTok;
-    // v0.36.6 (Johnny: loud blips before the volume changes): the engine glides the VCA Level over ~10 ms but switches
-    // change at once, so the old sound is first taken to silence, and only then does the new one go on, still at Level 0,
-    // and Level fades up
-    const trim = 'level'; await hush(); if (tok !== fadeTok) return;
-    load({ ...snap, params: { ...p, level: 0 } });
+    // v0.43.4 (Johnny: "it still drops the level to 0 then fades up?"): the Level is known before the sound goes on, so
+    // it goes on at that Level at once (the dip to 0 and fade up of v0.36.6-v0.43.3 were only there to hide the wait
+    // while each sound was measured)
+    const snap = levelled({ params: p, bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) });
+    load(snap);
     // a new name from the namer, shown unsaved; SAVE stores it under that name
     name = NAMER(prjBar.user); nameEl.value = name;
     prjSel.value = ''; prjSel.dispatchEvent(new Event('sync')); const c = curEl(); if (c) c.textContent = name + ' *';
-    pend = false; busy = false;
-    const fin = levelled(clone(snap));
-    for (const q of TRIMS) if (q !== trim && fin.params[q] !== state.params[q]) { state.params[q] = fin.params[q]; post({ type: 'param', id: q, v: fin.params[q] }); if (ui[q]) ui[q](fin.params[q]); }
-    fadeTo(tok, trim, fin.params[trim]);
   }
   function back() {
     const u = undo.pop(); if (!u) return false;
-    const tok = ++fadeTok; boot(); const lv = u.snap.params.level;
-    hush().then(() => { if (tok !== fadeTok) return; load({ ...u.snap, params: { ...u.snap.params, level: 0 } }); fadeTo(tok, 'level', lv); });
+    boot(); load(u.snap);
     name = u.name;
     prjSel.value = u.sel; prjSel.dispatchEvent(new Event('sync'));
     nameEl.value = u.name; const c = curEl(); if (c && u.name) c.textContent = u.name + ' *';
     return true;
   }
   // picking a preset starts a new history
-  prjSel.addEventListener('change', () => { undo.length = 0; name = ''; fadeTok++; });
+  prjSel.addEventListener('change', () => { undo.length = 0; name = ''; });
   return {
     roll, back,
     get amount() { return amount; },
