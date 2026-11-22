@@ -85,7 +85,7 @@ function bs2CC(cc, val) {
 }
 function onMidi(e, bs2) {
   const [st, cc, val] = e.data, t = st & 0xf0;
-  if (t === 0x90 && val > 0) { boot(); midiDown.add(cc); midiHeld.add(cc); post(bs2 && val >= 100 ? { type: 'noteOn', n: cc, acc: 1 } : { type: 'noteOn', n: cc }); return; }
+  if (t === 0x90 && val > 0) { boot(); if (seqRecNote(cc)) return; midiDown.add(cc); midiHeld.add(cc); post(bs2 && val >= 100 ? { type: 'noteOn', n: cc, acc: 1 } : { type: 'noteOn', n: cc }); return; }
   if (t === 0x80 || t === 0x90) { midiDown.delete(cc); if (midiSus) return; if (midiHeld.delete(cc)) post({ type: 'noteOff', n: cc }); return; }
   if (t === 0xe0) { const v = (((val << 7) | cc) - 8192) / (val >= 64 ? 8191 : 8192); midiLater('bend', () => setLever(v)); return; }
   if (t === 0xd0) { modIn.press = cc / 127; midiLater('mod', setMod); return; }

@@ -432,21 +432,29 @@ for (const b of BOXES) {
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'seqrun') {
-      makeKey(cx, y0 + KY, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 12, tag: 'play' });
-      labelAt(() => 'PLAY', cx, y0 + 28 + SEQ_GH + 9);
+      // v0.47.0 (Johnny: "clean up the sequencer area - add the classic sh101 sequencer"): PLAY, RECORD and the note count stacked
+      // beside the grid, top to bottom. The window shows how many notes are recorded, the one playing (3/8), or the last one tapped in
+      const gy = y0 + 28, sx = cx;
+      makeKey(sx, gy + 22, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 10, tag: 'play' });
+      labelAt(() => 'PLAY', sx, gy + 46);
+      makeKey(sx, gy + 92, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 10, tag: 'rec' });
+      labelAt(() => 'RECORD', sx, gy + 116);
+      makeDisplay(sx - 27, gy + 156, 54, 24, () => { const N = state.seq.notes, c = N.length;
+        if (seqRec) return c ? noteName(N[c - 1]) : 'REC'; if (!c) return '--'; return seqOn && seqNoteAt >= 0 ? `${seqNoteAt + 1}/${c}` : String(c); });
+      labelAt(() => 'NOTES', sx, gy + 196);
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx0 = M + b.c * C + col * spread * C + 40, gx = gx0 + 30, gw = w * spread * C - 52 - 52, gy = y0 + 28, gh = SEQ_GH;
+      const gx0 = M + b.c * C + col * spread * C + 40, gx = gx0 + 42, gw = w * spread * C - 52 - 64, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
       const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
-      // v0.45.9: the grid sits 30 further right (where the RETRIG column was) so the RETRIG tabs clear the row names
+      // v0.45.9: the grid sits further right (where the RETRIG column was) so the RETRIG tabs clear the row names; v0.47.0: the row names 12 right too, clear of the NOTES window
       seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: rowH0, gap: LGAP, laneOf,
         rowY: (ri) => TOP + ri * rowH0 + laneOf(ri) * LGAP,   // a row's top, from the grid's top
         rowAt: (dy) => { for (let ri = 0; ri < SEQ_ROWS.length; ri++) { const t = TOP + ri * rowH0 + laneOf(ri) * LGAP; if (dy >= t - LGAP / 2 && dy < t + rowH0) return ri; } return -1; } };
       SEQ_ROWS.forEach((r, ri) => { const yy = gy + seqGrid.rowY(ri) + 0.5 * seqGrid.rowH;
-        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx0 - 14, yy + 0.5, 9.5, "right"); }); });
+        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx0 - 2, yy + 0.5, 9.5, "right"); }); });
       for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 9);
       makeSeqGrid();
       // v0.45.9 (Johnny's sketch): each lane's RETRIG tick (v0.43.1) is a tab on the top-left corner of its loop frame (makeSeqGrid)

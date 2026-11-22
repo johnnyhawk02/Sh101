@@ -96,4 +96,14 @@ console.log('key priority ok');
   const at = []; render(p, 0.03); for (let k = 0; k < 6; k++) { at.push(p.pitchT); render(p, 0.125); }
   assert.equal(at[3], at[0], 'a 3-step octave lane repeats every 3 steps'); assert.equal(at[4] - at[0], 12);
 }
+// v0.47.0: a recorded note list: each gate plays the next note (rests don't use one up); a key moves the list
+{
+  const [p, send] = make(), steps = Array.from({ length: 16 }, (_, i) => ({ on: i !== 1, o: 0, s: false, a: false }));
+  send({ type: 'seq', seq: { steps, bpm: 120, notes: [48, 52, 55] } }); send({ type: 'run', on: true });
+  const at = []; render(p, 0.03); for (let k = 0; k < 6; k++) { at.push(p.gate ? p.pitchT : null); render(p, 0.125); }
+  const T = 12 * p.P.transpose - 12;
+  assert.deepEqual(at, [48 + T, null, 52 + T, 55 + T, 48 + T, 52 + T], 'gates step through the note list, rests skip none');
+  send({ type: 'noteOn', n: 50 }); render(p, 0.125 * 3);
+  assert.equal((p.pitchT - T - 48) % 1, 0); assert.ok([50, 54, 57].includes(p.pitchT - T), 'a key moves the list by its distance from the first note');
+}
 console.log('sequencer ok');

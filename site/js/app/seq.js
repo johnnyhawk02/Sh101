@@ -4,6 +4,12 @@
 const SEQ_N = 16;
 // v0.42.1 (Johnny: "remove the tempo, as it'll soon be a VST"): a fixed 120 BPM here; the host will set it. Steps gain accent (a)
 const SEQ0 = () => ({ steps: [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1].map((on, i) => ({ on: !!on, o: [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1][i], s: i === 4 || i === 12, a: i % 4 === 0 })) });
+// v0.47.0 (Johnny: "add the classic sh101 sequencer in there - press record and tap in the notes - the gate seq plays them in order"):
+// RECORD clears the note list and every key played (computer keys or MIDI) adds one, until RECORD or PLAY is pressed again. While
+// it runs, each GATE step plays the next note in the list (round and round), the octave lane on top; a key played then moves
+// the whole list (the list's first note = as recorded). With no notes, a gate plays the last key, as before
+const SEQ_NOTES_MAX = 100;
+let seqRec = false, seqNoteAt = -1;
 // v0.43.0 (Johnny): each lane (octave, note, slide, accent) has its own length, 1-16
 const SEQ_LANES = ['o', 'on', 's', 'a'];
 // a pattern as saved (the session, or a preset since v0.46.0), checked and filled in
@@ -16,6 +22,8 @@ function seqTidy(q) {
   q.st = Object.assign({ o: 0, on: 0, s: 0, a: 0 }, q.st || {});
   for (const k of SEQ_LANES) { q.st[k] = Math.max(0, Math.min(SEQ_N - 1, q.st[k] | 0)); q.len[k] = Math.max(1, Math.min(SEQ_N - q.st[k], q.len[k] | 0)); }
   q.rt = Object.assign({ o: false, on: false, s: false, a: false }, q.rt || {});
+  // v0.47.0: the recorded note list (MIDI note numbers, before OCTAVE); empty = every gate plays the last key
+  q.notes = Array.isArray(q.notes) ? q.notes.filter((n) => Number.isFinite(n)).map((n) => Math.max(0, Math.min(127, n | 0))).slice(0, SEQ_NOTES_MAX) : [];
   return q;
 }
 // v0.42.2: a v0.42.0-1 pattern (octaves -1..1) moves up one before it's tidied
@@ -26,9 +34,14 @@ function seqLoad(q) { state.seq = seqTidy(q); seqSend(); }
 // v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note
 let seqOn = false, seqPos = -1, seqLanePos = null;
 const seqBpm = () => 120;
-const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len }, st: { ...state.seq.st }, rt: { ...state.seq.rt } } });
+const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len }, st: { ...state.seq.st }, rt: { ...state.seq.rt }, notes: [...state.seq.notes] } });
 function seqSend() { post(seqMsg()); save(); }
-async function seqRun(on = !seqOn) { await boot(); seqOn = on; if (!on) { seqPos = -1; seqLanePos = null; } post(seqMsg()); post({ type: 'run', on }); }
+async function seqRun(on = !seqOn) { await boot(); seqRec = false; seqOn = on; if (!on) { seqPos = -1; seqLanePos = null; seqNoteAt = -1; } post(seqMsg()); post({ type: 'run', on }); }
+function seqRecord(on = !seqRec) { boot(); seqRec = on; if (on) { state.seq.notes = []; seqNoteAt = -1; seqSend(); } }
+// a key while RECORD is on: add it to the list. True when the key shouldn't also go to the engine (it would move the running pattern)
+function seqRecNote(n) { if (!seqRec) return false; if (state.seq.notes.length < SEQ_NOTES_MAX) { state.seq.notes.push(n); seqSend(); } return seqOn; }
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const noteName = (n) => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1);
 // v0.42.4 (Johnny): nudge the whole pattern a step (d -1 = left, 1 = right), and randomise one part of every step
 // v0.43.0: each lane turns round within its own length
 function seqNudge(d) {

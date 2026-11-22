@@ -111,6 +111,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
     // v0.42.0 (Johnny: "a simple octave sequencer, note ons and octave and slides"): 16 steps, each { on, o: -1/0/+1, s: slide }.
     // Every step plays one note (C3, or the last key played while it runs), or 1 or 2 octaves above it; a slide step glides into the next.
     this.seq = { steps: [], bpm: 120 }; this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 };
+    // v0.47.0: the recorded note list (seq.notes): each gate plays the next one; a key played while it runs moves the list (shift)
+    this.noteIdx = 0; this.shift = 0;
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
@@ -137,7 +139,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'mode': if ('hold' in m) this.hold = !!m.hold; break;
       case 'seq': Object.assign(this.seq, m.seq); break;
       case 'run':
-        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 }; }
+        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 }; this.noteIdx = 0; this.shift = 0; }
         else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.port.postMessage({ type: 'step', i: -1 }); }
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
@@ -189,8 +191,10 @@ class KestrelProcessor extends AudioWorkletProcessor {
     n += this.P.transpose * 12;
     if (this.running) {   // a key played while the sequencer runs moves it to that note (the note the key plays)
       this.root = n - 12;
-      // v0.43.1 (Johnny): a lane with RETRIG ticked starts again from its step 1 on the next step
+      const NL = this.seq.notes || []; if (NL.length) this.shift = n - this.P.transpose * 12 - NL[0];   // v0.47.0: the first recorded note plays the list as recorded
+      // v0.43.1 (Johnny): a lane with RETRIG ticked starts again from its step 1 on the next step (GATE's also starts the note list again)
       const rt = this.seq.rt || {}; for (const k in this.laneAt) if (rt[k]) this.laneAt[k] = this.stepIdx;
+      if (rt.on) this.noteIdx = 0;
       return;
     }
     const legato = this.keys.length > 0 && this.gate;
@@ -216,16 +220,19 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const S = this.seq, N = this.stepIdx, L = S.len || {}, n16 = Math.max(1, S.steps.length || 1);
     const A = S.st || {}, pos = {}; for (const k in this.laneAt) { const a = Math.max(0, Math.min(n16 - 1, A[k] | 0)), len = Math.max(1, Math.min(n16 - a, L[k] || n16)); pos[k] = a + ((N - this.laneAt[k]) % len + len) % len; }   // v0.43.9: each lane loops from its start step
     const lane = (k) => S.steps[pos[k]] || {};
-    const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N, dur = this.fs * 60 / S.bpm / 4;
+    const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N; let ni = -1; const dur = this.fs * 60 / S.bpm / 4;
     this.nextStepAt += dur;
     if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else {
-      const n = (this.root >= 0 ? this.root : 36 + 12 * this.P.transpose) + 12 * Math.max(0, Math.min(2, st.o | 0));   // v0.42.2: octave 0 = the current note, 1 and 2 above it
+      const NL = S.notes || []; let base;
+      if (NL.length) { const k = this.noteIdx % NL.length; base = NL[k] + this.shift + 12 * this.P.transpose - 12; this.noteIdx = k + 1; ni = k; }   // v0.47.0: the next recorded note
+      else base = this.root >= 0 ? this.root : 36 + 12 * this.P.transpose;
+      const n = base + 12 * Math.max(0, Math.min(2, st.o | 0));   // v0.42.2: octave 0 = the current note, 1 and 2 above it
       if (this.lastSlide && this.gate) { this.setPitch(n, 0.06); this.accOn = st.a ? 1 : 0; }
       else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(!!st.a); }
       this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
     }
-    this.port.postMessage({ type: 'step', i, p: pos });
+    this.port.postMessage({ type: 'step', i, p: pos, ni });
     this.stepIdx = (N + 1) % 720720;   // a count every lane length divides
   }
 
