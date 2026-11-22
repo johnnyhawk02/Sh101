@@ -432,48 +432,46 @@ for (const b of BOXES) {
       addCtl(lev);
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'seqrun') {
-      // v0.47.0 (Johnny: "clean up the sequencer area - add the classic sh101 sequencer"): PLAY, RECORD and the note count stacked
-      // beside the grid, top to bottom. The window shows how many notes are recorded, the one playing (3/8), or the last one tapped in
+      // v0.47.0: PLAY beside the grid (RECORD and the NOTES window moved under the grid in v0.48.0)
       const gy = y0 + 28, sx = cx;
       makeKey(sx, gy + 22, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 10, tag: 'play' });
       labelAt(() => 'PLAY', sx, gy + 46);
-      makeKey(sx, gy + 92, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 10, tag: 'rec' });
-      labelAt(() => 'RECORD', sx, gy + 116);
-      makeDisplay(sx - 27, gy + 156, 54, 24, () => { const N = state.seq.notes, c = N.length;
-        if (seqRec) return c ? noteName(N[c - 1]) : 'REC'; if (!c) return '--'; return seqOn && seqNoteAt >= 0 ? `${seqNoteAt + 1}/${c}` : String(c); });
-      labelAt(() => 'NOTES', sx, gy + 196);
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx0 = M + b.c * C + col * spread * C + 40, gx = gx0 + 42, gw = w * spread * C - 52 - 64, gy = y0 + 28, gh = SEQ_GH;
+      const gx0 = M + b.c * C + col * spread * C + 40, gx = gx0 + 30, gw = w * spread * C - 52 - 52, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
       const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
-      // v0.45.9: the grid sits further right (where the RETRIG column was) so the RETRIG tabs clear the row names; v0.47.0: the row names 12 right too, clear of the NOTES window
+      // v0.45.9: the grid sits further right (where the RETRIG column was) so the RETRIG tabs clear the row names
       seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: rowH0, gap: LGAP, laneOf,
         rowY: (ri) => TOP + ri * rowH0 + laneOf(ri) * LGAP,   // a row's top, from the grid's top
         rowAt: (dy) => { for (let ri = 0; ri < SEQ_ROWS.length; ri++) { const t = TOP + ri * rowH0 + laneOf(ri) * LGAP; if (dy >= t - LGAP / 2 && dy < t + rowH0) return ri; } return -1; } };
       SEQ_ROWS.forEach((r, ri) => { const yy = gy + seqGrid.rowY(ri) + 0.5 * seqGrid.rowH;
-        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx0 - 2, yy + 0.5, 9.5, "right"); }); });
+        prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx0 - 14, yy + 0.5, 9.5, "right"); }); });
       for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 9);
       makeSeqGrid();
       // v0.45.9 (Johnny's sketch): each lane's RETRIG tick (v0.43.1) is a tab on the top-left corner of its loop frame (makeSeqGrid)
-      // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
-      // slides and octaves
-      // v0.43.3: RANDOM printed once before its keys: ALL, GATES, ACC, SLIDES, OCTAVES, LENGTH, RETRIG
-      const ty = y0 + 28 + SEQ_GH + 34, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
-        ['GATES', 'rndOn', () => seqRandom('on')], ['ACC', 'rndA', () => seqRandom('a')], ['SLIDES', 'rndS', () => seqRandom('s')],
-        ['OCTAVES', 'rndO', () => seqRandom('o')], ['LENGTH', 'rndLen', () => seqRandom('len')], ['RETRIG', 'rndRt', () => seqRandom('rt')], ['RESET LOOPS', 'loopsReset', () => seqResetLoops()]];   // v0.43.16 (Johnny): every lane back to steps 1-16
-      { const rx = gx0 + 12 + 2 * 62 + 4; prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(rx, ty - 9, 64, 18); x.fillStyle = inkOf(ink); text(x, 'RANDOM', rx + 32, ty + 0.5, 10.5); }); }
-      let tx = gx0 + 12, first = true;
-      TK.forEach(([label, tag, press], k) => {
-        makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); press(); }, pad: 6, tag });
-        const tri = label === '◀' || label === '▶', lx = tx + 20;
-        prints.push((x, ink) => { x.fillStyle = ink;
-          if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
-          else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
-        tx += tri ? 62 : (gw + 52 - 2 * 62 - 24 - 96 - 110) / 7; if (label === 'RETRIG') tx = gx0 + gw + 52 - 104; if (tri && label === '▶') tx += 96;
-      });
+      // v0.48.0 (Johnny: "make all the seq randomiser into a menu - have shortkeys for them"; "the new note seq can go on the LHS under
+      // the gate seq"): under the grid, left to right: the note sequencer (RECORD and its NOTES window), nudge ◀ ▶ (v0.42.4), and
+      // one RANDOM key that opens the randomiser menu (seqMenu below; its shortcuts are in seq.js SEQ_RND)
+      const ty = y0 + 28 + SEQ_GH + 34, kl = (kx, label) => prints.push((x, ink) => { x.fillStyle = ink; text(x, label, kx + 20, ty + 0.5, 10.5, 'left'); });
+      let tx = gx + 12;
+      makeKey(tx, ty, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 6, tag: 'rec' }); kl(tx, 'RECORD');
+      const dw = 6 * C, dx = tx + 86;
+      makeDisplay(dx, ty - 12, dw, 24, () => { const N = state.seq.notes, c = N.length, nm = (a) => a.map(noteName).join(' ');
+        if (seqRec) return c ? 'REC ' + nm(N.slice(-9)) : 'REC - PLAY SOME KEYS';
+        if (!c) return 'NO NOTES - PRESS RECORD';
+        const at = seqOn && seqNoteAt >= 0 ? seqNoteAt : -1;
+        return (at >= 0 ? `${at + 1}/${c} ` : `${c} NOTES `) + nm(at >= 0 ? N.slice(at, at + 9) : N.slice(0, 9)); });
+      tx = dx + dw + 30;
+      for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) {
+        makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); const lx = tx + 24;
+        prints.push((x, ink) => { x.fillStyle = ink; x.beginPath(); x.moveTo(lx + d * 5, ty); x.lineTo(lx - d * 5, ty - 6); x.lineTo(lx - d * 5, ty + 6); x.closePath(); x.fill(); });
+        tx += 62;
+      }
+      const rx = gx + gw - 92;
+      makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); kl(rx, 'RANDOM…');
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
       // steps and browser, and the randomiser (rand.js) and its undo
@@ -883,6 +881,12 @@ tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTa
   try { await navigator.clipboard.writeText(t); b.textContent = 'COPIED'; } catch (er) { prompt('Copy the tapers', t); }
   setTimeout(() => { b.textContent = 'COPY ALL TAPERS'; }, 1500); };
 function openTaper(id) { tpId = id; tpDraw(); tp.open(); }
+// v0.48.0 (Johnny: "make all the seq randomiser into a menu - have shortkeys for them"): the sequencer's RANDOM menu, one row per
+// randomiser (seq.js SEQ_RND) with its key. It stays open, so a row can be pressed again and again; ✕, Esc or a click outside closes it
+const sm = sheet('RANDOM');
+sm.body.innerHTML = `<div class="f sm-list">${SEQ_RND.map(([label, key], i) => `<button data-i="${i}" style="display:flex;justify-content:space-between;gap:28px;width:100%;margin:0 0 6px"><span>${label}</span><b style="opacity:.6">${key === ' ' ? 'SPACE' : key.toUpperCase()}</b></button>`).join('')}</div>`;
+sm.body.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; boot(); SEQ_RND[+b.dataset.i][2](); dirty = true; });
+const seqMenu = { isOpen: () => sm.el.classList.contains('open'), toggle() { if (this.isOpen()) sm.close(); else sm.open(); dirty = true; } };
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
 const pb = sheet('PRESETS');

@@ -71,6 +71,15 @@ function seqRandom(k) {
   }
   seqSend();
 }
+// v0.48.0 (Johnny: "make all the seq randomiser into a menu - have shortkeys for them"): the RANDOM menu's rows (view3d.js) and their
+// keys: the number keys, clear of the note keys (A-; and the black keys above) and Z/X (octave)
+const SEQ_RND = [['RANDOM ALL', '1', () => seqRandom('all')], ['RANDOM GATES', '2', () => seqRandom('on')], ['RANDOM ACCENTS', '3', () => seqRandom('a')],
+  ['RANDOM SLIDES', '4', () => seqRandom('s')], ['RANDOM OCTAVES', '5', () => seqRandom('o')], ['RANDOM LENGTHS', '6', () => seqRandom('len')],
+  ['RANDOM RETRIGS', '7', () => seqRandom('rt')], ['RESET LOOPS', '0', () => seqResetLoops()]];
+window.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || (e.target.matches && e.target.matches('input, select, textarea'))) return;
+  const r = SEQ_RND.find(([, k]) => k === e.key); if (r) { e.preventDefault(); r[2](); }
+});
 function seqStepSet(i, k, v) { const st = state.seq.steps[i]; st[k] = v; seqSend(); }
 // the space bar starts and stops it
 window.addEventListener('keydown', (e) => {
