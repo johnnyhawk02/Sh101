@@ -118,4 +118,11 @@ console.log('key priority ok');
   const b2 = []; render(q, 0.03); for (let k = 0; k < 7; k++) { b2.push(q.pitchT - T); render(q, 0.125); }
   assert.deepEqual(b2, [48, 52, 55, 48, 52, 48, 52], 'loop 5 over 3 notes: round the notes, back to note 1 after 5');
 }
+// v0.52.0: STEP CYCLE 2 starts every lane again after 2 steps
+{
+  const [p, send] = make(), steps = Array.from({ length: 16 }, (_, i) => ({ on: true, o: i % 3, s: false, a: false }));
+  send({ type: 'seq', seq: { steps, bpm: 120, cyc: 2 } }); send({ type: 'run', on: true });
+  const at = []; render(p, 0.03); for (let k = 0; k < 5; k++) { at.push(p.pitchT); render(p, 0.125); }
+  assert.deepEqual(at.map((v) => v - at[0]), [0, 12, 0, 12, 0], 'step cycle 2 repeats steps 1-2');
+}
 console.log('sequencer ok');

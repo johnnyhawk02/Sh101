@@ -466,15 +466,19 @@ for (const b of BOXES) {
       const lab = (lx, t) => prints.push((x, ink) => { x.fillStyle = ink; text(x, t, lx, ty + 0.5, 10.5, 'left'); });
       const nx = tx + 44, NW = 40;
       makeDisplay(nx, ty - 12, NW, 24, () => String(state.seq.notes.length)); lab(nx + NW + 8, 'NOTES');
-      const lx = nx + NW + 76, ld = makeDisplay(lx, ty - 12, NW, 24, () => state.seq.notes.length ? String(seqLoopN()) : '-', { tag: 'nloop' });
-      lab(lx + NW + 8, 'LOOP');
-      { let g0 = null; ld.kind = 'roll';
-        ld.down = (p) => { g0 = { y: p ? p[1] : 0, v: seqLoopN(), moved: false, top: p && p[1] < ty }; };
-        ld.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; seqSetLoop(g0.v + dv); };
-        ld.up = () => { if (g0 && !g0.moved) seqSetLoop(seqLoopN() + (g0.top ? 1 : -1)); g0 = null; }; }
-      let ax = lx + NW + 74; lab(ax - 12, 'NEXT'); ax += 34;
+      // a number box: drag up/down, or click its top half for one more and its bottom half for one fewer
+      const numBox = (bx, show, get, set, tag) => { const d = makeDisplay(bx, ty - 12, NW, 24, show, { tag }); let g0 = null; d.kind = 'roll';
+        d.down = (p) => { g0 = { y: p ? p[1] : 0, v: get(), moved: false, top: p && p[1] < ty }; };
+        d.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; set(g0.v + dv); };
+        d.up = () => { if (g0 && !g0.moved) set(get() + (g0.top ? 1 : -1)); g0 = null; }; };
+      // v0.52.0 (Johnny: "loop is note seq retrigger, we need a retrigger numbox for the gate seq - think of names for these that are short
+      // and snappy"): NOTE CYCLE (was LOOP: after this many notes, back to note 1) and STEP CYCLE (after this many steps every lane of the
+      // grid starts again from its loop start; OFF = never)
+      const lx = nx + NW + 76; numBox(lx, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop'); lab(lx + NW + 8, 'NOTE CYCLE');
+      let ax = lx + NW + 124; lab(ax - 12, 'NEXT'); ax += 34;
       for (const [a, t] of [['gate', 'GATE'], ['step', '1/16']]) { makeKey(ax, ty, 24, 14, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), pad: 6, tag: 'adv:' + a }); lab(ax + 20, t); ax += 70; }
-      tx = ax + 20;
+      const cx2 = ax + 4; numBox(cx2, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc'); lab(cx2 + NW + 8, 'STEP CYCLE');
+      tx = cx2 + NW + 124;
       for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) { makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); icon(tx, arrow(d)); tx += 56; }
       const rx = gx + gw - 30;
       makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); icon(rx, dice);

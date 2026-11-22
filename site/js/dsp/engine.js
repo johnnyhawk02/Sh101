@@ -112,7 +112,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     // Every step plays one note (C3, or the last key played while it runs), or 1 or 2 octaves above it; a slide step glides into the next.
     this.seq = { steps: [], bpm: 120 }; this.running = false; this.stepIdx = 0; this.nextStepAt = 0; this.gateOffAt = -1; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 };
     // v0.47.0: the recorded note list (seq.notes): each gate plays the next one; a key played while it runs moves the list (shift)
-    this.noteIdx = 0; this.shift = 0;
+    this.noteIdx = 0; this.shift = 0; this.cycN = 0;
     this.meterAt = 0;
     this.node = new Float64Array(NODES.length);
     this.inj = new Float64Array(INJ.length);
@@ -139,7 +139,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'mode': if ('hold' in m) this.hold = !!m.hold; break;
       case 'seq': Object.assign(this.seq, m.seq); break;
       case 'run':
-        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 }; this.noteIdx = 0; this.shift = 0; }
+        if (m.on && !this.running) { this.running = true; this.stepIdx = 0; this.nextStepAt = this.t; this.lastSlide = false; this.root = -1; this.laneAt = { o: 0, on: 0, s: 0, a: 0 }; this.noteIdx = 0; this.shift = 0; this.cycN = 0; }
         else if (!m.on && this.running) { this.running = false; this.gateOff(); this.gateOffAt = -1; this.port.postMessage({ type: 'step', i: -1 }); }
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
@@ -218,6 +218,8 @@ class KestrelProcessor extends AudioWorkletProcessor {
   seqStep() {
     // v0.43.0 (Johnny: "a step length on the RHS for each lane"): octave, note, slide and accent each loop at their own length
     const S = this.seq, N = this.stepIdx, L = S.len || {}, n16 = Math.max(1, S.steps.length || 1);
+    // v0.52.0 (Johnny): STEP CYCLE, every `cyc` steps all the lanes start again from their loop starts
+    if (S.cyc > 0) { if (this.cycN >= S.cyc) { for (const k in this.laneAt) this.laneAt[k] = N; this.cycN = 0; } this.cycN++; }
     const A = S.st || {}, pos = {}; for (const k in this.laneAt) { const a = Math.max(0, Math.min(n16 - 1, A[k] | 0)), len = Math.max(1, Math.min(n16 - a, L[k] || n16)); pos[k] = a + ((N - this.laneAt[k]) % len + len) % len; }   // v0.43.9: each lane loops from its start step
     const lane = (k) => S.steps[pos[k]] || {};
     const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N; let ni = -1; const dur = this.fs * 60 / S.bpm / 4;
