@@ -10,8 +10,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
-const C = 62, R = 150, M = 24, COLS = 18, ROWS = 4;
-const SEQ_TOOLS = 40;   // v0.42.4: the strip of keys under the sequencer's grid
+const C = 62, R = 150, M = 8, COLS = 18, ROWS = 4;   // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
+const SEQ_TOOLS = 62;   // v0.42.4: the strip of keys under the sequencer's grid
 const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
@@ -104,6 +104,7 @@ const BOXES = [
   { r: 3, c: 0, s: 18, h: R + SEQ_TOOLS, n: 'SEQUENCER', it: [{ t: 'seqrun' }, { t: 'grid', w: 17 }] },
 ];
 let seqGrid = null;
+const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's highlights)
 const SEQ_LANE_ROWS = [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]];   // lane, first row, rows
 const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
@@ -421,23 +422,28 @@ for (const b of BOXES) {
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'seqrun') {
       makeKey(cx, y0 + KY, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 12, tag: 'play' });
-      labelAt(() => 'PLAY', cx, ly);
+      labelAt(() => 'PLAY', cx, y0 + 28 + 120 + 9);
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84, gy = y0 + 26, gh = 102;
-      seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: gh / SEQ_ROWS.length };
-      SEQ_ROWS.forEach((r, ri) => { const yy = gy + (ri + 0.5) * seqGrid.rowH;
+      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84, gy = y0 + 28, gh = 120;
+      // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
+      const LGAP = 8, TOP = 4, rowH0 = (gh - TOP - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;
+      const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
+      seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: rowH0, gap: LGAP, laneOf,
+        rowY: (ri) => TOP + ri * rowH0 + laneOf(ri) * LGAP,   // a row's top, from the grid's top
+        rowAt: (dy) => { for (let ri = 0; ri < SEQ_ROWS.length; ri++) { const t = TOP + ri * rowH0 + laneOf(ri) * LGAP; if (dy >= t - LGAP / 2 && dy < t + rowH0) return ri; } return -1; } };
+      SEQ_ROWS.forEach((r, ri) => { const yy = gy + seqGrid.rowY(ri) + 0.5 * seqGrid.rowH;
         prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 8, yy + 0.5, 9.5, 'right'); }); });
-      for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, ly);
+      for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 9);
       makeSeqGrid();
       // v0.43.0 (Johnny: "a step length on the RHS for each lane - try a number box"): drag up or down, or press the
       // top half for one more and the bottom half for one fewer. The octave lane's box sits across its three rows
       const rh = seqGrid.rowH, nx = gx + gw + 10;
       prints.push((x, ink) => { x.fillStyle = ink; text(x, 'LEN', nx + 15, gy - 6, 9, 'center'); text(x, 'RETRIG', nx + 54, gy - 6, 9, 'center'); });
       SEQ_LANE_ROWS.forEach(([k, r0, n]) => {
-        const by = gy + r0 * rh + (n * rh - (rh - 3)) / 2, bh = rh - 3;
-        if (n > 1) prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(nx - 5, gy + r0 * rh + 4, 1.2, n * rh - 8); });
+        const ly0 = gy + seqGrid.rowY(r0), by = ly0 + (n * rh - (rh - 3)) / 2, bh = rh - 3;
+        if (n > 1) prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(nx - 5, ly0 + 4, 1.2, n * rh - 8); });
         const d = makeDisplay(nx, by, 30, bh, () => String(state.seq.len[k]), { tag: 'len:' + k });
         let g0 = null; d.kind = 'roll';
         d.down = (p) => { g0 = { y: p ? p[1] : 0, v: state.seq.len[k], moved: false, top: p && p[1] < by + bh / 2 }; };
@@ -449,7 +455,7 @@ for (const b of BOXES) {
       // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
       // slides and octaves
       // v0.43.3: RANDOM printed once before its keys: ALL, GATES, ACC, SLIDES, OCTAVES, LENGTH, RETRIG
-      const ty = y0 + R + 10, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
+      const ty = y0 + R + 31, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
         ['GATES', 'rndOn', () => seqRandom('on')], ['ACC', 'rndA', () => seqRandom('a')], ['SLIDES', 'rndS', () => seqRandom('s')],
         ['OCTAVES', 'rndO', () => seqRandom('o')], ['LENGTH', 'rndLen', () => seqRandom('len')], ['RETRIG', 'rndRt', () => seqRandom('rt')]];
       { const rx = gx + 12 + 2 * 62 + 4; prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(rx, ty - 9, 64, 18); x.fillStyle = inkOf(ink); text(x, 'RANDOM', rx + 32, ty + 0.5, 10.5); }); }
@@ -491,7 +497,7 @@ function makeSeqGrid() {
       const st = state.seq.steps[i], cx = i * cw;
       SEQ_ROWS.forEach(([t, v], ri) => {
         // v0.43.0: each lane has its own length (steps past it are faint) and its own playhead
-        const y = ri * rh, n = state.seq.len[t]; x.globalAlpha = i < n ? 1 : 0.25;
+        const y = G.rowY(ri), n = state.seq.len[t]; x.globalAlpha = i < n ? 1 : 0.25;
         if (seqPos >= 0 && (seqLanePos ? seqLanePos[t] : seqPos % n) === i) { x.fillStyle = tone(0.16); x.fillRect(cx, y, cw, rh); }
         x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
         if (t === 'o' ? (st.o | 0) === v : !!st[t]) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
@@ -501,14 +507,15 @@ function makeSeqGrid() {
     }
     // v0.43.5 (Johnny): each lane's grab bar, at the end of its last step; drag it to set the lane's length
     for (const [k, r0, n] of SEQ_LANE_ROWS) {
-      const bx = Math.min(G.w - 2, state.seq.len[k] * cw), y = r0 * rh + 2, h = n * rh - 4;
-      x.fillStyle = ink; x.fillRect(bx - 1.5, y, 3, h); x.fillRect(bx - 4, y + h / 2 - 7, 8, 14);
+      const ly = G.rowY(r0), bx = Math.min(G.w - 2, state.seq.len[k] * cw), y = ly + 2, h = n * rh - 4;
+      x.fillStyle = SPOT; x.fillRect(0, ly - 3.5, G.w, 2.5);   // the lane's spot-colour strip
+      x.fillRect(bx - 1.5, y, 3, h); x.fillRect(bx - 4, y + h / 2 - 7, 8, 14);
       x.fillStyle = inkOf(ink); x.fillRect(bx - 2, y + h / 2 - 3, 4, 1); x.fillRect(bx - 2, y + h / 2, 4, 1); x.fillRect(bx - 2, y + h / 2 + 3, 4, 1);
     }
     tex.needsUpdate = true; return true;
   };
   const at = (p) => { if (!p || p[0] < G.x || p[0] >= G.x + G.w || p[1] < G.y || p[1] >= G.y + G.h) return null;
-    return { i: Math.min(SEQ_N - 1, Math.floor((p[0] - G.x) / G.colW)), r: SEQ_ROWS[Math.min(SEQ_ROWS.length - 1, Math.floor((p[1] - G.y) / G.rowH))] }; };
+    return { i: Math.min(SEQ_N - 1, Math.floor((p[0] - G.x) / G.colW)), r: SEQ_ROWS[Math.max(0, G.rowAt(p[1] - G.y))] }; };
   // what a press does: an octave cell picks that octave; the others toggle. A drag paints the same
   const apply = (h, paint) => {
     const st = state.seq.steps[h.i], [t, v] = h.r;
@@ -518,7 +525,7 @@ function makeSeqGrid() {
   };
   let paint = null, lenDrag = null;
   // a press near a lane's grab bar takes the bar, not the cell under it
-  const barAt = (p) => { if (!p) return null; const ri = Math.floor((p[1] - G.y) / G.rowH);
+  const barAt = (p) => { if (!p) return null; const ri = G.rowAt(p[1] - G.y);
     const ln = SEQ_LANE_ROWS.find(([, r0, n]) => ri >= r0 && ri < r0 + n); if (!ln) return null;
     const bx = G.x + state.seq.len[ln[0]] * G.colW; return Math.abs(p[0] - bx) <= 7 ? ln[0] : null; };
   addCtl({ kind: 'roll', rect: [G.x, G.y, G.w + 8, G.h], sync: draw,
@@ -1132,7 +1139,7 @@ window.shyoy3d = {
   where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy - TRAVEL + 2 * TRAVEL * knobVal(id), CAP.d).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
   grid() { return seqGrid; },
-  cell(i, ri) { const G = seqGrid; return this.at(G.x + (i + 0.5) * G.colW, G.y + (ri + 0.5) * G.rowH); },
+  cell(i, ri) { const G = seqGrid; return this.at(G.x + (i + 0.5) * G.colW, G.y + G.rowY(ri) + 0.5 * G.rowH); },
   title() { return this.at(TITLE.x + TITLE.w / 2, TITLE.y + 50); },
   at(pxX, pxY) { const v = P(pxX, pxY, 8).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   ctls, W, H, look,
