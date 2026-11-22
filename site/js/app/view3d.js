@@ -70,6 +70,16 @@ function setKnob(id, v) {
 }
 const knobVal = (id) => state.params[id];
 const knobBase = knobVal;
+// v0.45.0 (Johnny: "logarithmic pots for some things ... a popup that sets the logarithmicness of the pots"): each slider has
+// a taper, 0 (linear) to 100 (strongly logarithmic, like an audio-taper pot): the value is (e^(k u) - 1) / (e^k - 1) of
+// the cap's position u, k = taper / 20. Right-click (or Ctrl-click) a slider for its TAPER pop-up. Kept in this browser
+// (shyoy.taper), not in presets. The mixer and the VCA level start as log pots, as on a real panel.
+const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50 };
+const taper = { ...TAPER0 };
+try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
+const taperK = (id) => Math.max(0, Math.min(100, taper[id] || 0)) / 20;
+const valOf = (id, u) => { const k = taperK(id); u = Math.max(0, Math.min(1, u)); return k < 1e-3 ? u : (Math.exp(k * u) - 1) / (Math.exp(k) - 1); };
+const posOf = (id, v) => { const k = taperK(id); v = Math.max(0, Math.min(1, v)); return k < 1e-3 ? v : Math.log(1 + v * (Math.exp(k) - 1)) / k; };
 const knobText = (id, v) => String(DEF[id] && DEF[id].fmt ? DEF[id].fmt(v) : Math.round(v * 100));
 const swVal = (id) => state.params[id] | 0;
 function setSw(id, i) {
@@ -261,7 +271,7 @@ function makeKnob(cx, cy, o) {
   k.sync = () => {
     const id = k.cur(); g.visible = !!id; if (!id) return false;
     const v = knobVal(id); if (v === k.shown) return false;
-    k.shown = v; cap.position.y = -TRAVEL + 2 * TRAVEL * v; shadowDirty = true; return true;
+    k.shown = v; cap.position.y = -TRAVEL + 2 * TRAVEL * posOf(id, v); shadowDirty = true; return true;
   };
   k.colour(); k.size(look.ksize); k.clean(look.ocd); addCtl(k); knobs.push(k); return k;
 }
@@ -652,7 +662,7 @@ cv.addEventListener('pointerdown', (e) => {
   e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   boot();
   const g = { c, x: e.clientX, y: e.clientY, moved: false };
-  if (c.kind === 'knob') { g.id = c.cur(); g.v0 = knobBase(g.id); ro.show(c, knobText(g.id, g.v0)); }
+  if (c.kind === 'knob') { g.id = c.cur(); g.v0 = posOf(g.id, knobBase(g.id)); ro.show(c, knobText(g.id, knobBase(g.id))); }
   else if (c.kind === 'key') { c.down = true; if (c.hold) c.hold(true); else if (c.press) c.press(); }
   else if (c.kind === 'lever') { c.held = true; g.v0 = c.v; }
   else if (c.kind === 'roll') c.down(toPanel(e));
@@ -664,7 +674,7 @@ cv.addEventListener('pointermove', (e) => {
   const c = g.c;
   if (c.kind === 'knob') {   // the cap follows the finger along its slot (Shift: finer)
     const v = Math.max(0, Math.min(1, g.v0 + (g.y - e.clientY) / slotPx(c) * (e.shiftKey ? 0.2 : 1)));
-    setKnob(g.id, v); ro.show(c, knobText(g.id, knobBase(g.id)));
+    setKnob(g.id, valOf(g.id, v)); ro.show(c, knobText(g.id, knobBase(g.id)));
   } else if (c.kind === 'lever') {
     const r = cv.getBoundingClientRect(), pxPerUnit = r.width / W * (camera.position.z > 0 ? 1 : 1);
     const v = Math.max(-1, Math.min(1, g.v0 + (e.clientX - g.x) / (c.half * pxPerUnit))); c.v = v; setLever(v);
@@ -682,10 +692,10 @@ function release(e) {
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
-cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (e.ctrlKey) return; const c = pick(e); if (c && c.kind === 'title' && shyoyRand.back()) wobbleLogo(); });
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const c = pick(e); if (c && c.kind === 'knob' && c.cur()) return openTaper(c.cur()); if (e.ctrlKey) return; if (c && c.kind === 'title' && shyoyRand.back()) wobbleLogo(); });
 cv.addEventListener('wheel', (e) => {
   const c = pick(e); if (!c || c.kind !== 'knob') return; e.preventDefault(); boot();
-  const id = c.cur(); setKnob(id, knobBase(id) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02));
+  const id = c.cur(); setKnob(id, valOf(id, posOf(id, knobBase(id)) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02)));
 }, { passive: false });
 
 // ---------------------------------------------------------------- overlays: OPTIONS and the preset browser
@@ -751,6 +761,27 @@ opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI<
 const $o = (s) => opt.body.querySelector(s);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 function openOptions3d() { opt.open(); }
+// the TAPER pop-up (v0.45.0): one slider's taper, with its curve drawn (cap position across, value up)
+const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((it) => it.t === 'knob').map((it) => [it.id, b.n + ' ' + it.label])));
+const tp = sheet('TAPER');
+tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="240" height="160" style="display:block;width:240px;height:160px;margin:6px 0 10px"></canvas>
+  <div class="row" style="font-size:10px;letter-spacing:.08em"><b>LIN</b><input type="range" min="0" max="100" id="tp-r" aria-label="Taper, linear to logarithmic"><b>LOG</b><b class="val" id="tp-v"></b></div></div>
+  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-def">DEFAULT</button></div>`;
+let tpId = null;
+const tpDraw = () => {
+  const id = tpId, c = tp.body.querySelector('#tp-cv'), x = c.getContext('2d'), w = c.width, h = c.height, ink = curInk;
+  x.clearRect(0, 0, w, h); x.strokeStyle = ink; x.globalAlpha = 0.3; x.lineWidth = 1; x.strokeRect(0.5, 0.5, w - 1, h - 1);
+  x.beginPath(); x.moveTo(0, h); x.lineTo(w, 0); x.stroke(); x.globalAlpha = 1; x.lineWidth = 2.5; x.beginPath();
+  for (let i = 0; i <= 60; i++) { const u = i / 60; x.lineTo(u * w, h - valOf(id, u) * h); } x.stroke();
+  const u = posOf(id, knobVal(id)); x.fillStyle = ink; x.beginPath(); x.arc(u * w, h - knobVal(id) * h, 4, 0, 7); x.fill();
+  tp.body.querySelector('#tp-r').value = taper[id] || 0; tp.body.querySelector('#tp-v').textContent = taper[id] || 0;
+  tp.body.querySelector('#tp-name').textContent = (KNOB_NAMES[id] || id).toUpperCase();
+};
+const tpSet = (v) => { taper[tpId] = Math.round(v); try { localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); } catch (e) {} for (const k of knobs) k.shown = null; dirty = true; tpDraw(); };
+tp.body.querySelector('#tp-r').oninput = (e) => tpSet(+e.target.value);
+tp.body.querySelector('#tp-lin').onclick = () => tpSet(0);
+tp.body.querySelector('#tp-def').onclick = () => tpSet(TAPER0[tpId] || 0);
+function openTaper(id) { tpId = id; tpDraw(); tp.open(); }
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
 const pb = sheet('PRESETS');
@@ -818,7 +849,7 @@ window.shyoy3d = {
   show() { if (!live) { live = true; fit(); dirty = printDirty = shadowDirty = true; requestAnimationFrame(frame); } },
   hide() { live = false; opt.close(); pb.close(); },
   // for headless checks: where a control is on screen
-  where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy - TRAVEL + 2 * TRAVEL * knobVal(id), CAP.d).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
+  where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy - TRAVEL + 2 * TRAVEL * posOf(id, knobVal(id)), CAP.d).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
   grid() { return seqGrid; },
   cell(i, ri) { const G = seqGrid; return this.at(G.x + (i + 0.5) * G.colW, G.y + G.rowY(ri) + 0.5 * G.rowH); },
