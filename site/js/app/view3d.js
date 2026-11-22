@@ -11,7 +11,8 @@ import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
 const C = 62, R = 150, M = 8, COLS = 18, ROWS = 4;   // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
-const SEQ_TOOLS = 96;   // v0.42.4: the strip of keys under the sequencer's grid
+const SEQ_GH = 180;   // v0.43.10: the sequencer grid's height
+const SEQ_TOOLS = 96 + SEQ_GH - 154;   // v0.42.4: the strip of keys under the sequencer's grid
 const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
@@ -422,13 +423,13 @@ for (const b of BOXES) {
       labelAt(() => 'BEND', cx, ly);
     } else if (it.t === 'seqrun') {
       makeKey(cx, y0 + KY, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 12, tag: 'play' });
-      labelAt(() => 'PLAY', cx, y0 + 28 + 154 + 9);
+      labelAt(() => 'PLAY', cx, y0 + 28 + SEQ_GH + 9);
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84, gy = y0 + 28, gh = 154;
+      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 84, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
-      const LGAP = 16, TOP = 4, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
+      const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
       seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: rowH0, gap: LGAP, laneOf,
         rowY: (ri) => TOP + ri * rowH0 + laneOf(ri) * LGAP,   // a row's top, from the grid's top
@@ -455,7 +456,7 @@ for (const b of BOXES) {
       // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
       // slides and octaves
       // v0.43.3: RANDOM printed once before its keys: ALL, GATES, ACC, SLIDES, OCTAVES, LENGTH, RETRIG
-      const ty = y0 + 28 + 154 + 34, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
+      const ty = y0 + 28 + SEQ_GH + 34, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['ALL', 'rndAll', () => seqRandom('all')],
         ['GATES', 'rndOn', () => seqRandom('on')], ['ACC', 'rndA', () => seqRandom('a')], ['SLIDES', 'rndS', () => seqRandom('s')],
         ['OCTAVES', 'rndO', () => seqRandom('o')], ['LENGTH', 'rndLen', () => seqRandom('len')], ['RETRIG', 'rndRt', () => seqRandom('rt')]];
       { const rx = gx + 12 + 2 * 62 + 4; prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(rx, ty - 9, 64, 18); x.fillStyle = inkOf(ink); text(x, 'RANDOM', rx + 32, ty + 0.5, 10.5); }); }
@@ -509,6 +510,9 @@ function makeSeqGrid() {
     for (const [k, r0, n] of SEQ_LANE_ROWS) {
       const ly = G.rowY(r0), ax = Math.max(2, state.seq.st[k] * cw), bx = Math.min(G.w - 2, (state.seq.st[k] + state.seq.len[k]) * cw), y = ly + 2, h = n * rh - 4;
       x.strokeStyle = SPOT; x.lineWidth = 2; x.strokeRect(ax - 1, ly - 2.5, bx - ax, n * rh + 5);   // v0.43.8 (Johnny): a spot-colour box round the lane; v0.43.9: from its start bar to its length bar
+      // v0.43.10 (Johnny: "thicker draggable bars at the top"): a thick bar along the top of the box; drag it to move the loop, keeping its length
+      x.fillStyle = SPOT; x.fillRect(ax - 1, ly - 11, bx - ax, 8);
+      x.fillStyle = inkOf(ink); for (let d = -6; d <= 6; d += 3) x.fillRect((ax + bx) / 2 + d - 0.5, ly - 9, 1, 4);
       for (const gx of [ax, bx]) { const hx = Math.max(4, Math.min(G.w - 4, gx)); x.fillStyle = SPOT; x.fillRect(gx - 1.5, y, 3, h); x.fillRect(hx - 4, y + h / 2 - 7, 8, 14);
         x.fillStyle = inkOf(ink); x.fillRect(hx - 2, y + h / 2 - 3, 4, 1); x.fillRect(hx - 2, y + h / 2, 4, 1); x.fillRect(hx - 2, y + h / 2 + 3, 4, 1); }
     }
@@ -525,14 +529,18 @@ function makeSeqGrid() {
   };
   let paint = null, lenDrag = null;
   // a press near a lane's grab bar takes the bar, not the cell under it
+  const topAt = (p) => { if (!p) return null; const dy = p[1] - G.y, dx = p[0] - G.x;
+    for (const [k, r0] of SEQ_LANE_ROWS) { const ly = G.rowY(r0), a = state.seq.st[k] * G.colW, b = a + state.seq.len[k] * G.colW;
+      if (dy >= ly - 13 && dy < ly - 2 && dx >= a - 2 && dx <= b + 2) return k; } return null; };
   const barAt = (p) => { if (!p) return null; const ri = G.rowAt(p[1] - G.y);
     const ln = SEQ_LANE_ROWS.find(([, r0, n]) => ri >= r0 && ri < r0 + n); if (!ln) return null;
     const k = ln[0], ax = G.x + state.seq.st[k] * G.colW, bx = ax + state.seq.len[k] * G.colW, da = Math.abs(p[0] - ax), db = Math.abs(p[0] - bx);
     return Math.min(da, db) > 7 ? null : { k, end: db <= da }; };
   addCtl({ kind: 'roll', rect: [G.x - 8, G.y, G.w + 16, G.h], sync: draw,
-    down(p) { const b = barAt(p); if (b) { lenDrag = b; return; }
+    down(p) { const tk = topAt(p); if (tk) { lenDrag = { k: tk, move: true, c0: (p[0] - G.x) / G.colW, a0: state.seq.st[tk] }; return; }
+      const b = barAt(p); if (b) { lenDrag = b; return; }
       const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
-    move(p) { if (lenDrag) { if (p) { const c = Math.round((p[0] - G.x) / G.colW), k = lenDrag.k; if (lenDrag.end) seqLen(k, c - state.seq.st[k]); else seqStart(k, c); } return; }
+    move(p) { if (lenDrag) { if (p) { const c = Math.round((p[0] - G.x) / G.colW), k = lenDrag.k; if (lenDrag.move) seqShift(k, lenDrag.a0 + Math.round((p[0] - G.x) / G.colW - lenDrag.c0)); else if (lenDrag.end) seqLen(k, c - state.seq.st[k]); else seqStart(k, c); } return; }
       const h = at(p); if (h && paint) apply(h, paint); },
     up() { paint = null; lenDrag = null; } });
 }
