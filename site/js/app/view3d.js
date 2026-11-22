@@ -600,6 +600,9 @@ prints.push((x, ink) => {
     const wv = pc2.getImageData(0, 0, patch.width, patch.height).data, img = lx2.getImageData(0, 0, logoCv.width, logoCv.height), d = img.data;
     for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const v = wv[i]; const f = Math.max(0, Math.min(1, (v - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i + 3] *= f + (1 - f) * look.ocd; }
     lx2.putImageData(img, 0, 0);
+    // v0.51.0: keep the worn word, then put the smiley on its 'o' (logoFace, redrawn as it grins)
+    logoBase.width = logoCv.width; logoBase.height = logoCv.height; logoBase.getContext('2d').drawImage(logoCv, 0, 0);
+    logoGeom = { lx, ly, sc: lw / logo.naturalWidth, ink }; logoFace(logoGrin);
     logoTex.needsUpdate = true; shadowDirty = true;   // v0.44.2: the logo casts a shadow
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
   x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 122, 10, 'right');
@@ -613,9 +616,28 @@ const LOGO_Z = logoLayer.position.z, logoWob = { t0: -1 };
 const wobbleLogo = () => { const U = (a, b) => a + Math.random() * (b - a), sg = () => (Math.random() < 0.5 ? -1 : 1);
   Object.assign(logoWob, { t0: performance.now(), ax: sg() * U(0.12, 0.5), ay: sg() * U(0.1, 0.45), az: sg() * U(0.02, 0.14),
     fx: U(10, 24), fy: U(8, 20), fz: U(12, 28), px: U(0, 6.3), py: U(0, 6.3), pz: U(0, 6.3), k: U(1.8, 3.6), lift: U(25, 70) }); dirty = true; };
+// v0.51.0 (Johnny: "put a smiley over the 'o' in shyoy / when you click on shyoy the smiley grins and his eyes grow"): the o's hole
+// is filled and a face cut out of the o (eyes and a smile, so the panel shows through, like the rest of the word); g 0..1 is the grin
+const logoBase = document.createElement('canvas'); let logoGeom = null, logoGrin = 0;
+const LOGO_O = { x: 380, y: 99, hole: 17 };   // the 'o' in icons/logo.png (547 x 200): its centre and its hole's radius, in image pixels
+function logoFace(g) {
+  if (!logoGeom) return; const { lx, ly, sc, ink } = logoGeom, c = logoCv.getContext('2d'), k = sc * S2;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, logoCv.width, logoCv.height); c.drawImage(logoBase, 0, 0);
+  c.setTransform(k, 0, 0, k, (lx + LOGO_O.x * sc) * S2, (ly + LOGO_O.y * sc) * S2);   // image pixels, from the o's centre
+  c.fillStyle = ink; c.beginPath(); c.arc(0, 0, LOGO_O.hole, 0, 7); c.fill();
+  c.globalCompositeOperation = 'destination-out'; c.fillStyle = c.strokeStyle = '#000';
+  const eg = 1 + 0.7 * g;   // the eyes grow
+  for (const ex of [-16, 16]) { c.beginPath(); c.ellipse(ex, -15 - 2 * g, 5.5 * eg, 8 * eg, 0, 0, 7); c.fill(); }
+  // the smile: wider, deeper and open-mouthed as it grins
+  const r = 22 + 4 * g, a0 = Math.PI * (0.2 - 0.12 * g), a1 = Math.PI - a0;
+  c.lineCap = 'round'; c.lineWidth = 6 + 2 * g; c.beginPath(); c.arc(0, 2 - 4 * g, r, a0, a1); c.stroke();
+  if (g > 0.05) { c.beginPath(); c.arc(0, 2 - 4 * g, r, a0, a1); c.closePath(); c.globalAlpha = Math.min(1, g * 1.5); c.fill(); c.globalAlpha = 1; }
+  c.globalCompositeOperation = 'source-over'; c.setTransform(1, 0, 0, 1, 0, 0); logoTex.needsUpdate = true;
+}
 function logoWobbleStep(now) {
   const w = logoWob, t = (now - w.t0) / 1000, e = Math.exp(-t * w.k) * (1 - Math.exp(-t * 25));   // eases in over ~0.1 s, then dies away
-  if (t > 0.3 && e < 0.01 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; w.t0 = -1; shadowDirty = dirty = true; return; }
+  if (t > 0.3 && e < 0.01 && !shyoyRand.spinning) { logoLayer.rotation.set(0, 0, 0); logoLayer.position.z = LOGO_Z; w.t0 = -1; logoGrin = 0; logoFace(0); shadowDirty = dirty = true; return; }
+  logoGrin = Math.min(1, e * 1.6); logoFace(logoGrin);   // v0.51.0: the smiley grins while the word wobbles
   logoLayer.rotation.set(Math.sin(t * w.fx + w.px) * w.ax * e, Math.sin(t * w.fy + w.py) * w.ay * e, Math.sin(t * w.fz + w.pz) * w.az * e);
   logoLayer.position.z = LOGO_Z + w.lift * e; shadowDirty = dirty = true;
 }
