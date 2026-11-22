@@ -45,7 +45,7 @@ if (typeof look.oddOn !== 'boolean') look.oddOn = true; if (typeof look.oddK !==
 delete look.boxCol;   // v0.35.0's section backgrounds, dropped (Johnny meant knob colours)
 if (!look.knobCol || typeof look.knobCol !== 'object') look.knobCol = {};
 if (typeof look.knobAll !== 'string') look.knobAll = '';
-if (typeof look.dragCol !== 'string') look.dragCol = '';   // v0.43.12 (Johnny): the sequencer's drag areas colour ('' = the spot red)
+if (typeof look.barCol !== 'string') look.barCol = '';   // v0.43.12 (Johnny): the sequencer's drag areas colour ('' = the spot red)
 // v0.33.4 (Johnny): KNOB SIZE runs 0-100 over the real scale 0.9-1.5 (was 60-135%)
 const KSIZE = [0.9, 1.5], ksizeToUI = (k) => Math.max(0, Math.min(100, (k - KSIZE[0]) / (KSIZE[1] - KSIZE[0]) * 100));
 look.ksize = Math.max(KSIZE[0], Math.min(KSIZE[1], look.ksize));
@@ -107,6 +107,8 @@ const BOXES = [
 ];
 let seqGrid = null;
 const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's highlights)
+// v0.43.14 (Johnny: "make the drag bars a bit lighter than the panel colour"): the panel colour, a third of the way to white
+const dragAuto = () => '#' + [1, 3, 5].map((i) => { const v = parseInt(look.colour.slice(i, i + 2), 16); return Math.round(v + (255 - v) * 0.35).toString(16).padStart(2, '0'); }).join('');
 const SEQ_LANE_ROWS = [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]];   // lane, first row, rows
 const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'NOTE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
 const TITLE = { x: M + 14 * C, y: M, w: 4 * C, h: R };
@@ -492,14 +494,14 @@ function makeSeqGrid() {
   m.position.copy(P(G.x + G.w / 2, G.y + G.h / 2, 0.08)); m.renderOrder = 1; grp.add(m);
   let sig = '';
   const draw = () => {
-    const ink = curInk, light = ink === '#000000', s2 = JSON.stringify(state.seq) + ink + look.dragCol + seqPos + JSON.stringify(seqLanePos); if (s2 === sig) return false; sig = s2;
+    const ink = curInk, light = ink === '#000000', s2 = JSON.stringify(state.seq) + ink + look.barCol + look.colour + seqPos + JSON.stringify(seqLanePos); if (s2 === sig) return false; sig = s2;
     const tone = (a) => light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`, cw = G.colW, rh = G.rowH;
     x.setTransform(3, 0, 0, 3, 0, 0); x.clearRect(0, 0, G.w, G.h);
     for (let i = 0; i < SEQ_N; i++) {
       const st = state.seq.steps[i], cx = i * cw;
       SEQ_ROWS.forEach(([t, v], ri) => {
         // v0.43.0: each lane has its own length (steps past it are faint) and its own playhead
-        const y = G.rowY(ri), n = state.seq.len[t], a = state.seq.st[t]; x.globalAlpha = i >= a && i < a + n ? 1 : 0.25;
+        const y = G.rowY(ri), n = state.seq.len[t], a = state.seq.st[t]; x.globalAlpha = i >= a && i < a + n ? 1 : 0.1;   // v0.43.14 (Johnny): steps outside the loop fade nearly into the panel
         if (seqPos >= 0 && (seqLanePos ? seqLanePos[t] : a + seqPos % n) === i) { x.fillStyle = tone(0.16); x.fillRect(cx, y, cw, rh); }
         x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
         if (t === 'o' ? (st.o | 0) === v : !!st[t]) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
@@ -507,16 +509,16 @@ function makeSeqGrid() {
       });
       if (i % 4 === 3 && i < SEQ_N - 1) { x.fillStyle = tone(0.55); x.fillRect(cx + cw - 0.75, 0, 1.5, G.h); }
     }
-    const DC = look.dragCol || SPOT;
+    const DC = look.barCol || dragAuto(), grip = lum(DC) > 0.4 ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)';
     // v0.43.5 (Johnny): each lane's grab bar, at the end of its last step; drag it to set the lane's length
     for (const [k, r0, n] of SEQ_LANE_ROWS) {
       const ly = G.rowY(r0), ax = Math.max(2, state.seq.st[k] * cw), bx = Math.min(G.w - 2, (state.seq.st[k] + state.seq.len[k]) * cw), y = ly + 2, h = n * rh - 4;
       x.strokeStyle = DC; x.lineWidth = 2; x.strokeRect(ax - 1, ly - 2.5, bx - ax, n * rh + 5);   // v0.43.8 (Johnny): a spot-colour box round the lane; v0.43.9: from its start bar to its length bar
       // v0.43.10 (Johnny: "thicker draggable bars at the top"): a thick bar along the top of the box; drag it to move the loop, keeping its length
       x.fillStyle = DC; x.fillRect(ax - 1, ly - 11, bx - ax, 8);
-      x.fillStyle = inkOf(ink); for (let d = -6; d <= 6; d += 3) x.fillRect((ax + bx) / 2 + d - 0.5, ly - 9, 1, 4);
+      x.fillStyle = grip; for (let d = -6; d <= 6; d += 3) x.fillRect((ax + bx) / 2 + d - 0.5, ly - 9, 1, 4);
       for (const gx of [ax, bx]) { const hx = Math.max(4, Math.min(G.w - 4, gx)); x.fillStyle = DC; x.fillRect(gx - 1.5, y, 3, h); x.fillRect(hx - 4, y + h / 2 - 7, 8, 14);
-        x.fillStyle = inkOf(ink); x.fillRect(hx - 2, y + h / 2 - 3, 4, 1); x.fillRect(hx - 2, y + h / 2, 4, 1); x.fillRect(hx - 2, y + h / 2 + 3, 4, 1); }
+        x.fillStyle = grip; x.fillRect(hx - 2, y + h / 2 - 3, 4, 1); x.fillRect(hx - 2, y + h / 2, 4, 1); x.fillRect(hx - 2, y + h / 2 + 3, 4, 1); }
     }
     tex.needsUpdate = true; return true;
   };
@@ -968,7 +970,7 @@ opt.body.innerHTML = `
   <div class="f"><span>ALL SLIDERS</span><div class="bxc"><label id="o3-kall"><input type="color" aria-label="All slider caps colour"><span>EVERY CAP</span><button class="clr" aria-label="Clear">×</button></label></div></div>
   ${['synth'].map((pg) => `<div class="f"><span>SECTIONS</span><div class="bxc">${BOXR.filter((b) => b.page === pg && b.knobs).map((b) => `<label data-bk="${boxKey(b)}"><input type="color" aria-label="${b.n} colour"><span>${b.n}</span><button class="clr" aria-label="Clear ${b.n}">×</button></label>`).join('')}</div></div>`).join('')}
   <div class="row"><button id="o3-bxall">ALL BLACK</button></div>
-  <div class="f"><span>SEQUENCER</span><div class="bxc"><label id="o3-drag"><input type="color" aria-label="Sequencer drag areas colour"><span>DRAG AREAS</span><button class="clr" aria-label="Reset to red">×</button></label></div></div>
+  <div class="f"><span>SEQUENCER</span><div class="bxc"><label id="o3-drag"><input type="color" aria-label="Sequencer drag areas colour"><span>DRAG AREAS</span><button class="clr" aria-label="Back to automatic">×</button></label></div></div>
   </div>
   <div class="pane" data-pane="knobs">
   <div class="f"><span>CAP SIZE</span><div class="row"><input type="range" min="0" max="100" id="o3-ksize" aria-label="Slider cap size"><b class="val" id="o3-ksizev"></b></div></div>
@@ -993,7 +995,7 @@ opt.body.innerHTML = `
   <div class="f"><span>MORE</span><div class="row"><button id="o3-midi">MIDI</button><button id="o3-about">ABOUT</button><button id="o3-reset">RESET LOOK</button></div></div>
   </div>`;
 const $o = (s) => opt.body.querySelector(s);
-const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'dragCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
+const LOOK_CMP = ['colour', 'light', 'bright', 'finish', 'lens', 'tilt', 'ksize', 'kstyle', 'knobAll', 'knobCol', 'barCol', 'oddOn', 'oddK', 'lights', 'stickers', 'stkOn', 'stk'];
 function drawOpt() {
   const same = (a, b) => !!a && JSON.stringify(LOOK_CMP.map((k) => a[k] ?? LOOK0[k])) === JSON.stringify(LOOK_CMP.map((k) => b[k] ?? LOOK0[k]));
   opt.body.querySelectorAll('[data-look]').forEach((b) => { const sl = lookSlots[+b.dataset.look]; b.classList.toggle('lit', same(sl, look)); b.style.opacity = sl || lookSaving ? '' : '.45'; b.classList.toggle('arm', lookSaving); });
@@ -1020,7 +1022,7 @@ function drawOpt() {
   });
   $o('#o3-ocd').value = Math.round(look.ocd * 100); $o('#o3-ocdv').textContent = Math.round(look.ocd * 100);
   $o('#o3-rnd').value = Math.round(shyoyRand.amount * 100); $o('#o3-rndv').textContent = Math.round(shyoyRand.amount * 100);
-  $o('#o3-drag input').value = look.dragCol || SPOT; $o('#o3-drag').classList.toggle('set', !!look.dragCol);
+  $o('#o3-drag input').value = look.barCol || dragAuto(); $o('#o3-drag').classList.toggle('set', !!look.barCol);
   $o('#o3-kall input').value = look.knobAll || '#0e0e0e'; $o('#o3-kall').classList.toggle('set', !!look.knobAll);
   opt.body.querySelectorAll('[data-bk]').forEach((l) => { const c = look.knobCol[l.dataset.bk]; l.querySelector('input').value = c || look.knobAll || '#0e0e0e'; l.classList.toggle('set', !!c); });
   $o('#o3-ksize').value = Math.round(ksizeToUI(look.ksize)); $o('#o3-ksizev').textContent = Math.round(ksizeToUI(look.ksize));
@@ -1034,7 +1036,7 @@ opt.body.querySelectorAll('[data-look]').forEach((b) => b.onclick = () => {
   if (lookSaving) { lookSlots[i] = copyLook(look); saveSlots(); lookSaving = false; drawOpt(); return; }
   if (!lookSlots[i]) return;
   // v0.33.2 (Johnny): a look carries its stickers (which, shown or not, size/place/turn); older saved looks get the defaults
-  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, dragCol: '', oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look);
+  Object.assign(look, { stickers: ['smile'], stkOn: true, stk: {}, kstyle: 'yamaha', knobAll: '', knobCol: {}, barCol: '', oddOn: true, oddK: -1 }, copyLook(lookSlots[i])); delete look.boxCol; normStk(look);
   if (!Array.isArray(look.lights) || look.lights.length !== 3 || look.lv !== 2) { look.lights = presetLights(look.light); look.lv = 2; }   // looks saved with the v0.35.5-0.36.2 lights
   saveLook(); applyLook(); drawOpt();
 });
@@ -1071,8 +1073,8 @@ opt.body.querySelectorAll('[data-bk]').forEach((l) => {
 });
 $o('#o3-bxall').onclick = () => { look.knobAll = ''; setLook('knobCol', {}); };
 $o('#o3-kall input').oninput = (e) => setLook('knobAll', e.target.value);
-$o('#o3-drag input').oninput = (e) => setLook('dragCol', e.target.value);
-$o('#o3-drag .clr').onclick = (e) => { e.preventDefault(); setLook('dragCol', ''); };
+$o('#o3-drag input').oninput = (e) => setLook('barCol', e.target.value);
+$o('#o3-drag .clr').onclick = (e) => { e.preventDefault(); setLook('barCol', ''); };
 $o('#o3-kall .clr').onclick = (e) => { e.preventDefault(); setLook('knobAll', ''); };
 $o('#o3-ksize').oninput = (e) => setLook('ksize', KSIZE[0] + (KSIZE[1] - KSIZE[0]) * e.target.value / 100);
 $o('#o3-odd').onchange = (e) => setLook('oddOn', e.target.checked);
