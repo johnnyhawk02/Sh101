@@ -74,7 +74,7 @@ const knobBase = knobVal;
 // a taper, 0 (linear) to 100 (strongly logarithmic, like an audio-taper pot): the value is (e^(k u) - 1) / (e^k - 1) of
 // the cap's position u, k = taper / 20. Right-click (or Ctrl-click) a slider for its TAPER pop-up. Kept in this browser
 // (shyoy.taper), not in presets. The mixer and the VCA level start as log pots, as on a real panel.
-const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: -60 };   // v0.45.3: decay anti-log (Johnny: 2-40 ms took 40% of the slider; now about 13%, 0.4 s at 30%, 2 s half-way)
+const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: -60, release: -80 };   // v0.45.3: decay anti-log (Johnny: 2-40 ms took 40% of the slider; now about 13%, 0.4 s at 30%, 2 s half-way); v0.45.4: release more so (Johnny: not much release until 70% up), 0.24 s at 20%, 0.86 s at 30%, 3.6 s half-way
 const taper = { ...TAPER0 };
 try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
 // v0.45.1 (Johnny: "the decay could do with a curve that bulges the opposite"): -100 .. 100, below 0 bends the other way (anti-log)
