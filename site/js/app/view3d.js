@@ -10,8 +10,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
-const C = 62, R = 150, M = 8, COLS = 18, ROWS = 4;   // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
-const SEQ_GH = 180;   // v0.43.10: the sequencer grid's height
+const C = 70, R = 150, M = 8, COLS = 18, ROWS = 4;   // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
+const SEQ_GH = 240;   // v0.43.10: the sequencer grid's height
 const SEQ_TOOLS = 96 + SEQ_GH - 154;   // v0.42.4: the strip of keys under the sequencer's grid
 const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
