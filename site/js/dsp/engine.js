@@ -207,9 +207,10 @@ class KestrelProcessor extends AudioWorkletProcessor {
   }
 
   seqStep() {
-    const S = this.seq, len = Math.max(1, S.steps.length || 1);
-    if (this.stepIdx >= len) this.stepIdx = 0;
-    const i = this.stepIdx, st = S.steps[i] || { on: false }, dur = this.fs * 60 / S.bpm / 4;
+    // v0.43.0 (Johnny: "a step length on the RHS for each lane"): octave, note, slide and accent each loop at their own length
+    const S = this.seq, N = this.stepIdx, L = S.len || {}, n16 = Math.max(1, S.steps.length || 1);
+    const lane = (k) => S.steps[N % Math.max(1, Math.min(n16, L[k] || n16))] || {};
+    const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N, dur = this.fs * 60 / S.bpm / 4;
     this.nextStepAt += dur;
     if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else {
@@ -219,7 +220,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
     }
     this.port.postMessage({ type: 'step', i });
-    this.stepIdx = (i + 1) % len;
+    this.stepIdx = (N + 1) % 720720;   // a count every lane length divides
   }
 
   process(inputs, outputs) {

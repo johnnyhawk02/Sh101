@@ -424,15 +424,27 @@ for (const b of BOXES) {
     } else if (it.t === 'grid') {
       // v0.42.1 (Johnny: "use the note grid like the one we just got rid of"): a printed grid, rows top to bottom octave
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
-      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52, gy = y0 + 26, gh = 102;
+      const gx = M + b.c * C + col * spread * C + 40, gw = w * spread * C - 52 - 44, gy = y0 + 26, gh = 102;
       seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: gh / SEQ_ROWS.length };
       SEQ_ROWS.forEach((r, ri) => { const yy = gy + (ri + 0.5) * seqGrid.rowH;
         prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx - 8, yy + 0.5, 9.5, 'right'); }); });
       for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, ly);
       makeSeqGrid();
+      // v0.43.0 (Johnny: "a step length on the RHS for each lane - try a number box"): drag up or down, or press the
+      // top half for one more and the bottom half for one fewer. The octave lane's box sits across its three rows
+      const rh = seqGrid.rowH, nx = gx + gw + 10;
+      [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]].forEach(([k, r0, n]) => {
+        const by = gy + r0 * rh + (n * rh - (rh - 3)) / 2, bh = rh - 3;
+        if (n > 1) prints.push((x, ink) => { x.fillStyle = ink; x.fillRect(nx - 5, gy + r0 * rh + 4, 1.2, n * rh - 8); });
+        const d = makeDisplay(nx, by, 30, bh, () => String(state.seq.len[k]), { tag: 'len:' + k });
+        let g0 = null; d.kind = 'roll';
+        d.down = (p) => { g0 = { y: p ? p[1] : 0, v: state.seq.len[k], moved: false, top: p && p[1] < by + bh / 2 }; };
+        d.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; seqLen(k, g0.v + dv); };
+        d.up = () => { if (g0 && !g0.moved) seqLen(k, state.seq.len[k] + (g0.top ? 1 : -1)); g0 = null; };
+      });
       // v0.42.4 (Johnny): under the grid, nudge the pattern a step left or right, and randomise its gates, accents,
       // slides and octaves
-      const ty = y0 + R + 10, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)],
+      const ty = y0 + R + 10, TK = [['◀', 'nudgeL', () => seqNudge(-1)], ['▶', 'nudgeR', () => seqNudge(1)], ['RANDOM ALL', 'rndAll', () => seqRandom('all')],
         ['RANDOM GATES', 'rndOn', () => seqRandom('on')], ['RANDOM ACC', 'rndA', () => seqRandom('a')],
         ['RANDOM SLIDES', 'rndS', () => seqRandom('s')], ['RANDOM OCTAVES', 'rndO', () => seqRandom('o')]];
       let tx = gx + 12;
@@ -442,7 +454,7 @@ for (const b of BOXES) {
         prints.push((x, ink) => { x.fillStyle = ink;
           if (tri) { const d = label === '◀' ? -1 : 1; x.beginPath(); x.moveTo(lx + 4 + d * 5, ty); x.lineTo(lx + 4 - d * 5, ty - 6); x.lineTo(lx + 4 - d * 5, ty + 6); x.closePath(); x.fill(); }
           else text(x, label, lx, ty + 0.5, 10.5, 'left'); });
-        tx += tri ? 62 : (gw - 2 * 62 - 24) / 4;
+        tx += tri ? 62 : (gw + 44 - 2 * 62 - 24) / 5;
       });
     } else if (it.t === 'preset') {
       // v0.41.0 (Johnny: "tidy up - no blank spaces"): the name across the box, five keys spread under it: the preset
@@ -466,17 +478,18 @@ function makeSeqGrid() {
   m.position.copy(P(G.x + G.w / 2, G.y + G.h / 2, 0.08)); m.renderOrder = 1; grp.add(m);
   let sig = '';
   const draw = () => {
-    const ink = curInk, light = ink === '#000000', s2 = JSON.stringify(state.seq.steps) + ink + seqPos; if (s2 === sig) return false; sig = s2;
+    const ink = curInk, light = ink === '#000000', s2 = JSON.stringify(state.seq) + ink + seqPos; if (s2 === sig) return false; sig = s2;
     const tone = (a) => light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`, cw = G.colW, rh = G.rowH;
     x.setTransform(3, 0, 0, 3, 0, 0); x.clearRect(0, 0, G.w, G.h);
     for (let i = 0; i < SEQ_N; i++) {
       const st = state.seq.steps[i], cx = i * cw;
-      if (seqPos === i) { x.fillStyle = tone(0.16); x.fillRect(cx, 0, cw, G.h); }
       SEQ_ROWS.forEach(([t, v], ri) => {
-        const y = ri * rh; x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
-        const own = t === 'o' ? (st.o | 0) === v : !!st[t], on = own && (t === 'on' || st.on);
-        if (on) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
-        else if (own && t !== 'on') { x.strokeStyle = ink; x.lineWidth = 1.5; x.strokeRect(cx + 4, y + 4, cw - 8, rh - 8); }   // set, on a step that rests
+        // v0.43.0: each lane has its own length (steps past it are faint) and its own playhead
+        const y = ri * rh, n = state.seq.len[t]; x.globalAlpha = i < n ? 1 : 0.25;
+        if (seqPos >= 0 && seqPos % n === i) { x.fillStyle = tone(0.16); x.fillRect(cx, y, cw, rh); }
+        x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
+        if (t === 'o' ? (st.o | 0) === v : !!st[t]) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
+        x.globalAlpha = 1;
       });
       if (i % 4 === 3 && i < SEQ_N - 1) { x.fillStyle = tone(0.55); x.fillRect(cx + cw - 0.75, 0, 1.5, G.h); }
     }
@@ -484,10 +497,10 @@ function makeSeqGrid() {
   };
   const at = (p) => { if (!p || p[0] < G.x || p[0] >= G.x + G.w || p[1] < G.y || p[1] >= G.y + G.h) return null;
     return { i: Math.min(SEQ_N - 1, Math.floor((p[0] - G.x) / G.colW)), r: SEQ_ROWS[Math.min(SEQ_ROWS.length - 1, Math.floor((p[1] - G.y) / G.rowH))] }; };
-  // what a press does: an octave cell picks that octave and turns the step on; the others toggle. A drag paints the same
+  // what a press does: an octave cell picks that octave; the others toggle. A drag paints the same
   const apply = (h, paint) => {
     const st = state.seq.steps[h.i], [t, v] = h.r;
-    if (t === 'o') { if (paint && paint.t !== 'o') return; if ((st.o | 0) === v && st.on) return; st.o = v; st.on = true; }
+    if (t === 'o') { if (paint && paint.t !== 'o') return; if ((st.o | 0) === v) return; st.o = v; }
     else { const want = paint ? paint.v : !st[t]; if (paint && paint.t !== t) return; if (!!st[t] === want) return; st[t] = want; }
     seqSend();
   };
@@ -1100,6 +1113,7 @@ window.shyoy3d = {
   // for headless checks: where a control is on screen
   where(id) { const k = knobs.find((k) => k.cur() === id); if (!k) return null; const v = P(k.cx, k.cy - TRAVEL + 2 * TRAVEL * knobVal(id), CAP.d).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },
   tap(tag) { const c = ctls.find((c) => c.tag === tag); if (!c) return null; const [x, y, w, h] = c.rect; return this.at(x + w / 2, y + h / 2); },
+  grid() { return seqGrid; },
   cell(i, ri) { const G = seqGrid; return this.at(G.x + (i + 0.5) * G.colW, G.y + (ri + 0.5) * G.rowH); },
   title() { return this.at(TITLE.x + TITLE.w / 2, TITLE.y + 50); },
   at(pxX, pxY) { const v = P(pxX, pxY, 8).project(camera); const r = cv.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; },

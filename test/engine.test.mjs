@@ -90,4 +90,10 @@ console.log('key priority ok');
   assert.equal(p.root, 62 + 12 * p.P.transpose - 12, 'a key played while running moves the root');
   send({ type: 'run', on: false }); assert.equal(p.gate, false);
 }
+{
+  const [p, send] = make(), steps = Array.from({ length: 16 }, (_, i) => ({ on: true, o: i % 3, s: false, a: false }));
+  send({ type: 'seq', seq: { steps, bpm: 120, len: { o: 3, on: 16, s: 16, a: 16 } } }); send({ type: 'run', on: true });
+  const at = []; render(p, 0.03); for (let k = 0; k < 6; k++) { at.push(p.pitchT); render(p, 0.125); }
+  assert.equal(at[3], at[0], 'a 3-step octave lane repeats every 3 steps'); assert.equal(at[4] - at[0], 12);
+}
 console.log('sequencer ok');

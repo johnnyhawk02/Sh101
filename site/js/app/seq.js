@@ -5,16 +5,26 @@ const SEQ_N = 16;
 // v0.42.1 (Johnny: "remove the tempo, as it'll soon be a VST"): a fixed 120 BPM here; the host will set it. Steps gain accent (a)
 const SEQ0 = () => ({ steps: [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1].map((on, i) => ({ on: !!on, o: [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1][i], s: i === 4 || i === 12, a: i % 4 === 0 })) });
 if (!state.seq || !Array.isArray(state.seq.steps) || state.seq.steps.length !== SEQ_N) state.seq = SEQ0();
+// v0.43.0 (Johnny): each lane (octave, note, slide, accent) has its own length, 1-16
+const SEQ_LANES = ['o', 'on', 's', 'a'];
+state.seq.len = Object.assign({ o: SEQ_N, on: SEQ_N, s: SEQ_N, a: SEQ_N }, state.seq.len || {});
 // v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note; a v0.42.0-1 pattern (-1..1) moves up one
 if (state.seq.steps.some((s) => s.o < 0)) state.seq.steps.forEach((s) => { s.o = (s.o | 0) + 1; });
 let seqOn = false, seqPos = -1;
 const seqBpm = () => 120;
-const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm() } });
+const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len } } });
 function seqSend() { post(seqMsg()); save(); }
 async function seqRun(on = !seqOn) { await boot(); seqOn = on; if (!on) seqPos = -1; post(seqMsg()); post({ type: 'run', on }); }
 // v0.42.4 (Johnny): nudge the whole pattern a step (d -1 = left, 1 = right), and randomise one part of every step
-function seqNudge(d) { const S = state.seq.steps; if (d < 0) S.push(S.shift()); else S.unshift(S.pop()); seqSend(); }
+// v0.43.0: each lane turns round within its own length
+function seqNudge(d) {
+  for (const k of SEQ_LANES) { const n = state.seq.len[k], S = state.seq.steps, v = S.slice(0, n).map((s) => s[k]);
+    if (d < 0) v.push(v.shift()); else v.unshift(v.pop()); v.forEach((x, i) => { S[i][k] = x; }); }
+  seqSend();
+}
+function seqLen(k, n) { n = Math.max(1, Math.min(SEQ_N, n | 0)); if (state.seq.len[k] === n) return; state.seq.len[k] = n; seqSend(); }
 function seqRandom(k) {
+  if (k === 'all') { for (const l of SEQ_LANES) seqRandom(l); return; }
   const r = Math.random;
   for (const st of state.seq.steps) {
     if (k === 'on') st.on = r() < 0.7;
