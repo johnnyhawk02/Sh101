@@ -497,8 +497,8 @@ function makeSeqGrid() {
       const st = state.seq.steps[i], cx = i * cw;
       SEQ_ROWS.forEach(([t, v], ri) => {
         // v0.43.0: each lane has its own length (steps past it are faint) and its own playhead
-        const y = G.rowY(ri), n = state.seq.len[t]; x.globalAlpha = i < n ? 1 : 0.25;
-        if (seqPos >= 0 && (seqLanePos ? seqLanePos[t] : seqPos % n) === i) { x.fillStyle = tone(0.16); x.fillRect(cx, y, cw, rh); }
+        const y = G.rowY(ri), n = state.seq.len[t], a = state.seq.st[t]; x.globalAlpha = i >= a && i < a + n ? 1 : 0.25;
+        if (seqPos >= 0 && (seqLanePos ? seqLanePos[t] : a + seqPos % n) === i) { x.fillStyle = tone(0.16); x.fillRect(cx, y, cw, rh); }
         x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
         if (t === 'o' ? (st.o | 0) === v : !!st[t]) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
         x.globalAlpha = 1;
@@ -507,10 +507,10 @@ function makeSeqGrid() {
     }
     // v0.43.5 (Johnny): each lane's grab bar, at the end of its last step; drag it to set the lane's length
     for (const [k, r0, n] of SEQ_LANE_ROWS) {
-      const ly = G.rowY(r0), bx = Math.min(G.w - 2, state.seq.len[k] * cw), y = ly + 2, h = n * rh - 4;
-      x.strokeStyle = SPOT; x.lineWidth = 2; x.strokeRect(1, ly - 2.5, bx - 1, n * rh + 5); x.fillStyle = SPOT;   // v0.43.8 (Johnny): a spot-colour box round the lane, from step 1 to its length bar
-      x.fillRect(bx - 1.5, y, 3, h); x.fillRect(bx - 4, y + h / 2 - 7, 8, 14);
-      x.fillStyle = inkOf(ink); x.fillRect(bx - 2, y + h / 2 - 3, 4, 1); x.fillRect(bx - 2, y + h / 2, 4, 1); x.fillRect(bx - 2, y + h / 2 + 3, 4, 1);
+      const ly = G.rowY(r0), ax = Math.max(2, state.seq.st[k] * cw), bx = Math.min(G.w - 2, (state.seq.st[k] + state.seq.len[k]) * cw), y = ly + 2, h = n * rh - 4;
+      x.strokeStyle = SPOT; x.lineWidth = 2; x.strokeRect(ax - 1, ly - 2.5, bx - ax, n * rh + 5);   // v0.43.8 (Johnny): a spot-colour box round the lane; v0.43.9: from its start bar to its length bar
+      for (const gx of [ax, bx]) { const hx = Math.max(4, Math.min(G.w - 4, gx)); x.fillStyle = SPOT; x.fillRect(gx - 1.5, y, 3, h); x.fillRect(hx - 4, y + h / 2 - 7, 8, 14);
+        x.fillStyle = inkOf(ink); x.fillRect(hx - 2, y + h / 2 - 3, 4, 1); x.fillRect(hx - 2, y + h / 2, 4, 1); x.fillRect(hx - 2, y + h / 2 + 3, 4, 1); }
     }
     tex.needsUpdate = true; return true;
   };
@@ -527,11 +527,12 @@ function makeSeqGrid() {
   // a press near a lane's grab bar takes the bar, not the cell under it
   const barAt = (p) => { if (!p) return null; const ri = G.rowAt(p[1] - G.y);
     const ln = SEQ_LANE_ROWS.find(([, r0, n]) => ri >= r0 && ri < r0 + n); if (!ln) return null;
-    const bx = G.x + state.seq.len[ln[0]] * G.colW; return Math.abs(p[0] - bx) <= 7 ? ln[0] : null; };
-  addCtl({ kind: 'roll', rect: [G.x, G.y, G.w + 8, G.h], sync: draw,
-    down(p) { const k = barAt(p); if (k) { lenDrag = k; return; }
+    const k = ln[0], ax = G.x + state.seq.st[k] * G.colW, bx = ax + state.seq.len[k] * G.colW, da = Math.abs(p[0] - ax), db = Math.abs(p[0] - bx);
+    return Math.min(da, db) > 7 ? null : { k, end: db <= da }; };
+  addCtl({ kind: 'roll', rect: [G.x - 8, G.y, G.w + 16, G.h], sync: draw,
+    down(p) { const b = barAt(p); if (b) { lenDrag = b; return; }
       const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
-    move(p) { if (lenDrag) { if (p) seqLen(lenDrag, Math.round((p[0] - G.x) / G.colW)); return; }
+    move(p) { if (lenDrag) { if (p) { const c = Math.round((p[0] - G.x) / G.colW), k = lenDrag.k; if (lenDrag.end) seqLen(k, c - state.seq.st[k]); else seqStart(k, c); } return; }
       const h = at(p); if (h && paint) apply(h, paint); },
     up() { paint = null; lenDrag = null; } });
 }

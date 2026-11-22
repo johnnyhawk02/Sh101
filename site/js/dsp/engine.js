@@ -214,7 +214,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
   seqStep() {
     // v0.43.0 (Johnny: "a step length on the RHS for each lane"): octave, note, slide and accent each loop at their own length
     const S = this.seq, N = this.stepIdx, L = S.len || {}, n16 = Math.max(1, S.steps.length || 1);
-    const pos = {}; for (const k in this.laneAt) { const len = Math.max(1, Math.min(n16, L[k] || n16)); pos[k] = ((N - this.laneAt[k]) % len + len) % len; }
+    const A = S.st || {}, pos = {}; for (const k in this.laneAt) { const a = Math.max(0, Math.min(n16 - 1, A[k] | 0)), len = Math.max(1, Math.min(n16 - a, L[k] || n16)); pos[k] = a + ((N - this.laneAt[k]) % len + len) % len; }   // v0.43.9: each lane loops from its start step
     const lane = (k) => S.steps[pos[k]] || {};
     const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N, dur = this.fs * 60 / S.bpm / 4;
     this.nextStepAt += dur;
