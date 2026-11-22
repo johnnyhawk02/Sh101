@@ -541,9 +541,12 @@ function makeSeqGrid() {
       if (dy >= ly - 13 && dy < ly - 2 && dx >= a - 2 && dx <= b + 2) return k; } return null; };
   const barAt = (p) => { if (!p) return null; const ri = G.rowAt(p[1] - G.y);
     const ln = SEQ_LANE_ROWS.find(([, r0, n]) => ri >= r0 && ri < r0 + n); if (!ln) return null;
-    const k = ln[0], ax = G.x + state.seq.st[k] * G.colW, bx = ax + state.seq.len[k] * G.colW, da = Math.abs(p[0] - ax), db = Math.abs(p[0] - bx);
-    return Math.min(da, db) > 7 ? null : { k, end: db <= da }; };
-  addCtl({ kind: 'roll', rect: [G.x - 8, G.y, G.w + 16, G.h], sync: draw,
+    const k = ln[0], ax = G.x + state.seq.st[k] * G.colW, bx = ax + state.seq.len[k] * G.colW;
+    // v0.43.17 (Johnny: "make the left and right grab area bigger, mainly outside of the loop"): 4 px inside, about half a step outside
+    const out = Math.max(14, G.colW * 0.5);
+    if (p[0] >= bx - 4 && p[0] <= bx + out) return { k, end: true };
+    if (p[0] >= ax - out && p[0] <= ax + 4) return { k, end: false }; return null; };
+  addCtl({ kind: 'roll', rect: [G.x - 30, G.y, G.w + 38, G.h], sync: draw,
     down(p) { const tk = topAt(p); if (tk) { lenDrag = { k: tk, move: true, c0: (p[0] - G.x) / G.colW, a0: state.seq.st[tk] }; return; }
       const b = barAt(p); if (b) { lenDrag = b; return; }
       const h = at(p); if (!h) return; const [t] = h.r; apply(h); paint = { t, v: t === 'o' ? true : !!state.seq.steps[h.i][t] }; },
