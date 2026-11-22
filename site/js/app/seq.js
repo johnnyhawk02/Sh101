@@ -8,7 +8,7 @@ const SEQ0 = () => ({ steps: [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1].ma
 // RECORD clears the note list and every key played (computer keys or MIDI) adds one, until RECORD or PLAY is pressed again. While
 // it runs, each GATE step plays the next note in the list (round and round), the octave lane on top; a key played then moves
 // the whole list (the list's first note = as recorded). With no notes, a gate plays the last key, as before
-const SEQ_NOTES_MAX = 100;
+const SEQ_NOTES_MAX = 100, SEQ_LOOP_MAX = 64;
 let seqRec = false, seqNoteAt = -1;
 // v0.43.0 (Johnny): each lane (octave, note, slide, accent) has its own length, 1-16
 const SEQ_LANES = ['o', 'on', 's', 'a'];
@@ -23,6 +23,7 @@ function seqTidy(q) {
   for (const k of SEQ_LANES) { q.st[k] = Math.max(0, Math.min(SEQ_N - 1, q.st[k] | 0)); q.len[k] = Math.max(1, Math.min(SEQ_N - q.st[k], q.len[k] | 0)); }
   q.rt = Object.assign({ o: false, on: false, s: false, a: false }, q.rt || {});
   // v0.47.0: the recorded note list (MIDI note numbers, before OCTAVE); empty = every gate plays the last key
+  q.loop = Math.max(0, Math.min(SEQ_LOOP_MAX, q.loop | 0)); q.adv = q.adv === 'step' ? 'step' : 'gate';   // v0.50.0: note LOOP (0 = all) and what moves to the next note
   q.notes = Array.isArray(q.notes) ? q.notes.filter((n) => Number.isFinite(n)).map((n) => Math.max(0, Math.min(127, n | 0))).slice(0, SEQ_NOTES_MAX) : [];
   return q;
 }
@@ -34,10 +35,14 @@ function seqLoad(q) { state.seq = seqTidy(q); seqSend(); }
 // v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note
 let seqOn = false, seqPos = -1, seqLanePos = null;
 const seqBpm = () => 120;
-const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len }, st: { ...state.seq.st }, rt: { ...state.seq.rt }, notes: [...state.seq.notes] } });
+const seqMsg = () => ({ type: 'seq', seq: { steps: state.seq.steps.map((s) => ({ on: s.on, o: s.o, s: s.s, a: s.a })), bpm: seqBpm(), len: { ...state.seq.len }, st: { ...state.seq.st }, rt: { ...state.seq.rt }, notes: [...state.seq.notes], loop: state.seq.loop, adv: state.seq.adv } });
 function seqSend() { post(seqMsg()); save(); }
 async function seqRun(on = !seqOn) { await boot(); seqRec = false; seqOn = on; if (!on) { seqPos = -1; seqLanePos = null; seqNoteAt = -1; } post(seqMsg()); post({ type: 'run', on }); }
-function seqRecord(on = !seqRec) { boot(); seqRec = on; if (on) { state.seq.notes = []; seqNoteAt = -1; seqSend(); } }
+function seqRecord(on = !seqRec) { boot(); seqRec = on; if (on) { state.seq.notes = []; state.seq.loop = 0; seqNoteAt = -1; seqSend(); } }
+// v0.50.0: LOOP, how many notes it plays before going back to note 1, round the list as often as it takes (1..64; 0 = the number of notes)
+const seqLoopN = () => state.seq.loop > 0 ? state.seq.loop : state.seq.notes.length;
+function seqSetLoop(n) { if (!state.seq.notes.length) return; n = Math.max(1, Math.min(SEQ_LOOP_MAX, n | 0)); if (n === state.seq.loop) return; state.seq.loop = n; seqSend(); }
+function seqSetAdv(a) { state.seq.adv = a; seqSend(); }
 // a key while RECORD is on: add it to the list. True when the key shouldn't also go to the engine (it would move the running pattern)
 function seqRecNote(n) { if (!seqRec) return false; if (state.seq.notes.length < SEQ_NOTES_MAX) { state.seq.notes.push(n); seqSend(); } return seqOn; }
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];

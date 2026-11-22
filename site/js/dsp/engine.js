@@ -222,10 +222,16 @@ class KestrelProcessor extends AudioWorkletProcessor {
     const lane = (k) => S.steps[pos[k]] || {};
     const st = { on: !!lane('on').on, o: lane('o').o, s: !!lane('s').s, a: !!lane('a').a }, i = N; let ni = -1; const dur = this.fs * 60 / S.bpm / 4;
     this.nextStepAt += dur;
+    // v0.50.0 (Johnny: "a loop numbox"; "the next note ... incremented by either the gate seq or the next 1/16th beat"): the list plays
+    // a count of `loop` advances (0 = as many as there are notes) going round the notes, and back to note 1 when it reaches LOOP
+    // (Johnny: "if the loop is longer than the num of notes it just loops the notes and then resets at the loop num"); with adv 'step'
+    // every 1/16 moves on to the next note, rests included, else only gates do
+    const NL = S.notes || [], NN = NL.length, LP = S.loop > 0 ? S.loop : NN, byStep = S.adv === 'step';
+    let nk = -1; if (NN && (st.on || byStep)) { const c = this.noteIdx % LP; this.noteIdx = c + 1; nk = c % NN; ni = nk; }
     if (!st.on) { this.gateOff(); this.gateOffAt = -1; this.lastSlide = false; }
     else {
-      const NL = S.notes || []; let base;
-      if (NL.length) { const k = this.noteIdx % NL.length; base = NL[k] + this.shift + 12 * this.P.transpose - 12; this.noteIdx = k + 1; ni = k; }   // v0.47.0: the next recorded note
+      let base;
+      if (nk >= 0) base = NL[nk] + this.shift + 12 * this.P.transpose - 12;   // v0.47.0: the next recorded note
       else base = this.root >= 0 ? this.root : 36 + 12 * this.P.transpose;
       const n = base + 12 * Math.max(0, Math.min(2, st.o | 0));   // v0.42.2: octave 0 = the current note, 1 and 2 above it
       if (this.lastSlide && this.gate) { this.setPitch(n, 0.06); this.accOn = st.a ? 1 : 0; }

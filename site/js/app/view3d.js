@@ -460,13 +460,21 @@ for (const b of BOXES) {
       let tx = gx0 - 50;
       makeKey(tx, ty, 24, 14, { on: () => seqOn, press: () => seqRun(), pad: 6, tag: 'play' }); icon(tx, play); tx += 56;
       makeKey(tx, ty, 24, 14, { on: () => seqRec, press: () => seqRecord(), pad: 6, tag: 'rec' }); icon(tx, rec);
-      const dw = 6 * C, dx = tx + 50;
-      makeDisplay(dx, ty - 12, dw, 24, () => { const N = state.seq.notes, c = N.length, nm = (a) => a.map(noteName).join(' ');
-        if (seqRec) return c ? 'REC ' + nm(N.slice(-9)) : 'REC - PLAY SOME KEYS';
-        if (!c) return 'NO NOTES - PRESS RECORD';
-        const at = seqOn && seqNoteAt >= 0 ? seqNoteAt : -1;
-        return (at >= 0 ? `${at + 1}/${c} ` : `${c} NOTES `) + nm(at >= 0 ? N.slice(at, at + 9) : N.slice(0, 9)); });
-      tx = dx + dw + 30;
+      // v0.50.0 (Johnny: "dont show the notes in the seq, show number of notes and have a loop numbox. also the next note to be played
+      // every can be incremented by either the gate seq or the next 1/16th beat"): the count of notes, the LOOP box (drag up/down or click
+      // its top/bottom half; how many of them it plays round) and NEXT NOTE: GATE (each gate) or 1/16 (every step)
+      const lab = (lx, t) => prints.push((x, ink) => { x.fillStyle = ink; text(x, t, lx, ty + 0.5, 10.5, 'left'); });
+      const nx = tx + 44, NW = 40;
+      makeDisplay(nx, ty - 12, NW, 24, () => String(state.seq.notes.length)); lab(nx + NW + 8, 'NOTES');
+      const lx = nx + NW + 76, ld = makeDisplay(lx, ty - 12, NW, 24, () => state.seq.notes.length ? String(seqLoopN()) : '-', { tag: 'nloop' });
+      lab(lx + NW + 8, 'LOOP');
+      { let g0 = null; ld.kind = 'roll';
+        ld.down = (p) => { g0 = { y: p ? p[1] : 0, v: seqLoopN(), moved: false, top: p && p[1] < ty }; };
+        ld.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; seqSetLoop(g0.v + dv); };
+        ld.up = () => { if (g0 && !g0.moved) seqSetLoop(seqLoopN() + (g0.top ? 1 : -1)); g0 = null; }; }
+      let ax = lx + NW + 74; lab(ax - 12, 'NEXT'); ax += 34;
+      for (const [a, t] of [['gate', 'GATE'], ['step', '1/16']]) { makeKey(ax, ty, 24, 14, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), pad: 6, tag: 'adv:' + a }); lab(ax + 20, t); ax += 70; }
+      tx = ax + 20;
       for (const [d, tag] of [[-1, 'nudgeL'], [1, 'nudgeR']]) { makeKey(tx, ty, 24, 14, { on: () => false, press: () => { boot(); seqNudge(d); }, pad: 6, tag }); icon(tx, arrow(d)); tx += 56; }
       const rx = gx + gw - 30;
       makeKey(rx, ty, 24, 14, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), pad: 6, tag: 'rndMenu' }); icon(rx, dice);

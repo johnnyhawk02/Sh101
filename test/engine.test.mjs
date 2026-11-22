@@ -106,4 +106,16 @@ console.log('key priority ok');
   send({ type: 'noteOn', n: 50 }); render(p, 0.125 * 3);
   assert.equal((p.pitchT - T - 48) % 1, 0); assert.ok([50, 54, 57].includes(p.pitchT - T), 'a key moves the list by its distance from the first note');
 }
+// v0.50.0: LOOP plays only the first notes; adv 'step' moves on every step, rests included
+{
+  const [p, send] = make(), steps = Array.from({ length: 16 }, (_, i) => ({ on: i !== 1, o: 0, s: false, a: false }));
+  send({ type: 'seq', seq: { steps, bpm: 120, notes: [48, 52, 55], loop: 2, adv: 'step' } }); send({ type: 'run', on: true });
+  const at = []; render(p, 0.03); for (let k = 0; k < 5; k++) { at.push(p.gate ? p.pitchT : null); render(p, 0.125); }
+  const T = 12 * p.P.transpose - 12;
+  assert.deepEqual(at, [48 + T, null, 48 + T, 52 + T, 48 + T], 'loop 2 by steps: the rest uses up note 2');
+  const [q, sq] = make(), on = Array.from({ length: 16 }, () => ({ on: true, o: 0, s: false, a: false }));
+  sq({ type: 'seq', seq: { steps: on, bpm: 120, notes: [48, 52, 55], loop: 5 } }); sq({ type: 'run', on: true });
+  const b2 = []; render(q, 0.03); for (let k = 0; k < 7; k++) { b2.push(q.pitchT - T); render(q, 0.125); }
+  assert.deepEqual(b2, [48, 52, 55, 48, 52, 48, 52], 'loop 5 over 3 notes: round the notes, back to note 1 after 5');
+}
 console.log('sequencer ok');
