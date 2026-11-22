@@ -483,7 +483,7 @@ let modHeld = false;
 // ---- the sequencer's note grid (v0.42.1), drawn on its own layer over the print
 // v0.45.9: a lane's RETRIG tab, in grid units: left of the loop frame's left dragger, from the top of its top bar
 function rtTab(k) { const G = seqGrid, r0 = SEQ_LANE_ROWS.find(([kk]) => kk === k)[1], L = state.seq.st[k] * G.colW + 1.5 - 10;
-  return { x: L - 30, y: G.rowY(r0) - 11, w: 30, h: 24 }; }
+  return { x: L - 24, y: G.rowY(r0) - 11, w: 24, h: 22 }; }
 function makeSeqGrid() {
   const G = seqGrid, PAD = 12, PADL = 42, c = document.createElement('canvas'); c.width = Math.ceil((G.w + PADL + PAD) * 3); c.height = Math.ceil(G.h * 3); const x = c.getContext("2d");   // v0.43.18: PAD each side for the draggers   // v0.45.9: PADL on the left for the RETRIG tabs
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -521,8 +521,10 @@ function makeSeqGrid() {
       // v0.45.9 (Johnny's sketch): the RETRIG tab, sticking out left from the frame's top-left corner, with its tick under the word
       const T = rtTab(k), on = !!state.seq.rt[k], tc = T.x + T.w / 2 + 4, fg = lum(DC) > 0.4 ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.85)';
       x.fillStyle = DC; x.fillRect(T.x, T.y, T.w + 1, T.h);
-      x.fillStyle = fg; text(x, 'RETRIG', tc, T.y + 6, 6.2, 'center', MONO, 700);
-      x.strokeStyle = fg; x.lineWidth = 1; x.strokeRect(tc - 4.5, T.y + 11.5, 9, 9); if (on) x.fillRect(tc - 3, T.y + 13, 6, 6);
+      // v0.46.1 (Johnny: "instead of saying retrig, have little play icon"): a play triangle, filled when RETRIG is on, an outline when off
+      const ty = T.y + T.h / 2 - 1, th = 6;
+      x.beginPath(); x.moveTo(tc - th * 0.8, ty - th); x.lineTo(tc + th * 0.95, ty); x.lineTo(tc - th * 0.8, ty + th); x.closePath();
+      x.lineJoin = 'round'; x.strokeStyle = fg; x.lineWidth = 1.3; x.stroke(); if (on) { x.fillStyle = fg; x.fill(); }
     }
     tex.needsUpdate = true; return true;
   };
