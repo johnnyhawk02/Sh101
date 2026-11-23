@@ -82,12 +82,13 @@ const knobBase = knobVal;
 // 0..1), joined by straight lines in x. The TAPER pop-up's SEGMENTS key turns it on; drag the points on its drawing, click
 // the line to add one, double-click a point to take it away.
 // v0.45.8: Johnny's own decay curve (22 Nov 2026), with a straight run from 38% (357 ms) to 10 s
-const SEG_ENV = () => [[0, 0.002], [0.02, 0.013], [0.22, 0.128], [0.27, 0.2], [0.38, 0.357], [1, 10]];
+// v0.57.8 (Johnny: "can you make it straight after the curve stops"): the 27% and 38% points dropped, so it runs straight from 22% (128 ms) to 10 s
+const SEG_ENV = () => [[0, 0.002], [0.02, 0.013], [0.22, 0.128], [1, 10]];
 const TAPER_KEY = 'shyoy.taper', TAPER0 = { saw: 50, pulse: 50, sub: 50, noise: 50, level: 50, decay: SEG_ENV(), release: SEG_ENV() };
 const taper = JSON.parse(JSON.stringify(TAPER0));
 try { Object.assign(taper, JSON.parse(localStorage.getItem(TAPER_KEY) || '{}')); } catch (e) {}
 // v0.45.6: Johnny asked for the segment curves on decay and release, so they replace whatever this browser had kept for those two, once
-try { if (localStorage.getItem('shyoy.taperv') !== '4') { taper.decay = SEG_ENV(); taper.release = SEG_ENV(); localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '4'); } } catch (e) {}
+try { if (localStorage.getItem('shyoy.taperv') !== '5') { taper.decay = SEG_ENV(); taper.release = SEG_ENV(); localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); localStorage.setItem('shyoy.taperv', '5'); } } catch (e) {}
 for (const k in taper) if (taper[k] === 'S') taper[k] = SEG_ENV();   // v0.45.5's 'S' curve
 // v0.45.1 (Johnny: "the decay could do with a curve that bulges the opposite"): -100 .. 100, below 0 bends the other way (anti-log)
 const taperK = (id) => Math.max(-100, Math.min(100, +taper[id] || 0)) / 20;
@@ -928,8 +929,9 @@ const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((
 const tp = sheet('TAPER');
 tp.body.innerHTML = `<div class="f"><span id="tp-name"></span><canvas id="tp-cv" width="600" height="360" style="display:block;width:300px;height:180px;margin:6px 0 4px;touch-action:none;cursor:crosshair"></canvas>
   <p class="tp-pts" id="tp-pts" style="margin:0 0 10px;font-size:9.5px;letter-spacing:.04em;min-height:12px"></p>
-  <div class="row" style="font-size:10px;letter-spacing:.08em"><b>ANTI</b><input type="range" min="-100" max="100" id="tp-r" aria-label="Taper, anti-log through linear to log" list="tp-mid"><datalist id="tp-mid"><option value="0"></datalist><b>LOG</b><b class="val" id="tp-v"></b></div></div>
-  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-seg">SEGMENTS</button><button id="tp-def">DEFAULT</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
+  <div class="row" style="font-size:10px;letter-spacing:.08em"><b>ANTI</b><input type="range" min="-100" max="100" id="tp-r" aria-label="Taper, anti-log through linear to log" list="tp-mid"><datalist id="tp-mid"><option value="0"></datalist><b>LOG</b><b class="val" id="tp-v"></b></div>
+  <div class="row" id="tp-caner" style="font-size:10px;letter-spacing:.08em;margin-top:10px" hidden><b style="width:52px">CURVE</b><input type="range" min="0" max="100" id="tp-cc" aria-label="Candy cane curve"><b style="width:52px;text-align:right">LENGTH</b><input type="range" min="3" max="80" id="tp-cf" aria-label="Candy cane length"></div></div>
+  <div class="row"><button id="tp-lin">LINEAR</button><button id="tp-seg">SEGMENTS</button><button id="tp-cane">CANDY CANE</button><button id="tp-def">DEFAULT</button><button id="tp-copy">COPY ALL TAPERS</button></div>`;
 let tpId = null, tpDrag = -1;
 const TPW = 300, TPH = 180, tpCv = tp.body.querySelector('#tp-cv');
 const tpXY = (id, [u, x]) => [u * TPW, TPH - fromX(id, x) * TPH];
@@ -944,22 +946,33 @@ const tpDraw = () => {
     x.font = `600 11px ${MONO}`; x.textAlign = px > w / 2 ? 'right' : 'left'; x.fillStyle = ink; x.fillText(t, px + (px > w / 2 ? -10 : 10), Math.max(14, Math.min(h - 6, py - 8))); }
   tp.body.querySelector('#tp-pts').textContent = P ? P.map((p) => `${Math.round(p[0] * 100)}% ${knobText(id, fromX(id, p[1]))}`).join('  ·  ') : '';
   tp.body.querySelector('#tp-r').value = +taper[id] || 0; tp.body.querySelector('#tp-v').textContent = P ? 'SEGMENTS' : (taper[id] || 0);
-  tp.body.querySelector('#tp-seg').classList.toggle('lit', !!P);
+  const cf = taper['~' + id]; tp.body.querySelector('#tp-seg').classList.toggle('lit', !!P && !cf); tp.body.querySelector('#tp-cane').classList.toggle('lit', !!cf);
+  tp.body.querySelector('#tp-caner').hidden = !cf; if (cf) { tp.body.querySelector('#tp-cc').value = Math.round(cf[0] * 100); tp.body.querySelector('#tp-cf').value = Math.round(cf[1] * 100); }
   tp.body.querySelector('#tp-name').textContent = (KNOB_NAMES[id] || id).toUpperCase();
 };
 const tpSave = () => { try { localStorage.setItem(TAPER_KEY, JSON.stringify(taper)); } catch (e) {} for (const k of knobs) k.shown = null; dirty = true; tpDraw(); };
-const tpSet = (v) => { taper[tpId] = Array.isArray(v) ? v.map((p) => [...p]) : Math.round(v); tpSave(); };
+const tpSet = (v, cane) => { if (!cane) delete taper['~' + tpId]; taper[tpId] = Array.isArray(v) ? v.map((p) => [...p]) : Math.round(v); tpSave(); };
 tp.body.querySelector('#tp-r').oninput = (e) => tpSet(+e.target.value);
 tp.body.querySelector('#tp-lin').onclick = () => tpSet(0);
 tp.body.querySelector('#tp-def').onclick = () => tpSet(TAPER0[tpId] || 0);
 // SEGMENTS: the curve as it stands, as five points (the env times get Johnny's set)
 tp.body.querySelector('#tp-seg').onclick = () => { if (segOf(tpId)) return; tpSet(ENV_IDS[tpId] ? SEG_ENV() : [0, 0.25, 0.5, 0.75, 1].map((u) => [u, +valOf(tpId, u).toFixed(4)])); };
+// v0.57.8 (Johnny: "can i have that as an editable shape called candy cane"): a quick bend up, then dead straight to the top,
+// as points to drag like any SEGMENTS curve (the straight run starts at the third point; on decay and release it is 2 ms > 13 ms > 128 ms > 10 s)
+// v0.57.8 (Johnny: "also how curvy and far it goes" / "but simple controls"): two sliders, CURVE (how high the bend climbs
+// above the straight diagonal) and LENGTH (how far along it turns straight). The shape is kept as [curve, length] beside the
+// points (taper['~' + id]); dragging a point or pressing another key turns it into plain SEGMENTS
+const caneOf = ([c, f]) => { const ye = f + c * 0.8 * (1 - f); return [[0, 0], [rnd4(f / 11), rnd4(ye * (0.2 + 0.6 * c))], [rnd4(f), rnd4(ye)], [1, 1]]; };
+const caneSet = (cf) => { taper['~' + tpId] = cf; tpSet(caneOf(cf).map(([u, v]) => [u, rnd4(toX(tpId, v))]), true); };
+tp.body.querySelector('#tp-cane').onclick = () => caneSet([0.43, 0.22]);   // as the decay default: 2 ms > 13 ms > 128 ms at 22%, straight to 10 s
+tp.body.querySelector('#tp-cc').oninput = (e) => { const cf = taper['~' + tpId]; if (cf) caneSet([+e.target.value / 100, cf[1]]); };
+tp.body.querySelector('#tp-cf').oninput = (e) => { const cf = taper['~' + tpId]; if (cf) caneSet([cf[0], +e.target.value / 100]); };
 // editing the points on the drawing
 const tpAt = (e) => { const r = tpCv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * TPW, (e.clientY - r.top) / r.height * TPH]; };
 const tpNear = (q) => { const P = segOf(tpId); if (!P) return -1; let best = -1, bd = 10; P.forEach((p, i) => { const [px, py] = tpXY(tpId, p), d = Math.hypot(px - q[0], py - q[1]); if (d < bd) { bd = d; best = i; } }); return best; };
 const rnd4 = (x) => +x.toPrecision(4);
 tpCv.addEventListener('pointerdown', (e) => {
-  const P = segOf(tpId); if (!P) return; const q = tpAt(e); let i = tpNear(q);
+  const P = segOf(tpId); if (!P) return; delete taper['~' + tpId]; const q = tpAt(e); let i = tpNear(q);
   if (i < 0) {   // a click on the line adds a point there
     const u = clamp01(q[0] / TPW); if (u <= P[0][0] || u >= P[P.length - 1][0]) return;
     i = P.findIndex((p) => p[0] > u); P.splice(i, 0, [rnd4(u), rnd4(toX(tpId, valOf(tpId, u)))]);
@@ -979,7 +992,7 @@ tpCv.addEventListener('pointerup', tpUp); tpCv.addEventListener('pointercancel',
 tpCv.addEventListener('dblclick', (e) => { const P = segOf(tpId); if (!P) return; const i = tpNear(tpAt(e)); if (i > 0 && i < P.length - 1) { P.splice(i, 1); tpDrag = -1; tpSave(); } });
 // v0.45.2 (Johnny: "a copy button to give you defaults"): every slider's taper (non-zero ones) as JSON, to paste back to
 // Claude to become TAPER0
-tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(Object.fromEntries(Object.entries(taper).filter(([, v]) => Array.isArray(v) || v)));
+tp.body.querySelector('#tp-copy').onclick = async (e) => { const b = e.currentTarget, t = JSON.stringify(Object.fromEntries(Object.entries(taper).filter(([k, v]) => k[0] !== '~' && (Array.isArray(v) || v))));
   try { await navigator.clipboard.writeText(t); b.textContent = 'COPIED'; } catch (er) { prompt('Copy the tapers', t); }
   setTimeout(() => { b.textContent = 'COPY ALL TAPERS'; }, 1500); };
 function openTaper(id) { tpId = id; tpDraw(); tp.open(); }
