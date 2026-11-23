@@ -856,6 +856,30 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet .list h3 { margin: 10px 0 4px; font-size: 10px; letter-spacing: .1em; font-weight: 600; opacity: .7; }
 .v3d-sheet .list button { width: 100%; justify-content: flex-start; margin: 0 0 4px; }
 .v3d-sheet .list button.lit { box-shadow: inset 3px 0 0 #ff2a14; }
+/* v0.57.6 (Johnny: "improve this, it looks thrown together"): the preset browser laid out properly. Name + save on top, the list
+   filling the middle (thin rows, the chosen one inverted with the spot colour along its edge), the preset and file keys in a footer */
+.v3d-sheet.pbs .win { width: min(660px, 94vw); display: flex; flex-direction: column; overflow: hidden; padding: 46px 20px 16px; }
+.pbs .body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.pbs .pb-top { display: flex; gap: 6px; align-items: stretch; flex-wrap: nowrap; }
+.pbs .pb-top input[type=text] { height: 32px; box-sizing: border-box; font-size: 13px; padding: 0 10px; }
+.pbs button.k { height: 32px; padding: 0 14px; justify-content: center; }
+.pbs button.k.ic { width: 32px; padding: 0; font-size: 15px; }
+.pbs .list { flex: 1; min-height: 0; max-height: none; overflow: auto; border: 1px solid rgb(var(--v3d-ink-rgb) / .45); border-radius: 6px; padding: 0 8px 8px;
+  scrollbar-width: thin; scrollbar-color: rgb(var(--v3d-ink-rgb) / .55) transparent; }
+.pbs .list::-webkit-scrollbar { width: 8px; } .pbs .list::-webkit-scrollbar-thumb { background: rgb(var(--v3d-ink-rgb) / .5); border-radius: 4px; }
+.pbs .list h3 { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; margin: 0 -8px 4px; padding: 10px 12px 6px; background: var(--v3d-panel);
+  font-size: 9.5px; letter-spacing: .14em; font-weight: 700; opacity: 1; color: rgb(var(--v3d-ink-rgb) / .6); border-bottom: 1px solid rgb(var(--v3d-ink-rgb) / .25); }
+.pbs .list h3 b { font-weight: 600; }
+.pbs .list button { width: 100%; height: 27px; margin: 0; padding: 0 10px; justify-content: flex-start; background: transparent; color: var(--v3d-ink); border-radius: 3px;
+  font: 600 12px ${MONO}; letter-spacing: .03em; }
+.pbs .list button:hover { background: rgb(var(--v3d-ink-rgb) / .08); }
+.pbs .list button.lit { background: var(--v3d-ink); color: var(--v3d-paper); box-shadow: inset 3px 0 0 #ff2a14; }
+.pbs .pb-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pbs .pb-foot .grp { display: flex; gap: 5px; align-items: center; }
+.pbs .pb-foot .grp > span { font-size: 9px; font-weight: 700; letter-spacing: .14em; opacity: .55; margin-right: 3px; }
+.pbs .pb-foot button { height: 26px; padding: 0 9px; font-size: 10px; background: transparent; color: var(--v3d-ink); box-shadow: inset 0 0 0 1.5px var(--v3d-ink); }
+.pbs .pb-foot button:hover:not(:disabled) { background: var(--v3d-ink); color: var(--v3d-paper); }
+.pbs .pb-foot button:disabled { opacity: .3; cursor: default; }
 .v3d-sheet input[type=text] { flex: 1; font: 600 12px ${MONO}; padding: 6px 8px; border: 1.5px solid var(--v3d-ink); background: transparent; color: inherit; border-radius: 3px; min-width: 0; }
 /* v0.25.0: the 2D app's Options (MIDI, about), drawn as a card of the panel */
 html[data-view="3d"] dialog#options {
@@ -965,10 +989,11 @@ sm.body.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'
 const seqMenu = { isOpen: () => sm.el.classList.contains('open'), toggle() { if (this.isOpen()) sm.close(); else sm.open(); dirty = true; } };
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
-const pb = sheet('PRESETS'); pb.el.querySelector('.win').style.height = 'min(560px, 88dvh)';   // v0.57.1 (Johnny: "i hate windows that change size"): one fixed size, the list scrolls
-pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-roll" aria-label="Suggest another name">🎲</button><button id="pb-save">SAVE</button></div>
-  <div class="row pb-mg"><button id="pb-ren">RENAME</button><button id="pb-dup">DUPLICATE</button><button id="pb-del">DELETE</button><button id="pb-res">RESTORE</button></div>
-  <div class="row pb-mg"><button id="pb-exp">EXPORT</button><button id="pb-expall">EXPORT ALL</button><button id="pb-imp">IMPORT</button></div></div><div class="list" id="pb-list"></div>`;
+const pb = sheet('PRESETS'); pb.el.classList.add('pbs'); pb.el.querySelector('.win').style.height = 'min(560px, 88dvh)';   // v0.57.1 (Johnny: "i hate windows that change size"): one fixed size, the list scrolls
+pb.body.innerHTML = `<div class="pb-top"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button class="k ic" id="pb-roll" aria-label="Suggest another name">🎲</button><button class="k" id="pb-save">SAVE</button></div>
+  <div class="list" id="pb-list"></div>
+  <div class="pb-foot"><div class="grp"><span>PRESET</span><button id="pb-ren">RENAME</button><button id="pb-dup">DUPLICATE</button><button id="pb-del">DELETE</button><button id="pb-res">RESTORE</button></div>
+  <div class="grp"><span>FILE</span><button id="pb-imp">IMPORT</button><button id="pb-exp">EXPORT</button><button id="pb-expall">EXPORT ALL</button></div></div>`;
 // v0.56.0 (Johnny: "add preset management to presets"): on the chosen preset, with the name in the box: RENAME (your own presets),
 // DUPLICATE (any preset, as one of your own), DELETE (press twice; a factory one is only hidden, RESTORE brings them back), EXPORT
 // (the chosen preset as a file), EXPORT ALL (all of your own) and IMPORT (a file of either kind; sounds.js)
@@ -997,10 +1022,13 @@ const prjSel = document.getElementById('prj-preset');
 function drawBrowser() {
   let h = '';
   for (const g of prjSel.querySelectorAll('optgroup')) {
-    h += `<h3>${g.label.toUpperCase()}</h3>`;
+    h += `<h3>${g.label.toUpperCase()}<b>${g.querySelectorAll('option').length}</b></h3>`;
     for (const o of g.querySelectorAll('option')) h += `<button data-v="${o.value.replace(/"/g, '&quot;')}" class="${o.value === prjSel.value ? 'lit' : ''}">${o.textContent.replace(/</g, '&lt;')}</button>`;
   }
   pb.body.querySelector('#pb-list').innerHTML = h;
+  const s = pbSrc(), q = (id) => pb.body.querySelector(id);   // keys that can't act on the chosen preset are greyed
+  q('#pb-ren').disabled = !s || s.v[0] !== 'u'; q('#pb-dup').disabled = q('#pb-del').disabled = q('#pb-exp').disabled = !s || !s.x;
+  const lit = pb.body.querySelector('#pb-list .lit'); if (lit && !drawBrowser.kept) lit.scrollIntoView({ block: 'nearest' });
 }
 pb.body.querySelector('#pb-list').addEventListener('click', (e) => {
   const b = e.target.closest('[data-v]'); if (!b) return;

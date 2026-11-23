@@ -83,7 +83,28 @@ function seqRandom(k) {
 // keys: the number keys, clear of the note keys (A-; and the black keys above) and Z/X (octave)
 const SEQ_RND = [['RANDOM ALL', '1', () => seqRandom('all')], ['RANDOM GATES', '2', () => seqRandom('on')], ['RANDOM ACCENTS', '3', () => seqRandom('a')],
   ['RANDOM SLIDES', '4', () => seqRandom('s')], ['RANDOM OCTAVES', '5', () => seqRandom('o')], ['RANDOM LENGTHS', '6', () => seqRandom('len')],
-  ['RANDOM RETRIGS', '7', () => seqRandom('rt')], ['RESET LOOPS', '0', () => seqResetLoops()]];
+  ['RANDOM RETRIGS', '7', () => seqRandom('rt')], ['RANDOM NOTES', '8', () => seqNotesRandom()], ['SHUFFLE NOTES', '9', () => seqNotesShuffle()],
+  ['RESET LOOPS', '0', () => seqResetLoops()]];
+// v0.57.6 (Johnny: "add note randomiser and note shuffler to the random menu"). RANDOM NOTES: a new note list, as many notes as
+// there are now (8 when empty), in C minor from C2 to G3, often the root or fifth, mostly small steps; SHUFFLE NOTES: the same notes
+// in a new order
+function seqNotesRandom() {
+  const SC = [0, 2, 3, 5, 7, 8, 10], pool = []; for (let n = 36; n <= 55; n++) if (SC.includes(n % 12)) pool.push(n);
+  const N = state.seq.notes.length || 8, out = [36 + 12 * (Math.random() < 0.3)]; let at = pool.indexOf(out[0]);
+  for (let i = 1; i < N; i++) {
+    const r = Math.random();
+    if (r < 0.25) at = pool.indexOf(Math.random() < 0.6 ? 36 + 12 * (Math.random() < 0.4) : 43);   // home: a root or the fifth
+    else at = Math.max(0, Math.min(pool.length - 1, at + [-2, -1, -1, 1, 1, 2, 3, -3][Math.random() * 8 | 0]));
+    out.push(pool[at]);
+  }
+  state.seq.notes = out; seqSend();
+}
+function seqNotesShuffle() {
+  const a = state.seq.notes.slice(); if (a.length < 2) return;
+  const was = a.join();
+  for (let t = 0; t < 4 && a.join() === was; t++) for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; }
+  state.seq.notes = a; seqSend();
+}
 window.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || (e.target.matches && e.target.matches('input, select, textarea'))) return;
   const r = SEQ_RND.find(([, k]) => k === e.key); if (r) { e.preventDefault(); r[2](); }
