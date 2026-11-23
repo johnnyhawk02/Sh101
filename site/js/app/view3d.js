@@ -45,11 +45,11 @@ const S = (id, label, opts, w = 1) => ({ t: 'sw', id, label, opts, w });
 const ROW_VCF = 1, ROW_BENDER = 1;
 const BOXES = [
   { r: 0, c: 0, s: 2, n: 'LFO', it: [K('lfoRate', 'RATE'), S('lfoWave', 'WAVE', ['TRI', 'SQR', 'RND', 'NOISE'])] },
-  { r: 0, c: 2, s: 6, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV'])] },   // v0.57.0: DRIFT gone (Johnny: "get rid of it")
-  { r: 0, c: 8, s: 5, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
+  { r: 0, c: 2, s: 5, n: 'VCO', it: [S('range', 'RANGE', ["16'", "8'", "4'", "2'"]), K('tune', 'TUNE'), K('vcoMod', 'MOD'), K('pw', 'PW'), S('pwmSrc', 'PWM', ['LFO', 'MAN', 'ENV'])] },   // v0.57.0: DRIFT gone (Johnny: "get rid of it"); v0.57.2 (Johnny: "keep sliders on the grid, just give shyoy and preset more space"): 6 -> 5 columns
+  { r: 0, c: 7, s: 5, n: 'MIXER', it: [K('saw', 'SAW'), K('pulse', 'PULSE'), K('sub', 'SUB'), K('noise', 'NOISE'), S('subType', 'SUB', ['-1 SQ', '-2 SQ', '-2 25%'])] },
   { r: ROW_VCF, c: 0, s: 7, n: 'VCF', it: [K('cutoff', 'CUTOFF'), K('reso', 'RES'), K('vcfEnv', 'ENV'), K('vcfMod', 'MOD'), K('kybd', 'KYBD'), K('drive', 'DRIVE'), K('accVcf', 'ACC')] },
   { r: ROW_VCF, c: 7, s: 5, n: 'ENVELOPE', it: [K('attack', 'A'), K('decay', 'D'), K('sustain', 'S'), K('release', 'R'), S('trig', 'TRIG', ['G+T', 'GATE', 'LFO'])] },
-  { r: 0, c: 13, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
+  { r: 0, c: 12, s: 2, n: 'VCA', it: [S('vcaMode', 'MODE', ['ENV', 'GATE']), K('level', 'LEVEL')] },
   { r: ROW_BENDER, c: 16, s: 3, n: 'PERFORM', it: [K('glide', 'PORTA'), S('glideMode', 'MODE', ['OFF', 'AUTO', 'ON']), K('accent', 'ACCENT')] },
   { r: ROW_BENDER, c: 12, s: 4, n: 'BENDER', it: [K('bendVco', 'VCO'), K('bendVcf', 'VCF'), K('lfoMod', 'LFO MOD'), S('transpose', 'OCTAVE', ['LOW', 'MID', 'HIGH'])] },
   // v0.53.1 (Johnny: "dont need these - i have them on my keyboard"): no BEND lever or MOD key on the panel; MIDI pitch bend and mod still work
@@ -64,7 +64,7 @@ const SPOT = '#ff2a14';   // the spot colour (the LEDs, and the OPTIONS sheet's 
 const dragAuto = () => '#' + [1, 3, 5].map((i) => { const v = parseInt(look.colour.slice(i, i + 2), 16); return Math.round(v + (255 - v) * 0.35).toString(16).padStart(2, '0'); }).join('');
 const SEQ_LANE_ROWS = [['o', 0, 3], ['on', 3, 1], ['s', 4, 1], ['a', 5, 1]];   // lane, first row, rows
 const SEQ_ROWS = [['o', 2, '2'], ['o', 1, '1'], ['o', 0, '0'], ['on', 0, 'GATE'], ['s', 0, 'SLIDE'], ['a', 0, 'ACC']];
-const TITLE = { x: M + 15 * C, y: M, w: 4 * C, h: R };
+const TITLE = { x: M + 14 * C, y: M, w: 5 * C, h: R };   // v0.57.2: 4 -> 5 columns, the freed VCO column
 
 // ---------------------------------------------------------------- the app's own setters
 const regOf = (id) => (ctlRegs[id] || []).find((r) => r.el.isConnected && r.el !== cv) || null;
@@ -604,7 +604,7 @@ logoLayer.position.copy(P(TITLE.x + TITLE.w / 2, TITLE.y + TITLE.h / 2, 10)); lo
 logoMat.shadowSide = THREE.DoubleSide; logoMat.alphaTest = 0.04; scene.add(logoLayer);   // the shadow pass copies map + alphaTest, so it casts the letters
 prints.push((x, ink) => {
   if (logo.naturalWidth) {
-    const lw = Math.min(262, TITLE.w - 16), lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 6;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
+    const lw = Math.min(300, TITLE.w - 16), lh = lw * logo.naturalHeight / logo.naturalWidth, lx = (TITLE.w - lw) / 2, ly = 0;   // v0.44.0 (Johnny: "make the word shyoy bigger"): 196 -> 262
     const lx2 = logoCv.getContext('2d'); lx2.setTransform(1, 0, 0, 1, 0, 0); lx2.globalCompositeOperation = 'source-over'; lx2.clearRect(0, 0, logoCv.width, logoCv.height);
     lx2.drawImage(logo, lx * S2, ly * S2, lw * S2, lh * S2); lx2.globalCompositeOperation = 'source-in'; lx2.fillStyle = ink; lx2.fillRect(0, 0, logoCv.width, logoCv.height);
     // worn ink (v0.31.2): where the wear map dips (scuffs, scratches, dents) the ink is rubbed thin or through to the
@@ -620,7 +620,7 @@ prints.push((x, ink) => {
     logoGeom = { lx, ly, sc: lw / logo.naturalWidth, ink }; logoFace(logoGrin);
     logoTex.needsUpdate = true; shadowDirty = true;   // v0.44.2: the logo casts a shadow
   } else { x.fillStyle = ink; text(x, 'shyoy', TITLE.x + TITLE.w / 2, TITLE.y + 50, 64, 'center', DISPLAY, 400); }
-  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 142, 9, 'right');   // v0.53.0: under the preset name
+  x.fillStyle = ink; text(x, 'v' + VER3D, TITLE.x + TITLE.w - 14, TITLE.y + 145, 9, 'right');   // v0.53.0: under the preset name
 });
 const VER3D = ((document.getElementById('ver') || {}).textContent || '').replace(/^v/, '');
 // v0.44.0 (Johnny: "clicking shyoy randomizes the sound, the word wobbles in 3 dimensions"; "command click opens options"):
@@ -660,9 +660,9 @@ const logoClick = (ev) => {
   if (ev && ev.shiftKey) { if (shyoyRand.back()) wobbleLogo(); return; }
   shyoyRand.roll(); wobbleLogo();
 };
-addCtl({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 4, TITLE.w - 20, 100], press: logoClick, sync: () => false });
+addCtl({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 4, TITLE.w - 20, 106], press: logoClick, sync: () => false });
 // v0.53.0 (Johnny): the preset's name under the word; a click opens the preset browser (the rolling name while a random sound is drawn)
-makeDisplay(TITLE.x + 14, TITLE.y + 108, TITLE.w - 28 - 60, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser(), tag: 'presetName' });
+makeDisplay(TITLE.x + 14, TITLE.y + 114, TITLE.w - 28 - 60, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser(), tag: 'presetName' });
 // v0.53.2 (Johnny: "a little save button on the RHS of the preset box that saves with the new preset name"): a floppy at the name's right
 // end; a click saves the sound and the pattern as a preset under the name shown (a tick for a moment says it's saved)
 let savedAt = 0;
@@ -671,11 +671,11 @@ const savePreset = () => { const n = ((document.querySelector('#prj-bar .pm-btn 
   savedAt = performance.now(); dirty = true; setTimeout(() => { dirty = true; }, 1300); };
 // v0.56.3 (Johnny: "have an undo button near shyoy to go back to last voice"): ↶ before the floppy steps back to the sound before (as
 // Shift-click on the word does); faint when there's nothing to go back to
-makeDisplay(TITLE.x + TITLE.w - 14 - 56, TITLE.y + 108, 26, 24, () => (shyoyRand.depth ? 'undo' : 'none'), { press: () => { if (shyoyRand.back()) wobbleLogo(); }, tag: 'presetUndo',
+makeDisplay(TITLE.x + TITLE.w - 14 - 56, TITLE.y + 114, 26, 24, () => (shyoyRand.depth ? 'undo' : 'none'), { press: () => { if (shyoyRand.back()) wobbleLogo(); }, tag: 'presetUndo',
   paint: (x, t) => { x.globalAlpha = t === 'undo' ? 1 : 0.35; x.strokeStyle = x.fillStyle = '#fff'; x.lineWidth = 1.6; x.lineCap = x.lineJoin = 'round';
     x.beginPath(); x.moveTo(8.5, 10); x.lineTo(15, 10); x.arc(15, 13.5, 3.5, -Math.PI / 2, Math.PI / 2); x.lineTo(9, 17); x.stroke();
     x.beginPath(); x.moveTo(6, 10); x.lineTo(10, 6.5); x.lineTo(10, 13.5); x.closePath(); x.fill(); x.globalAlpha = 1; } });
-makeDisplay(TITLE.x + TITLE.w - 14 - 26, TITLE.y + 108, 26, 24, () => (performance.now() - savedAt < 1200 ? 'ok' : 'save'), { press: savePreset, tag: 'presetSave',
+makeDisplay(TITLE.x + TITLE.w - 14 - 26, TITLE.y + 114, 26, 24, () => (performance.now() - savedAt < 1200 ? 'ok' : 'save'), { press: savePreset, tag: 'presetSave',
   paint: (x, t) => { x.fillStyle = '#fff'; x.strokeStyle = '#fff'; x.lineWidth = 1.4; x.lineJoin = x.lineCap = 'round'; x.beginPath();
     if (t === 'ok') { x.moveTo(7.5, 12.5); x.lineTo(11.5, 16.5); x.lineTo(18.5, 7.5); x.stroke(); return; }
     x.moveTo(7, 6); x.lineTo(17, 6); x.lineTo(19.5, 8.5); x.lineTo(19.5, 18); x.lineTo(6.5, 18); x.lineTo(6.5, 6.5); x.closePath(); x.stroke();   // a floppy disk
