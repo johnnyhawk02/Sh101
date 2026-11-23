@@ -66,7 +66,7 @@ class Engine {
 public:
     // ---- panel (mapped) targets, P in engine.js ----
     struct Panel {
-        double range = 0, tune = 0, vcoMod = 0, pw = 0.3; int pwmSrc = 1; double drift = 0.25;
+        double range = 0, tune = 0, vcoMod = 0, pw = 0.3; int pwmSrc = 1;
         double saw = 0.8, pulse = 0, sub = 0.4; int subType = 0; double noise = 0;
         double cutoff = 0.35, reso = 0.6, vcfEnv = 0.5, vcfMod = 0, kybd = 0.5;
         double att = 0.002, dec = 0.3, sus = 0, rel = 0.1; int trig = 0;
@@ -82,24 +82,42 @@ public:
         double tempC = 27, vBatt = 9, rBatt = 0.9;
     } C;
 
-    struct Seq { std::vector<SeqStep> steps; double bpm = 120; } seq;
+    // the sequencer pattern (seq.js seqMsg): lanes in the order of engine.js's laneAt { o, on, s, a }
+    enum Lane { LO = 0, LON = 1, LS = 2, LA = 3 };
+    struct Seq {
+        std::vector<SeqStep> steps; double bpm = 120;
+        int len[4] = { 0, 0, 0, 0 }, st[4] = { 0, 0, 0, 0 }; bool rt[4] = { false, false, false, false };   // len 0 = unset (all steps)
+        std::vector<int> notes; int loop = 0; bool advStep = false; int cyc = 0;
+    } seq;
+    int laneAt[4] = { 0, 0, 0, 0 }; int noteIdx = 0, cycN = 0; double shift = 0;
     bool running = false; int stepIdx = 0; double nextStepAt = 0, gateOffAt = -1; bool lastSlide = false; double root = -1;
     int64_t t = 0;
 
     // outgoing messages (the worklet's port.postMessage)
-    struct Listener { virtual ~Listener() = default; virtual void step (int i) = 0; virtual void meters (const double* node, double rail, double vIn, double env, double vc) = 0; };
+    struct Listener { virtual ~Listener() = default; virtual void step (int i, const int* lanePos, int ni) = 0; virtual void meters (const double* node, double rail, double vIn, double env, double vc) = 0; };
     Listener* listener = nullptr;
 
     explicit Engine (double sampleRate) {
-        fs = sampleRate; fso = fs * 2; dto = 1 / fso;
+        fs = sampleRate; setOS (2);
         smc = 1 - jsm::exp (-8 / (0.01 * fs));
-        dec1 = biquadLP (0.42 * fs, fso, 0.5412); dec2 = biquadLP (0.42 * fs, fso, 1.3066);
         for (int i = 0; i < 4; i++) { s[i] = 0; tl[i] = 1; g[i] = 0; }
         std::fill (std::begin (node), std::end (node), 0.0);
         std::fill (std::begin (inj), std::end (inj), 0.0);
         initSmooth();
     }
     double sampleRate() const { return fs; }
+
+    // v0.55.0: the oversampling factor of the audio path (1, 2 or 4); at 1x and 4x the per-tick constants are rescaled
+    void setOS (int n) {
+        n = n == 1 || n == 4 ? n : 2;
+        os = n; fso = fs * n; dto = 1 / fso;
+        dec1 = biquadLP (0.42 * fs, fso, 0.5412); dec2 = biquadLP (0.42 * fs, fso, 1.3066);
+        hpK = n == 2 ? 0.9997 : 1 - 0.0003 * 2 / n;
+        pinkA = n == 2 ? 0.7 : jsm::pow (0.7, 2.0 / n);
+        pinkB = n == 2 ? 0.3 : (1 - pinkA) * std::sqrt (n / 2.0) * 0.3 / (1 - 0.7);
+        wMax = std::min (fs * 0.5, fso * 0.45);
+    }
+    int oversampling() const { return os; }
 
     // ---------------- messages ----------------
     void setParam (const std::string& id, double v) {
@@ -109,7 +127,6 @@ public:
         else if (id == "vcoMod") p.vcoMod = v * v;
         else if (id == "pw") p.pw = v;
         else if (id == "pwmSrc") p.pwmSrc = toInt (v);
-        else if (id == "drift") p.drift = v;
         else if (id == "saw") p.saw = v; else if (id == "pulse") p.pulse = v; else if (id == "sub") p.sub = v;
         else if (id == "noise") p.noise = v; else if (id == "cutoff") p.cutoff = v; else if (id == "reso") p.reso = v;
         else if (id == "drive") p.drive = v; else if (id == "vcfEnv") p.vcfEnv = v; else if (id == "vcfMod") p.vcfMod = v;
@@ -152,10 +169,11 @@ public:
     void noteOn (double n, bool acc) { keyOn (n, acc); }
     void noteOff (double n) { keyOff (n); }
     void setHold (bool h) { hold = h; }
-    void setSeq (const std::vector<SeqStep>* steps, const double* bpm) { if (steps) seq.steps = *steps; if (bpm) seq.bpm = *bpm; }
+    // Object.assign (this.seq, m.seq): only what the message carries changes (see Messages.h)
+    Seq& seqForUpdate() { return seq; }
     void run (bool on) {
-        if (on && ! running) { running = true; stepIdx = 0; nextStepAt = (double) t; lastSlide = false; root = -1; }
-        else if (! on && running) { running = false; gateOff(); gateOffAt = -1; if (listener) listener->step (-1); }
+        if (on && ! running) { running = true; stepIdx = 0; nextStepAt = (double) t; lastSlide = false; root = -1; for (auto& a : laneAt) a = 0; noteIdx = 0; shift = 0; cycN = 0; }
+        else if (! on && running) { running = false; gateOff(); gateOffAt = -1; if (listener) listener->step (-1, nullptr, -1); }
     }
     void panic() { keys.clear(); gateOff(); }
     void reset() { vc = 0; for (int i = 0; i < 4; i++) { s[i] = 0; tl[i] = 1; } ve = 0; ltri = 0; }
@@ -165,6 +183,7 @@ public:
     void process (float* L, float* R, int n) {
         const double dt = 1 / fs;
         auto& p = P; auto& c = C;
+        const int osN = os;
         const double accUp = 1 - jsm::exp (-1 / (0.02 * fs)), accDn = 1 - jsm::exp (-1 / (0.15 * fs));
         const double gateC = 1 - jsm::exp (-1 / (0.0015 * fs));
         const double loadC = 1 - jsm::exp (-1 / (0.05 * fs));
@@ -232,10 +251,8 @@ public:
             pitch += (pitchT - pitch) * glideCoef;
 
             // ---- VCO control ----
-            if ((t & 255) == 0) driftT += (rand() * 0.6 - driftT) * 0.05;
-            drift += (driftT - drift) * 0.0005;
             const double lfoAmt = clampD (smVcoMod + smModPush * smLfoMod, 0, 2);
-            const double octCV = (pitch - 69) / 12 + p.range + smTune + lfo * lfoAmt * 0.5 + smLever * smBendVco + drift * p.drift * 0.0125
+            const double octCV = (pitch - 69) / 12 + p.range + smTune + lfo * lfoAmt * 0.5 + smLever * smBendVco
                 + clampD (inj[1] * 100e3, -6, 6);
             const double octEff = octCV + jsm::log2 (1 + VCO_PPM * (smTempC - 27));
             const double Ic = 442 * jsm::pow (2.0, octEff) * CT_NOM * VTH * rail;
@@ -263,7 +280,7 @@ public:
             if ((t & 1) == 0 || std::abs (fcBase - fcLast) > fcLast * 0.02) {
                 fcLast = fcBase;
                 for (int i = 0; i < 4; i++) {
-                    const double w = PI * std::min (fcBase * CF_NOM / c.cf[i], fso * 0.25) / fso;
+                    const double w = PI * std::min (fcBase * CF_NOM / c.cf[i], wMax) / fso;
                     g[i] = w < 0.3 ? w * (1 + w * w * (1.0 / 3 + w * w * 2 / 15)) : jsm::tan (w);
                 }
             }
@@ -284,7 +301,7 @@ public:
             const double vdd = 5 * rail;
 
             double y = 0;
-            for (int o = 0; o < 2; o++) {
+            for (int o = 0; o < osN; o++) {
                 double ev = -1, evH = 0, evP = 0, evS = 0;
                 const double vPrev = vc;
                 if (resetLeft > 0) {
@@ -330,11 +347,11 @@ public:
                 if (dP >= 0) { outPul += evP * dP * dP * 0.5; cPul -= evP * (1 - dP) * (1 - dP) * 0.5; }
                 oSaw = vcNow; oPul = cmpNow * V_PULSE * rail; oSub = subNow;
 
-                pink = pink * 0.7 + rand() * 0.3;
+                pink = pink * pinkA + rand() * pinkB;
 
                 double mix = (outSaw - VTH / 2) * 0.5 * lvSaw + (outPul - V_PULSE * rail * 0.5) * (5 / V_PULSE) * lvPul + (outSub - vdd * 0.5) * lvSub + pink * 3 * lvNoi;
                 mix = railV * tanhA (-mix / railV);
-                const double hp = mix - hpx + 0.9997 * hpy; hpx = mix; hpy = hp;
+                const double hp = mix - hpx + hpK * hpy; hpx = mix; hpy = hp;
 
                 const double xin = hp * att / (2 * VT0) + offN + vcfInj;
                 const double G0 = g[0] * tl[0], G1 = g[1] * tl[1], G2 = g[2] * tl[2], G3 = g[3] * tl[3];
@@ -357,7 +374,7 @@ public:
 
                 const double vcaIn = y4 * VCA_IN;
                 const double v = tanhA (vcaIn * tsc) * gain * VCA_OUT;
-                y = bq (dec2, bq (dec1, v));
+                y = osN > 1 ? bq (dec2, bq (dec1, v)) : v;
             }
             node[0] = oSaw; node[1] = oPul; node[2] = oSub; node[3] = pink;
             node[4] = ltri; node[5] = lsq * vsat; node[6] = ve;
@@ -381,7 +398,7 @@ public:
     double pitchTarget() const { return pitchT; }
 
 private:
-    double fs, fso, dto, smc;
+    double fs, fso, dto, smc; int os = 2; double hpK = 0.9997, pinkA = 0.7, pinkB = 0.3, wMax = 0;
     // smoothed panel values: the order of sm in engine.js
     static constexpr int N_SM = 21;
     double sm[N_SM];
@@ -397,7 +414,6 @@ private:
 
     double vc = 0, resetLeft = 0; int subC = 0, cmp = 0;
     double oSaw = 0, oPul = 0, oSub = 0, cSaw = 0, cPul = 0, cSub = 0;
-    double drift = 0, driftT = 0;
     uint32_t rng = 22222; double pink = 0;
     double hpx = 0, hpy = 0;
     double s[4], tl[4], g[4];
@@ -425,7 +441,13 @@ private:
     void gateOff() { if (gate) { gate = false; stage = 3; } }
     void keyOn (double n, bool acc) {
         n += P.transpose * 12;
-        if (running) { root = n - 12; return; }
+        if (running) {
+            root = n - 12;
+            if (! seq.notes.empty()) shift = n - P.transpose * 12 - seq.notes[0];
+            for (int k = 0; k < 4; k++) if (seq.rt[k]) laneAt[k] = stepIdx;
+            if (seq.rt[LON]) noteIdx = 0;
+            return;
+        }
         const bool legato = ! keys.empty() && gate;
         keys.erase (std::remove (keys.begin(), keys.end(), n), keys.end()); keys.push_back (n);
         const int gm = P.glideMode;
@@ -441,21 +463,33 @@ private:
         else if (! hold) gateOff();
     }
     void seqStep() {
-        const int len = std::max (1, (int) seq.steps.size());
-        if (stepIdx >= len) stepIdx = 0;
-        const int i = stepIdx;
-        const SeqStep st = i < (int) seq.steps.size() ? seq.steps[(size_t) i] : SeqStep();
+        const int N = stepIdx, n16 = std::max (1, (int) seq.steps.size());
+        if (seq.cyc > 0) { if (cycN >= seq.cyc) { for (auto& a : laneAt) a = N; cycN = 0; } cycN++; }
+        int pos[4];
+        for (int k = 0; k < 4; k++) {
+            const int a = std::max (0, std::min (n16 - 1, seq.st[k])), len = std::max (1, std::min (n16 - a, seq.len[k] ? seq.len[k] : n16));
+            pos[k] = a + ((N - laneAt[k]) % len + len) % len;
+        }
+        auto lane = [&] (int k) { return pos[k] < (int) seq.steps.size() ? seq.steps[(size_t) pos[k]] : SeqStep(); };
+        const SeqStep st { lane (LON).on, lane (LO).o, lane (LS).s, lane (LA).a };
+        const int i = N; int ni = -1;
         const double dur = fs * 60 / seq.bpm / 4;
         nextStepAt += dur;
+        const int NN = (int) seq.notes.size(), LP = seq.loop > 0 ? seq.loop : NN;
+        int nk = -1;
+        if (NN && (st.on || seq.advStep)) { const int c = noteIdx % LP; noteIdx = c + 1; nk = c % NN; ni = nk; }
         if (! st.on) { gateOff(); gateOffAt = -1; lastSlide = false; }
         else {
-            const double n = (root >= 0 ? root : 36 + 12 * P.transpose) + 12 * std::max (0, std::min (2, st.o));
-            if (lastSlide && gate) { setPitch (n, 0.06); accOn = st.a ? 1 : 0; }
+            double base;
+            if (nk >= 0) base = seq.notes[(size_t) nk] + shift + 12 * P.transpose - 12;
+            else base = root >= 0 ? root : 36 + 12 * P.transpose;
+            const double n = base + 12 * std::max (0, std::min (2, st.o));
+            if (lastSlide && gate) { setPitch (n, std::max (P.glide, 0.015)); accOn = st.a ? 1 : 0; }
             else { setPitch (n, P.glideMode == 2 ? P.glide : 0); trigger (st.a); }
             gateOffAt = st.s ? -1 : (double) t + dur * 0.5; lastSlide = st.s;
         }
-        if (listener) listener->step (i);
-        stepIdx = (i + 1) % len;
+        if (listener) listener->step (i, pos, ni);
+        stepIdx = (N + 1) % 720720;
     }
 };
 

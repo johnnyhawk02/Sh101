@@ -50,12 +50,14 @@ void ShyoyEditor::makeBrowser() {
                 if (juce::SystemStats::getEnvironmentVariable ("SHYOY_LOG", {}).isNotEmpty()) std::fprintf (stderr, "[shyoy msg] %s\n", m["type"].toString().toRawUTF8());
                 proc.postFromUi (m);
             }
+            else if (kind == "rec") proc.setRecording ((bool) v["on"]);
             else if (kind == "store") {
                 const auto key = v["k"].toString();
                 if (v.hasProperty ("v")) { const auto val = v["v"].toString(); proc.storeFromUi (key, &val); }
                 else proc.storeFromUi (key, nullptr);
             }
         });
+    proc.setRecording (false);   // a new page starts with RECORD off
     web = std::make_unique<WBC> (opts);
     addAndMakeVisible (*web);
     web->goToURL (WBC::getResourceProviderRoot());
@@ -74,11 +76,12 @@ void ShyoyEditor::pump() {
     if (! web) return;
     evs.clear();
     proc.drainUiEvents (evs);
-    int lastStep = -2;
+    int lastStep = -2, lastNi = -1; const ShyoyProcessor::UiEvent* lastStepEv = nullptr;
     for (auto& e : evs) {
         auto* o = new juce::DynamicObject();
         switch (e.kind) {
-            case ShyoyProcessor::UiEvent::Step: lastStep = e.i; delete o; continue;
+            case ShyoyProcessor::UiEvent::Step: lastStep = e.i; lastStepEv = &e; if (e.ni >= 0) lastNi = e.ni; if (e.i < 0) lastNi = -1; delete o; continue;
+            case ShyoyProcessor::UiEvent::RecNote: o->setProperty ("type", "recnote"); o->setProperty ("n", e.i); break;
             case ShyoyProcessor::UiEvent::CC: o->setProperty ("type", "cc"); o->setProperty ("i", e.i); o->setProperty ("v", e.v); break;
             case ShyoyProcessor::UiEvent::Bend: o->setProperty ("type", "bend"); o->setProperty ("v", e.v); break;
             case ShyoyProcessor::UiEvent::Press: o->setProperty ("type", "press"); o->setProperty ("v", e.v); break;
@@ -88,6 +91,11 @@ void ShyoyEditor::pump() {
     }
     if (lastStep != -2) {   // only the newest step matters to the page
         auto* o = new juce::DynamicObject(); o->setProperty ("type", "step"); o->setProperty ("i", lastStep);
+        if (lastStepEv && lastStepEv->hasP) {   // where each lane is, and the note list's newest note (keyboard.js onEngineMsg)
+            auto* p = new juce::DynamicObject(); static const char* lanes[4] = { "o", "on", "s", "a" };
+            for (int k = 0; k < 4; k++) p->setProperty (lanes[k], lastStepEv->p[k]);
+            o->setProperty ("p", juce::var (p)); o->setProperty ("ni", lastNi);
+        }
         web->emitEventIfBrowserIsVisible ("engine", juce::var (o));
     }
     juce::var m;

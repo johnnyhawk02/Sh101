@@ -35,7 +35,8 @@ void ShyoyProcessor::replaySnapshot (shyoy::Engine& e) {
     if (sHasCf) e.setBendCf (sCf);
     e.clearBridges();
     for (auto& [k, v] : sBridges) e.addBridge (k, v);
-    e.setSeq (&sSteps, &sBpm);
+    { std::vector<Cmd> c; shyoy::parse (seqMessage(), c); for (auto& x : c) shyoy::apply (e, x, false); }
+    e.setOS (sOs);
     e.setHold (sHold);
 }
 
@@ -78,16 +79,15 @@ void ShyoyProcessor::snapshot (const juce::var& m) {
     }
     else if (type == "bridges") { sBridges.clear(); if (auto* o = m["br"].getDynamicObject()) for (auto& nv : o->getProperties()) sBridges[nv.name.toString().toStdString()] = shyoy::num (nv.value); }
     else if (type == "seq") {
-        const auto s = m["seq"];
-        if (auto* a = s["steps"].getArray()) { sSteps.clear(); for (auto& st : *a) sSteps.push_back ({ shyoy::truthy (st["on"]), shyoy::intOf (st["o"]), shyoy::truthy (st["s"]), shyoy::truthy (st["a"]) }); }
-        if (s.hasProperty ("bpm")) sBpm = shyoy::num (s["bpm"]);
+        seqMerge (m["seq"]);
     }
+    else if (type == "os") { const int n = shyoy::intOf (m["n"]); sOs = n == 1 || n == 4 ? n : 2; }
     else if (type == "mode") { if (m.hasProperty ("hold")) sHold = shyoy::truthy (m["hold"]); }
     else if (type == "run") uiRunning = shyoy::truthy (m["on"]);
 }
 
 void ShyoyProcessor::loadDefaultSnapshot() {
-    sParams.clear(); sBend.clear(); sBridges.clear(); sHasCf = false; sSteps.clear(); sBpm = 120; sHold = false;
+    sParams.clear(); sBend.clear(); sBridges.clear(); sHasCf = false; sSeq = juce::var(); sOs = 2; sHold = false;
     const auto d = shyoy::json::parse (shyoy::DEFAULT_PATCH_JSON);
     if (auto* a = d["boot"].getArray()) for (auto& m : *a) snapshot (m);
     ccMap.clear();
@@ -101,10 +101,8 @@ juce::var ShyoyProcessor::snapshotVar() const {
     o->setProperty ("bend", map (sBend));
     o->setProperty ("bridges", map (sBridges));
     if (sHasCf) { juce::Array<juce::var> cf; for (double c : sCf) cf.add (c); o->setProperty ("cf", cf); }
-    juce::Array<juce::var> steps;
-    for (auto& s : sSteps) { auto* st = new juce::DynamicObject(); st->setProperty ("on", s.on); st->setProperty ("o", s.o); st->setProperty ("s", s.s); st->setProperty ("a", s.a); steps.add (juce::var (st)); }
-    o->setProperty ("steps", steps);
-    o->setProperty ("bpm", sBpm);
+    o->setProperty ("seq", sSeq.getDynamicObject() ? sSeq : juce::var (new juce::DynamicObject()));
+    o->setProperty ("os", sOs);
     o->setProperty ("hold", sHold);
     juce::Array<juce::var> cc; for (auto& c : ccMap) cc.add (juce::String (c));
     o->setProperty ("ccmap", cc);
@@ -115,8 +113,8 @@ void ShyoyProcessor::snapshotFromVar (const juce::var& v) {
     auto rd = [] (const juce::var& x, std::map<std::string, double>& m) { m.clear(); if (auto* o = x.getDynamicObject()) for (auto& nv : o->getProperties()) m[nv.name.toString().toStdString()] = shyoy::num (nv.value); };
     rd (v["params"], sParams); rd (v["bend"], sBend); rd (v["bridges"], sBridges);
     sHasCf = false; if (auto* a = v["cf"].getArray()) { sHasCf = true; for (int i = 0; i < 4; i++) sCf[i] = i < a->size() ? shyoy::num ((*a)[i]) : 0; }
-    sSteps.clear(); if (auto* a = v["steps"].getArray()) for (auto& st : *a) sSteps.push_back ({ shyoy::truthy (st["on"]), shyoy::intOf (st["o"]), shyoy::truthy (st["s"]), shyoy::truthy (st["a"]) });
-    sBpm = v.hasProperty ("bpm") ? shyoy::num (v["bpm"]) : 120.0;
+    sSeq = juce::var(); seqMerge (v["seq"]);
+    { const int n = shyoy::intOf (v["os"]); sOs = n == 1 || n == 4 ? n : 2; }
     sHold = shyoy::truthy (v["hold"]);
     if (auto* a = v["ccmap"].getArray()) { ccMap.clear(); for (auto& x : *a) ccMap.push_back (x.toString().toStdString()); }
 }
@@ -149,8 +147,8 @@ void ShyoyProcessor::setStateInformation (const void* data, int size) {
     shyoy::parse (msg ("params", "p", params), cmds);
     shyoy::parse (msg ("bend", "b", bend), cmds);
     shyoy::parse (msg ("bridges", "br", br), cmds);
-    auto* sq = new juce::DynamicObject(); sq->setProperty ("steps", snap["steps"]); sq->setProperty ("bpm", sBpm);
-    shyoy::parse (msg ("seq", "seq", juce::var (sq)), cmds);
+    shyoy::parse (seqMessage(), cmds);
+    { auto* om = new juce::DynamicObject(); om->setProperty ("type", "os"); om->setProperty ("n", sOs); shyoy::parse (juce::var (om), cmds); }
     auto* md = new juce::DynamicObject(); md->setProperty ("type", "mode"); md->setProperty ("hold", sHold);
     shyoy::parse (juce::var (md), cmds);
     queue (std::move (cmds));
@@ -197,7 +195,26 @@ void ShyoyProcessor::drainUiEvents (std::vector<UiEvent>& out) {
     for (int i = 0; i < r.blockSize1; i++) out.push_back (uiBuf[(size_t) (r.startIndex1 + i)]);
     for (int i = 0; i < r.blockSize2; i++) out.push_back (uiBuf[(size_t) (r.startIndex2 + i)]);
 }
-void ShyoyProcessor::step (int i) { pushUi ({ UiEvent::Step, i, 0 }); }
+void ShyoyProcessor::step (int i, const int* lanePos, int ni) {
+    UiEvent e { UiEvent::Step, i, 0 }; e.ni = ni;
+    if (lanePos) { e.hasP = true; for (int k = 0; k < 4; k++) e.p[k] = lanePos[k]; }
+    pushUi (e);
+}
+
+// the engine's seq is Object.assign (seq, m.seq) of every seq message; keep the same merge (a copy, as the page's
+// message objects are its own)
+void ShyoyProcessor::seqMerge (const juce::var& s) {
+    auto* in = s.getDynamicObject(); if (! in) return;
+    auto* o = new juce::DynamicObject();
+    if (auto* old = sSeq.getDynamicObject()) for (auto& nv : old->getProperties()) o->setProperty (nv.name, nv.value);
+    for (auto& nv : in->getProperties()) o->setProperty (nv.name, nv.value);
+    sSeq = juce::var (o);
+}
+juce::var ShyoyProcessor::seqMessage() const {
+    auto* m = new juce::DynamicObject(); m->setProperty ("type", "seq");
+    m->setProperty ("seq", sSeq.getDynamicObject() ? sSeq : juce::var (new juce::DynamicObject()));
+    return juce::var (m);
+}
 void ShyoyProcessor::meters (const double* node, double rail, double vIn, double env, double vc) {
     const juce::SpinLock::ScopedTryLockType tl (meterLock);
     if (! tl.isLocked()) return;
@@ -221,6 +238,10 @@ bool ShyoyProcessor::takeMeters (juce::var& out) {
 // ---------------- MIDI (site/js/app/midi.js, the path for any input) ----------------
 void ShyoyProcessor::handleMidi (const juce::MidiMessage& m) {
     auto& e = *engine;
+    if (m.isNoteOn() && uiRecording) {   // RECORD: the note goes to the page's list; while the sequencer runs it isn't played
+        UiEvent r { UiEvent::RecNote, m.getNoteNumber(), 0 }; pushUi (r);
+        if (e.running) return;
+    }
     if (m.isNoteOn()) { const int n = m.getNoteNumber(); midiDown.insert (n); midiHeld.insert (n); e.noteOn (n, false); return; }
     if (m.isNoteOff()) { const int n = m.getNoteNumber(); midiDown.erase (n); if (midiSus) return; if (midiHeld.erase (n)) e.noteOff (n); return; }
     if (m.isPitchWheel()) {
@@ -280,8 +301,7 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     hostWasPlaying = playing;
     if (playing && havePpq && e.running) {
         const double spStep = fs * 60 / e.seq.bpm / 4, q = ppq * 4, nextQ = std::ceil (q - 1e-7);
-        const int len = std::max (1, (int) e.seq.steps.size());
-        const int idx = (int) (((int64_t) nextQ % len + len) % len);
+        const int idx = (int) (((int64_t) nextQ % 720720 + 720720) % 720720);   // the engine's step count (every lane length divides it)
         const double at = (double) e.t + (nextQ - q) * spStep;
         if (std::abs (e.nextStepAt - at) > 1.0 || e.stepIdx != idx) { e.nextStepAt = at; e.stepIdx = idx; }
     }

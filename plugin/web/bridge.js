@@ -67,7 +67,8 @@
   const onPlugin = (m) => {
     try {
       if (m.type === 'step' || m.type === 'meters') { fromEngine(m); return; }
-      if (m.type === 'running') { seqOn = !!m.on; if (!seqOn) seqPos = -1; return; }
+      if (m.type === 'running') { seqOn = !!m.on; if (!seqOn) { seqPos = -1; seqLanePos = null; seqNoteAt = -1; } return; }
+      if (m.type === 'recnote') { seqRecNote(m.n); return; }   // a host note while RECORD is on (the plugin played it only if the sequencer is stopped)
       if (m.type === 'cc') {
         const id = MIDI_MAP[m.i] && MIDI_MAP[m.i].id; if (!id) return;
         if (ui[id]) ui[id](m.v); state.params[id] = m.v; save(); return;
@@ -87,6 +88,8 @@
       log(`page booted, localStorage ${shimmed ? 'replaced' : 'mirrored'}`);
       send({ kind: 'msg', json: JSON.stringify({ type: 'ccmap', ids: MIDI_MAP.map((x) => x.id) }) });
       const st = document.getElementById('midi-status'); if (st) st.textContent = 'MIDI comes from the host.';
+      // RECORD: the plugin sends host notes here instead of playing them while the sequencer runs, as midi.js does
+      let rec = false; setInterval(() => { if (seqRec !== rec) { rec = seqRec; send({ kind: 'rec', on: rec }); } }, 50);
       for (const id of ['mInstall', 'mUpdate', 'mInstallHow']) { const el = document.getElementById(id); if (el) el.hidden = true; }
     } catch (e) { console.warn('shyoy plugin', e); }
   });

@@ -44,10 +44,11 @@ public:
     void storeFromUi (const juce::String& key, const juce::String* value);   // a localStorage write (nullptr = remove)
     juce::var storeForUi() const;                                // what the page's localStorage starts with
     bool isSequencerRunning() const { return uiRunning; }
+    void setRecording (bool on) { uiRecording = on; }   // the page's RECORD key: host notes go to its note list (seq.js seqRecNote)
     static const char* patchKey() { return "kestrel-ms1-v2"; }
 
     // ---- to the web view: what the engine said, and MIDI that moved a control (polled by the editor) ----
-    struct UiEvent { enum Kind { Step, CC, Bend, Press, Running } kind; int i; float v; };
+    struct UiEvent { enum Kind { Step, CC, Bend, Press, Running, RecNote } kind; int i; float v; int p[4] = { 0, 0, 0, 0 }; int ni = -1; bool hasP = false; };
     void drainUiEvents (std::vector<UiEvent>& out);
     bool takeMeters (juce::var& out);
     std::function<void()> uiWake;
@@ -56,7 +57,7 @@ private:
     // engine (audio thread)
     std::unique_ptr<shyoy::Engine> engine;
     double fs = 0;
-    void step (int i) override;
+    void step (int i, const int* lanePos, int ni) override;
     void meters (const double* node, double rail, double vIn, double env, double vc) override;
 
     // messages from the message thread to the audio thread: pending -> inbox; the inbox is emptied (freed) back on the
@@ -71,12 +72,14 @@ private:
     // the sound as the engine last heard it, so a project reloads (and the engine restarts) without the editor
     std::map<std::string, double> sParams, sBend, sBridges;
     double sCf[4] {}; bool sHasCf = false, sHold = false;
-    std::vector<shyoy::SeqStep> sSteps; double sBpm = 120;
+    juce::var sSeq; int sOs = 2;   // the seq object as Object.assign builds it in the engine, and the oversampling
     void snapshot (const juce::var& m);
     void loadDefaultSnapshot();
     juce::var snapshotVar() const;
     void snapshotFromVar (const juce::var& v);
-    std::atomic<bool> uiRunning { false };
+    std::atomic<bool> uiRunning { false }, uiRecording { false };
+    void seqMerge (const juce::var& s);
+    juce::var seqMessage() const;
 
     // the page's localStorage: the sound (patchKey) belongs to this instance; looks, presets and options are shared by
     // every instance and kept in a file, as the web app keeps them in one browser

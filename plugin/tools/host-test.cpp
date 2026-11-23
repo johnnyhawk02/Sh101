@@ -73,13 +73,13 @@ struct Test : juce::Timer {
             if (juce::File ("/usr/bin/xdotool").existsAsFile()) {
                 auto* ed = plugin->getActiveEditor();
                 const auto r = ed->getScreenBounds();
-                const int x = r.getX() + juce::roundToInt (r.getWidth() * 0.109), y = r.getY() + juce::roundToInt (r.getHeight() * 0.794);
+                const int x = r.getX() + juce::roundToInt (r.getWidth() * 0.0695), y = r.getY() + juce::roundToInt (r.getHeight() * 0.925);
                 // run in the background: the message loop has to keep turning while the click is delivered
                 auto click = [] (int cx, int cy) { std::system (("(sleep 0.5; xdotool mousemove " + juce::String (cx) + " " + juce::String (cy) + "; sleep 0.5; xdotool click 1) &").toRawUTF8()); };
                 std::printf ("     editor at %s, clicking PLAY at %d,%d\n", r.toString().toRawUTF8(), x, y);
                 click (x, y);
                 // and step 3's accent cell (27.9% across, 85.6% down), so the page has a change to save
-                juce::Timer::callAfterDelay (2000, [r, click] { click (r.getX() + juce::roundToInt (r.getWidth() * 0.279), r.getY() + juce::roundToInt (r.getHeight() * 0.856)); });
+                juce::Timer::callAfterDelay (2000, [r, click] { click (r.getX() + juce::roundToInt (r.getWidth() * 0.246), r.getY() + juce::roundToInt (r.getHeight() * 0.822)); });
             }
         }
         if (tick == 40) {
