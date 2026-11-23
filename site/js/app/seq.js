@@ -57,6 +57,7 @@ function seqNudge(d) {
     if (d < 0) v.push(v.shift()); else v.unshift(v.pop()); v.forEach((x, i) => { S[a + i][k] = x; }); }
   seqSend();
 }
+function seqNoteNudge(d) { const v = state.seq.notes; if (v.length < 2) return; if (d < 0) v.push(v.shift()); else v.unshift(v.pop()); seqSend(); }   // v0.57.7
 function seqLen(k, n) { n = Math.max(1, Math.min(SEQ_N - state.seq.st[k], n | 0)); if (state.seq.len[k] === n) return; state.seq.len[k] = n; seqSend(); }
 // move a lane's start, keeping its end where it is
 function seqStart(k, a) { const e = state.seq.st[k] + state.seq.len[k]; a = Math.max(0, Math.min(e - 1, a | 0)); if (a === state.seq.st[k]) return; state.seq.st[k] = a; state.seq.len[k] = e - a; seqSend(); }

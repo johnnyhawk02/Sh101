@@ -495,12 +495,14 @@ for (const b of BOXES) {
       let x0 = L0; frame(x0, x0 + 124, 'PLAY');
       key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
       // notes
-      x0 += 124 + GAP; frame(x0, x0 + 336, 'NOTES');   // v0.56.4 (Johnny: "give the note seq more space"): 296 -> 336
+      x0 += 124 + GAP; frame(x0, x0 + 448, 'NOTES');   // v0.56.4 (Johnny: "give the note seq more space"): 296 -> 336
       at(x0 + 17, note); makeDisplay(x0 + 32, ty - 12, NW, 24, () => String(state.seq.notes.length));
       at(x0 + 102, cyc); numBox(x0 + 117, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop');
       for (const [a, k, draw] of [['gate', 204, pulse], ['step', 276, ticks]]) key(x0 + k, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), tag: 'adv:' + a }, draw);
+      // v0.57.7 (Johnny: "add nudge left/right in the note seq island"): turn the note list one place left or right
+      for (const [d, tag, k] of [[-1, 'nnudgeL', 348], [1, 'nnudgeR', 404]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNoteNudge(d); }, tag }, arrow(d));
       // steps
-      x0 += 336 + GAP; frame(x0, x0 + 196, 'STEPS');
+      x0 += 448 + GAP; frame(x0, x0 + 196, 'STEPS');
       at(x0 + 15, cyc); numBox(x0 + 28, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc');
       for (const [d, tag, k] of [[-1, 'nudgeL', 102], [1, 'nudgeR', 158]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNudge(d); }, tag }, arrow(d));
       // random
