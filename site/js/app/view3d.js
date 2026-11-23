@@ -13,7 +13,7 @@ import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 const C = 66, R = 150, M = 8, COLS = 19, ROWS = 3;   // v0.54.0 (Johnny: "try to get all the synth sliders on two lines"): 19 columns of 66 (was 18 of 70), two rows of sliders and the sequencer
 // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
 const SEQ_GH = 240;   // v0.43.10: the sequencer grid's height
-const SEQ_TOOLS = 96 + SEQ_GH - 154;   // v0.42.4: the strip of keys under the sequencer's grid
+const SEQ_TOOLS = 96 + SEQ_GH - 154 + 26;   // v0.56.7 (Johnny: "give everything breathing space"): +26   // v0.42.4: the strip of keys under the sequencer's grid
 const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
@@ -454,7 +454,7 @@ for (const b of BOXES) {
       // v0.48.0 (Johnny: "make all the seq randomiser into a menu - have shortkeys for them"; "the new note seq can go on the LHS under
       // the gate seq"); v0.49.0 (Johnny: "bring play down into the bottom section - also use icons"): under the grid, left to right:
       // PLAY ▶ and RECORD ●, the NOTES window, nudge ← →, and the dice key that opens the RANDOM menu (seqMenu; shortcuts in seq.js SEQ_RND)
-      const ty = y0 + 28 + SEQ_GH + 34;
+      const ty = y0 + 28 + SEQ_GH + 52;   // v0.56.7: +34 -> +52, clear of the step numbers
       const play = (x, ix, iy) => { x.moveTo(ix - 4, iy - 6.5); x.lineTo(ix + 6.5, iy); x.lineTo(ix - 4, iy + 6.5); x.closePath(); x.fill(); };
       const rec = (x, ix, iy) => { x.arc(ix + 1, iy, 5.5, 0, 7); x.fill(); };
       const arrow = (d) => (x, ix, iy) => { x.moveTo(ix - 6 * d, iy); x.lineTo(ix + 6 * d, iy); x.moveTo(ix + 1.5 * d, iy - 4.5); x.lineTo(ix + 6 * d, iy); x.lineTo(ix + 1.5 * d, iy + 4.5); x.stroke(); };
@@ -473,7 +473,7 @@ for (const b of BOXES) {
       const ticks = (x, ix, iy) => { x.lineWidth = 1.4; for (let k = 0; k < 4; k++) { x.moveTo(ix - 7.5 + k * 5, iy - 4.5); x.lineTo(ix - 7.5 + k * 5, iy + 4.5); } x.stroke(); };
       // v0.56.1 (Johnny: "label the little islands logically"): each frame's name sits in a gap in its top edge
       const frame = (x0, x1, name) => prints.push((x, ink) => { x.save(); x.font = `700 8.5px ${MONO}`; if ('letterSpacing' in x) x.letterSpacing = '.8px';
-        const tw = x.measureText(name).width, y0 = ty - 16, y1 = ty + 16, r = 5, g0 = x0 + 8, g1 = g0 + tw + 8;
+        const tw = x.measureText(name).width, y0 = ty - 20, y1 = ty + 20, r = 6, g0 = x0 + 8, g1 = g0 + tw + 8;
         x.globalAlpha = 0.45; x.strokeStyle = ink; x.lineWidth = 1; x.beginPath();
         x.moveTo(g0, y0); x.lineTo(x0 + r, y0); x.arcTo(x0, y0, x0, y0 + r, r); x.lineTo(x0, y1 - r); x.arcTo(x0, y1, x0 + r, y1, r); x.lineTo(x1 - r, y1);
         x.arcTo(x1, y1, x1, y1 - r, r); x.lineTo(x1, y0 + r); x.arcTo(x1, y0, x1 - r, y0, r); x.lineTo(g1, y0); x.stroke();
@@ -486,7 +486,7 @@ for (const b of BOXES) {
         d.up = () => { if (g0 && !g0.moved) set(get() + (g0.top ? 1 : -1)); g0 = null; }; };
       const key = (kx, o, draw) => { makeKey(kx, ty, 24, 14, { pad: 6, ...o }); at(kx + 27, draw); };
       // v0.56.1 (Johnny: "have them left aligned rather than spread out"): packed from the left with a small gap
-      const L0 = gx0 - 58, GAP = 14;   // v0.56.5 (Johnny: "add a space before play rec island"): -72 -> -58
+      const L0 = gx0 - 58, GAP = 22;   // v0.56.7: GAP 14 -> 22   // v0.56.5 (Johnny: "add a space before play rec island"): -72 -> -58
       // transport
       let x0 = L0; frame(x0, x0 + 124, 'PLAY');
       key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
