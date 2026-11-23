@@ -662,13 +662,19 @@ const logoClick = (ev) => {
 };
 addCtl({ kind: 'title', rect: [TITLE.x + 10, TITLE.y + 4, TITLE.w - 20, 100], press: logoClick, sync: () => false });
 // v0.53.0 (Johnny): the preset's name under the word; a click opens the preset browser (the rolling name while a random sound is drawn)
-makeDisplay(TITLE.x + 14, TITLE.y + 108, TITLE.w - 28 - 30, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser(), tag: 'presetName' });
+makeDisplay(TITLE.x + 14, TITLE.y + 108, TITLE.w - 28 - 60, 24, () => shyoyRand.reel || (document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '', { press: () => openBrowser(), tag: 'presetName' });
 // v0.53.2 (Johnny: "a little save button on the RHS of the preset box that saves with the new preset name"): a floppy at the name's right
 // end; a click saves the sound and the pattern as a preset under the name shown (a tick for a moment says it's saved)
 let savedAt = 0;
 const savePreset = () => { const n = ((document.querySelector('#prj-bar .pm-btn .cur') || {}).textContent || '').replace(/\s*\*$/, '').trim();
   if (!n || n === 'Choose…') return openBrowser(); const ne = document.getElementById('prj-name'); ne.value = n; document.getElementById('prj-save').click();
   savedAt = performance.now(); dirty = true; setTimeout(() => { dirty = true; }, 1300); };
+// v0.56.3 (Johnny: "have an undo button near shyoy to go back to last voice"): ↶ before the floppy steps back to the sound before (as
+// Shift-click on the word does); faint when there's nothing to go back to
+makeDisplay(TITLE.x + TITLE.w - 14 - 56, TITLE.y + 108, 26, 24, () => (shyoyRand.depth ? 'undo' : 'none'), { press: () => { if (shyoyRand.back()) wobbleLogo(); }, tag: 'presetUndo',
+  paint: (x, t) => { x.globalAlpha = t === 'undo' ? 1 : 0.35; x.strokeStyle = x.fillStyle = '#fff'; x.lineWidth = 1.6; x.lineCap = x.lineJoin = 'round';
+    x.beginPath(); x.moveTo(8.5, 10); x.lineTo(15, 10); x.arc(15, 13.5, 3.5, -Math.PI / 2, Math.PI / 2); x.lineTo(9, 17); x.stroke();
+    x.beginPath(); x.moveTo(6, 10); x.lineTo(10, 6.5); x.lineTo(10, 13.5); x.closePath(); x.fill(); x.globalAlpha = 1; } });
 makeDisplay(TITLE.x + TITLE.w - 14 - 26, TITLE.y + 108, 26, 24, () => (performance.now() - savedAt < 1200 ? 'ok' : 'save'), { press: savePreset, tag: 'presetSave',
   paint: (x, t) => { x.fillStyle = '#fff'; x.strokeStyle = '#fff'; x.lineWidth = 1.4; x.lineJoin = x.lineCap = 'round'; x.beginPath();
     if (t === 'ok') { x.moveTo(7.5, 12.5); x.lineTo(11.5, 16.5); x.lineTo(18.5, 7.5); x.stroke(); return; }
