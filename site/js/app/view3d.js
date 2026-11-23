@@ -861,9 +861,9 @@ html[data-view="3d"] dialog#options {
   --shadow: none; --acc: #ff2a14; --f-lcd: ${MONO}; --fs-xs: 12px; --fs-s: 13px; --fs: 14px; --fs-l: 16px; --fs-xl: 26px; --bezel: rgb(var(--ink-rgb));
   font-family: ${MONO}; letter-spacing: .03em; background-image: none; border: 0; border-radius: 0;
   box-shadow: inset 0 0 0 2px var(--ink), 0 20px 60px rgba(0,0,0,.55); }
-html[data-view="3d"] dialog#options, html.fit[data-view="3d"] dialog#options { width: min(720px, calc(100vw - 24px)); height: auto; max-height: min(560px, calc(100dvh - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
+html[data-view="3d"] dialog#options, html.fit[data-view="3d"] dialog#options { width: min(720px, calc(100vw - 24px)); height: min(560px, calc(100dvh - 24px)); max-height: none; inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
 html[data-view="3d"] dialog#options::backdrop { background: rgb(0 0 0 / .55); }
-html[data-view="3d"] #otabs :is([data-sec=colours], [data-sec=about]) { display: none; }   /* v0.56.8 (Johnny: "remove about page from options make window smaller"): no ABOUT, 720 wide (was the full 1344 x 842 fit size) */
+html[data-view="3d"] #otabs :is([data-sec=colours], [data-sec=about]) { display: none; }   /* v0.56.8 (Johnny: "remove about page from options make window smaller"): no ABOUT, 720 wide (was the full 1344 x 842 fit size); v0.57.1 (Johnny: "options window is a fixed size please"): always 720 x 560, tabs scroll inside */
 html[data-view="3d"] dialog#options :is(h2, h3, .otabs button) { text-transform: uppercase; }
 html[data-view="3d"] dialog#options .btn { font-family: ${MONO}; text-transform: uppercase; }
 #v3d-splash { position: fixed; inset: 0; z-index: 100; background: #0b0b0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity .35s; }
@@ -961,7 +961,7 @@ sm.body.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'
 const seqMenu = { isOpen: () => sm.el.classList.contains('open'), toggle() { if (this.isOpen()) sm.close(); else sm.open(); dirty = true; } };
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
-const pb = sheet('PRESETS');
+const pb = sheet('PRESETS'); pb.el.querySelector('.win').style.height = 'min(560px, 88dvh)';   // v0.57.1 (Johnny: "i hate windows that change size"): one fixed size, the list scrolls
 pb.body.innerHTML = `<div class="f"><div class="row"><input type="text" id="pb-name" maxlength="40" placeholder="SAVE AS…" aria-label="Preset name"><button id="pb-roll" aria-label="Suggest another name">🎲</button><button id="pb-save">SAVE</button></div>
   <div class="row pb-mg"><button id="pb-ren">RENAME</button><button id="pb-dup">DUPLICATE</button><button id="pb-del">DELETE</button><button id="pb-res">RESTORE</button></div>
   <div class="row pb-mg"><button id="pb-exp">EXPORT</button><button id="pb-expall">EXPORT ALL</button><button id="pb-imp">IMPORT</button></div></div><div class="list" id="pb-list"></div>`;
