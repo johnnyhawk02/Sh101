@@ -471,8 +471,13 @@ for (const b of BOXES) {
         x.beginPath(); x.moveTo(ex + tx * 4.5, ey + tyy * 4.5); x.lineTo(ex - nx * 3.2, ey - ny * 3.2); x.lineTo(ex + nx * 3.2, ey + ny * 3.2); x.closePath(); x.fill(); };
       const pulse = (x, ix, iy) => { x.moveTo(ix - 8, iy + 4.5); x.lineTo(ix - 3.5, iy + 4.5); x.lineTo(ix - 3.5, iy - 4.5); x.lineTo(ix + 3.5, iy - 4.5); x.lineTo(ix + 3.5, iy + 4.5); x.lineTo(ix + 8, iy + 4.5); x.stroke(); };
       const ticks = (x, ix, iy) => { x.lineWidth = 1.4; for (let k = 0; k < 4; k++) { x.moveTo(ix - 7.5 + k * 5, iy - 4.5); x.lineTo(ix - 7.5 + k * 5, iy + 4.5); } x.stroke(); };
-      const frame = (x0, x1) => prints.push((x, ink) => { x.save(); x.globalAlpha = 0.45; x.strokeStyle = ink; x.lineWidth = 1; x.beginPath();
-        x.roundRect ? x.roundRect(x0, ty - 16, x1 - x0, 32, 5) : x.rect(x0, ty - 16, x1 - x0, 32); x.stroke(); x.restore(); });
+      // v0.56.1 (Johnny: "label the little islands logically"): each frame's name sits in a gap in its top edge
+      const frame = (x0, x1, name) => prints.push((x, ink) => { x.save(); x.font = `700 8.5px ${MONO}`; if ('letterSpacing' in x) x.letterSpacing = '.8px';
+        const tw = x.measureText(name).width, y0 = ty - 16, y1 = ty + 16, r = 5, g0 = x0 + 8, g1 = g0 + tw + 8;
+        x.globalAlpha = 0.45; x.strokeStyle = ink; x.lineWidth = 1; x.beginPath();
+        x.moveTo(g0, y0); x.lineTo(x0 + r, y0); x.arcTo(x0, y0, x0, y0 + r, r); x.lineTo(x0, y1 - r); x.arcTo(x0, y1, x0 + r, y1, r); x.lineTo(x1 - r, y1);
+        x.arcTo(x1, y1, x1, y1 - r, r); x.lineTo(x1, y0 + r); x.arcTo(x1, y0, x1 - r, y0, r); x.lineTo(g1, y0); x.stroke();
+        x.globalAlpha = 1; x.fillStyle = ink; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText(name, g0 + 4, y0 + 0.5); x.restore(); });
       const NW = 40;
       // a number box: drag up/down, or click its top half for one more and its bottom half for one fewer
       const numBox = (bx, show, get, set, tag) => { const d = makeDisplay(bx, ty - 12, NW, 24, show, { tag }); let g0 = null; d.kind = 'roll';
@@ -480,22 +485,22 @@ for (const b of BOXES) {
         d.move = (p) => { if (!g0 || !p) return; const dv = Math.round((g0.y - p[1]) / 8); if (dv) g0.moved = true; set(g0.v + dv); };
         d.up = () => { if (g0 && !g0.moved) set(get() + (g0.top ? 1 : -1)); g0 = null; }; };
       const key = (kx, o, draw) => { makeKey(kx, ty, 24, 14, { pad: 6, ...o }); at(kx + 27, draw); };
-      // the groups spread evenly from the left edge to the die at the right
-      const L0 = gx0 - 72, rx = gx + gw - 30, GAP = (rx - 22 - L0 - (124 + 296 + 196)) / 3;
+      // v0.56.1 (Johnny: "have them left aligned rather than spread out"): packed from the left with a small gap
+      const L0 = gx0 - 72, GAP = 14;
       // transport
-      let x0 = L0; frame(x0, x0 + 124);
+      let x0 = L0; frame(x0, x0 + 124, 'PLAY');
       key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
       // notes
-      x0 += 124 + GAP; frame(x0, x0 + 296);
+      x0 += 124 + GAP; frame(x0, x0 + 296, 'NOTES');
       at(x0 + 15, note); makeDisplay(x0 + 28, ty - 12, NW, 24, () => String(state.seq.notes.length));
       at(x0 + 90, cyc); numBox(x0 + 103, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop');
       for (const [a, k, draw] of [['gate', 178, pulse], ['step', 238, ticks]]) key(x0 + k, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), tag: 'adv:' + a }, draw);
       // steps
-      x0 += 296 + GAP; frame(x0, x0 + 196);
+      x0 += 296 + GAP; frame(x0, x0 + 196, 'STEPS');
       at(x0 + 15, cyc); numBox(x0 + 28, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc');
       for (const [d, tag, k] of [[-1, 'nudgeL', 102], [1, 'nudgeR', 158]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNudge(d); }, tag }, arrow(d));
       // random
-      frame(rx - 22, rx + 42);
+      x0 += 196 + GAP; const rx = x0 + 22; frame(x0, x0 + 64, 'RANDOM');
       key(rx, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), tag: 'rndMenu' }, dice);
     }
     col += w;
