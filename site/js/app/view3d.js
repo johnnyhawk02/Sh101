@@ -861,9 +861,9 @@ html[data-view="3d"] dialog#options {
   --shadow: none; --acc: #ff2a14; --f-lcd: ${MONO}; --fs-xs: 12px; --fs-s: 13px; --fs: 14px; --fs-l: 16px; --fs-xl: 26px; --bezel: rgb(var(--ink-rgb));
   font-family: ${MONO}; letter-spacing: .03em; background-image: none; border: 0; border-radius: 0;
   box-shadow: inset 0 0 0 2px var(--ink), 0 20px 60px rgba(0,0,0,.55); }
-html[data-view="3d"] dialog#options { width: min(860px, calc(100vw - 24px)); height: auto; max-height: min(600px, calc(100dvh - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
+html[data-view="3d"] dialog#options, html.fit[data-view="3d"] dialog#options { width: min(720px, calc(100vw - 24px)); height: auto; max-height: min(560px, calc(100dvh - 24px)); inset: auto; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); }
 html[data-view="3d"] dialog#options::backdrop { background: rgb(0 0 0 / .55); }
-html[data-view="3d"] #otabs [data-sec=colours] { display: none; }
+html[data-view="3d"] #otabs :is([data-sec=colours], [data-sec=about]) { display: none; }   /* v0.56.8 (Johnny: "remove about page from options make window smaller"): no ABOUT, 720 wide (was the full 1344 x 842 fit size) */
 html[data-view="3d"] dialog#options :is(h2, h3, .otabs button) { text-transform: uppercase; }
 html[data-view="3d"] dialog#options .btn { font-family: ${MONO}; text-transform: uppercase; }
 #v3d-splash { position: fixed; inset: 0; z-index: 100; background: #0b0b0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity .35s; }
@@ -886,13 +886,13 @@ function sheet(title) {
 }
 const opt = sheet('OPTIONS');
 // v0.44.0: no look options; OPTIONS keeps MIDI and ABOUT. v0.55.0: AUDIO (oversampling) between them
-opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI</button><button id="o3-audio">AUDIO</button><button id="o3-about">ABOUT</button></div></div>`;
+opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI</button><button id="o3-audio">AUDIO</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
-for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-audio', 'audio'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
+for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-audio', 'audio']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
 // v0.56.2 (Johnny: "right click on shyoy opens options which opens at its full size on the last tab opened or the first tab if its the
 // first time"): straight to the full Options sheet on the tab last used (options.js keeps it as optTab), else the first tab
 function openOptions3d() { const first = (document.querySelector('#otabs [role=tab]') || {}).dataset?.sec || 'midi', k = store.get('optTab', first);
-  sheetVars(); showOptTab(document.getElementById('osec-' + k) ? k : first); openOptions(); }
+  sheetVars(); showOptTab(document.getElementById('osec-' + k) && k !== 'about' && k !== 'colours' ? k : first); openOptions(); }
 // the TAPER pop-up (v0.45.0): one slider's taper, with its curve drawn (cap position across, value up)
 const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((it) => it.t === 'knob').map((it) => [it.id, b.n + ' ' + it.label])));
 const tp = sheet('TAPER');
