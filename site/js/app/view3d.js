@@ -807,7 +807,7 @@ function release(e) {
   dirty = true;
 }
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
-cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const c = pick(e); if (c && c.kind === 'knob' && c.cur()) return openTaper(c.cur()); if (e.ctrlKey) return; if (c && c.kind === 'title' && shyoyRand.back()) wobbleLogo(); });
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const c = pick(e); if (c && c.kind === 'knob' && c.cur()) return openTaper(c.cur()); if (e.ctrlKey) return; if (c && c.kind === 'title') openOptions3d(); });   // v0.56.2 (Johnny): right-click on the word opens OPTIONS (Shift-click steps back)
 cv.addEventListener('wheel', (e) => {
   const c = pick(e); if (!c || c.kind !== 'knob') return; e.preventDefault(); boot();
   const id = c.cur(); setKnob(id, valOf(id, posOf(id, knobBase(id)) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.02)));
@@ -875,7 +875,10 @@ const opt = sheet('OPTIONS');
 opt.body.innerHTML = `<div class="f"><div class="row"><button id="o3-midi">MIDI</button><button id="o3-audio">AUDIO</button><button id="o3-about">ABOUT</button></div></div>`;
 const $o = (s) => opt.body.querySelector(s);
 for (const [id, k] of [['#o3-midi', 'midi'], ['#o3-audio', 'audio'], ['#o3-about', 'about']]) $o(id).onclick = () => { opt.close(); sheetVars(); showOptTab(k); openOptions(); };
-function openOptions3d() { opt.open(); }
+// v0.56.2 (Johnny: "right click on shyoy opens options which opens at its full size on the last tab opened or the first tab if its the
+// first time"): straight to the full Options sheet on the tab last used (options.js keeps it as optTab), else the first tab
+function openOptions3d() { const first = (document.querySelector('#otabs [role=tab]') || {}).dataset?.sec || 'midi', k = store.get('optTab', first);
+  sheetVars(); showOptTab(document.getElementById('osec-' + k) ? k : first); openOptions(); }
 // the TAPER pop-up (v0.45.0): one slider's taper, with its curve drawn (cap position across, value up)
 const KNOB_NAMES = Object.fromEntries(BOXES.flatMap((b) => (b.it || []).filter((it) => it.t === 'knob').map((it) => [it.id, b.n + ' ' + it.label])));
 const tp = sheet('TAPER');
