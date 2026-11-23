@@ -66,7 +66,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
     this.t = 0;
     // panel (mapped) targets
     this.P = {
-      range: 0, tune: 0, vcoMod: 0, pw: 0.3, pwmSrc: 1, drift: 0.25,
+      range: 0, tune: 0, vcoMod: 0, pw: 0.3, pwmSrc: 1,
       saw: 0.8, pulse: 0, sub: 0.4, subType: 0, noise: 0,
       cutoff: 0.35, reso: 0.6, vcfEnv: 0.5, vcfMod: 0, kybd: 0.5,
       att: 0.002, dec: 0.3, sus: 0, rel: 0.1, trig: 0,
@@ -86,7 +86,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
     // VCO state
     this.vc = 0; this.resetLeft = 0; this.subC = 0; this.cmp = 0;
     this.oSaw = 0; this.oPul = 0; this.oSub = 0; this.cSaw = 0; this.cPul = 0; this.cSub = 0;
-    this.drift = 0; this.driftT = 0;
     // noise
     this.rng = 22222; this.pink = 0;
     // mixer coupling cap
@@ -168,7 +167,6 @@ class KestrelProcessor extends AudioWorkletProcessor {
       case 'vcoMod': P.vcoMod = v * v; break;
       case 'pw': P.pw = v; break;
       case 'pwmSrc': P.pwmSrc = v | 0; break;
-      case 'drift': P.drift = v; break;
       case 'saw': case 'pulse': case 'sub': case 'noise': case 'cutoff': case 'reso': case 'drive':
       case 'vcfEnv': case 'vcfMod': case 'kybd': case 'level': case 'accent': P[id] = v; break;
       case 'bendVco': case 'bendVcf': case 'lfoMod': case 'lever': case 'modPush': P[id] = v; break;
@@ -332,10 +330,9 @@ class KestrelProcessor extends AudioWorkletProcessor {
       this.pitch += (this.pitchT - this.pitch) * this.glideCoef;
 
       // ---- VCO control: summed CV in octaves, expo converter with Vt(T) ----
-      if ((this.t & 255) === 0) this.driftT += (this.rand() * 0.6 - this.driftT) * 0.05;
-      this.drift += (this.driftT - this.drift) * 0.0005;
+      // v0.57.0 (Johnny, on DRIFT: "get rid of it"): no random pitch wander
       const lfoAmt = clamp(sm.vcoMod + sm.modPush * sm.lfoMod, 0, 2);
-      const octCV = (this.pitch - 69) / 12 + P.range + sm.tune + lfo * lfoAmt * 0.5 + sm.lever * sm.bendVco + this.drift * P.drift * 0.0125
+      const octCV = (this.pitch - 69) / 12 + P.range + sm.tune + lfo * lfoAmt * 0.5 + sm.lever * sm.bendVco
         + clamp(inj[1] * 100e3, -6, 6);
       // matched pair cancels Is; Vt scales the exponent around the trim point (C4)
       const octEff = octCV + Math.log2(1 + VCO_PPM * (sm.tempC - 27));

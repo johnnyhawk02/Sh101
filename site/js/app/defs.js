@@ -55,8 +55,7 @@ const RACK = [
     { f: 'tune', label: 'Tune', def: .5, fmt: v => ((v - .5) * 100).toFixed(0) + 'c' },
     { f: 'vcoMod', label: 'Mod', def: 0, fmt: pct },
     { f: 'pw', label: 'PW', def: .3, fmt: v => (50 - v * 50).toFixed(0) + '%' },
-    { s: 'pwmSrc', label: 'PWM', opts: ['LFO', 'Man', 'Env'], def: 1 },
-    { f: 'drift', label: 'Drift', def: .25, fmt: pct } ] },
+    { s: 'pwmSrc', label: 'PWM', opts: ['LFO', 'Man', 'Env'], def: 1 } ] },   // v0.57.0: Drift gone (Johnny: "get rid of it")
   { id: 'mix', name: 'Source mix', sub: 'summing amp', items: [
     { f: 'saw', label: 'Saw', def: .8, fmt: pct }, { f: 'pulse', label: 'Pulse', def: 0, fmt: pct },
     { f: 'sub', label: 'Sub', def: .4, fmt: pct }, { f: 'noise', label: 'Noise', def: 0, fmt: pct },

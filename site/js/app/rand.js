@@ -15,7 +15,7 @@ const shyoyRand = (() => {
     s.range = pick([4, 4.5, 1.5, 0]); f.pw = U(0, 0.85); s.pwmSrc = pick([3, 5, 2]);
     const src = ['saw', 'pulse', 'sub'], main = src[pick([4, 3, 3])];
     for (const k of src) f[k] = k === main ? U(0.6, 0.95) : chance(0.5) ? U(0.1, 0.7) : 0;
-    f.noise = chance(0.2) ? U(0.05, 0.25) : 0; s.subType = pick([1, 1, 1]); f.drift = U(0, 0.3);
+    f.noise = chance(0.2) ? U(0.05, 0.25) : 0; s.subType = pick([1, 1, 1]);
     // VCF
     f.cutoff = U(0.2, 0.85); f.reso = U(0, 0.9); f.vcfEnv = U(0.15, 0.85); f.kybd = U(0.2, 0.8); f.drive = U(0.2, 0.75);
     f.accVcf = chance(0.5) ? U(0, 0.5) : 0;
