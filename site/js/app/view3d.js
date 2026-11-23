@@ -491,12 +491,12 @@ for (const b of BOXES) {
       let x0 = L0; frame(x0, x0 + 124, 'PLAY');
       key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
       // notes
-      x0 += 124 + GAP; frame(x0, x0 + 296, 'NOTES');
-      at(x0 + 15, note); makeDisplay(x0 + 28, ty - 12, NW, 24, () => String(state.seq.notes.length));
-      at(x0 + 90, cyc); numBox(x0 + 103, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop');
-      for (const [a, k, draw] of [['gate', 178, pulse], ['step', 238, ticks]]) key(x0 + k, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), tag: 'adv:' + a }, draw);
+      x0 += 124 + GAP; frame(x0, x0 + 336, 'NOTES');   // v0.56.4 (Johnny: "give the note seq more space"): 296 -> 336
+      at(x0 + 17, note); makeDisplay(x0 + 32, ty - 12, NW, 24, () => String(state.seq.notes.length));
+      at(x0 + 102, cyc); numBox(x0 + 117, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop');
+      for (const [a, k, draw] of [['gate', 204, pulse], ['step', 276, ticks]]) key(x0 + k, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), tag: 'adv:' + a }, draw);
       // steps
-      x0 += 296 + GAP; frame(x0, x0 + 196, 'STEPS');
+      x0 += 336 + GAP; frame(x0, x0 + 196, 'STEPS');
       at(x0 + 15, cyc); numBox(x0 + 28, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc');
       for (const [d, tag, k] of [[-1, 'nudgeL', 102], [1, 'nudgeR', 158]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNudge(d); }, tag }, arrow(d));
       // random
@@ -525,7 +525,7 @@ function makeSeqGrid() {
       const st = state.seq.steps[i], cx = i * cw;
       SEQ_ROWS.forEach(([t, v], ri) => {
         // v0.43.0: each lane has its own length (steps past it are faint) and its own playhead
-        const y = G.rowY(ri), n = state.seq.len[t], a = state.seq.st[t]; x.globalAlpha = i >= a && i < a + n ? 1 : 0.1;   // v0.43.14 (Johnny): steps outside the loop fade nearly into the panel
+        const y = G.rowY(ri), n = state.seq.len[t], a = state.seq.st[t]; x.globalAlpha = i >= a && i < a + n ? 1 : 0.38;   // v0.43.14 (Johnny): steps outside the loop fade; v0.56.4 (Johnny: "the sequencer looks floaty"): 0.1 -> 0.38
         if (seqPos >= 0 && (seqLanePos ? seqLanePos[t] : a + seqPos % n) === i) { x.fillStyle = tone(0.16); x.fillRect(cx, y, cw, rh); }
         x.strokeStyle = tone(0.28); x.lineWidth = 1; x.strokeRect(cx + 1.5, y + 1.5, cw - 3, rh - 3);
         if (t === 'o' ? (st.o | 0) === v : !!st[t]) { x.fillStyle = ink; x.fillRect(cx + 3, y + 3, cw - 6, rh - 6); }
