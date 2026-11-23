@@ -2,9 +2,9 @@
 # app's engine renders on each platform, runs the VST3 in a test host on Linux, and publishes the VST3s to the
 # "plugin-latest" release.
 name: Plugin
+# Manual only (Actions tab > Plugin > Run workflow): the plugin is paused while the JS app changes, so pushes no longer
+# build it. Sync plugin/src/Engine.h with site/js/dsp/engine.js before running, or the sample match fails.
 on:
-  push:
-    paths: ['site/**', 'plugin/**', '.github/workflows/plugin.yml']
   workflow_dispatch:
 permissions:
   contents: write
