@@ -722,9 +722,17 @@ const pMasks = {};
 function printMask() {   // alpha: 1 where the ink holds, fading to 0 where the wear map is lowest (same thresholds as the logo)
   if (pMasks[page]) return pMasks[page];
   const pMask = pMasks[page] = document.createElement('canvas'); pMask.width = pc.width; pMask.height = pc.height; const m = pMask.getContext('2d');
-  m.drawImage(wearOf(page).image, 0, 0, pc.width, pc.height); const img = m.getImageData(0, 0, pc.width, pc.height), d = img.data;
-  for (let i = 0; i < d.length; i += 4) { d[i + 3] = 255 * Math.max(0, Math.min(1, (d[i] - LOGO_WEAR[0]) / LOGO_WEAR[1])); d[i] = d[i + 1] = d[i + 2] = 0; }
-  m.putImageData(img, 0, 0); return pMask;
+  // v0.56.6 (Johnny: "too many broken lines, just 2 or 3 over whole synth is plenty authentic"): the ink is solid, with
+  // three small rubbed-through breaks in the frame lines (bottom of the sequencer, top of VCO, right of ENVELOPE)
+  m.fillStyle = '#000'; m.fillRect(0, 0, pMask.width, pMask.height); m.globalCompositeOperation = 'destination-out';
+  const box = (n) => BOXR.find((r) => r.n === n), sq = box('SEQUENCER'), vco = box('VCO'), env = box('ENVELOPE');
+  const gaps = [sq && [sq.bx + sq.bw * 0.63, sq.by + sq.bh, 11], vco && [vco.bx + vco.bw * 0.78, vco.by, 7], env && [env.bx + env.bw, env.by + env.bh * 0.7, 6]];
+  for (const g of gaps) if (g) {
+    const [gx, gy, r] = g.map((v) => v * S2), gr = m.createRadialGradient(gx, gy, 0, gx, gy, r);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.6, 'rgba(0,0,0,.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    m.fillStyle = gr; m.beginPath(); m.arc(gx, gy, r, 0, 7); m.fill();
+  }
+  m.globalCompositeOperation = 'source-over'; return pMask;
 }
 let inkSig = '', inkCv = null;
 function inkMask() {   // the worn-ink mask, lifted towards solid ink by OCD
