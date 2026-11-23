@@ -12,8 +12,8 @@ import { RoomEnvironment } from './../vendor/RoomEnvironment.js';
 
 const C = 66, R = 150, M = 8, COLS = 19, ROWS = 3;   // v0.54.0 (Johnny: "try to get all the synth sliders on two lines"): 19 columns of 66 (was 18 of 70), two rows of sliders and the sequencer
 // v0.43.6 (Johnny: "the synth shouldn't have a border"): margin 24 -> 8
-const SEQ_GH = 240;   // v0.43.10: the sequencer grid's height
-const SEQ_TOOLS = 96 + SEQ_GH - 154 + 26;   // v0.56.7 (Johnny: "give everything breathing space"): +26   // v0.42.4: the strip of keys under the sequencer's grid
+const SEQ_GH = 282;   // v0.57.3: 240 -> 282, room for a frame round each lane   // v0.43.10: the sequencer grid's height
+const SEQ_TOOLS = 96 + SEQ_GH - 154 + 36;   // v0.56.7 (Johnny: "give everything breathing space"): +26   // v0.42.4: the strip of keys under the sequencer's grid
 const W = COLS * C + 2 * M, H = ROWS * R + SEQ_TOOLS + 2 * M;
 const KR = 19, DEPTH = 18, S2 = 2;                 // knob radius, slab thickness, print pixels per panel px
 const MONO = '"Geist Mono", ui-monospace, Menlo, Consolas, monospace', DISPLAY = '"Archivo Black", "Arial Black", sans-serif';
@@ -440,7 +440,7 @@ for (const b of BOXES) {
       // 2, 1, 0, note on, slide, accent; one column per step. Press a cell to set it; drag to paint the same along a row
       const gx0 = M + b.c * C + col * spread * C + 80, gx = gx0 + 30, gw = w * spread * C - 52 - 52 - 40, gy = y0 + 28, gh = SEQ_GH;
       // v0.43.6 (Johnny: "separate the lanes a bit"): a gap between lanes, with a strip of the spot colour along each lane's top
-      const LGAP = 22, TOP = 13, rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
+      const LGAP = 36, TOP = 13,   /* v0.57.3: 22 -> 36 */ rowH0 = (gh - TOP - 4 - LGAP * (SEQ_LANE_ROWS.length - 1)) / SEQ_ROWS.length;   // v0.43.8: more space
       const laneOf = (ri) => SEQ_LANE_ROWS.findIndex(([, r0, n]) => ri >= r0 && ri < r0 + n);
       // v0.45.9: the grid sits further right (where the RETRIG column was) so the RETRIG tabs clear the row names
       seqGrid = { x: gx, y: gy, w: gw, h: gh, colW: gw / SEQ_N, rowH: rowH0, gap: LGAP, laneOf,
@@ -448,13 +448,17 @@ for (const b of BOXES) {
         rowAt: (dy) => { for (let ri = 0; ri < SEQ_ROWS.length; ri++) { const t = TOP + ri * rowH0 + laneOf(ri) * LGAP; if (dy >= t - LGAP / 2 && dy < t + rowH0) return ri; } return -1; } };
       SEQ_ROWS.forEach((r, ri) => { const yy = gy + seqGrid.rowY(ri) + 0.5 * seqGrid.rowH;
         prints.push((x, ink) => { x.fillStyle = ink; text(x, r[2], gx0 - 14, yy + 0.5, 9.5, "right"); }); });
-      for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 9);
+      for (let i = 0; i < SEQ_N; i++) labelAt(() => String(i + 1), gx + (i + 0.5) * seqGrid.colW, gy + gh + 18);
+      // v0.57.3 (Johnny: "the sequencer needs rounded rectangles around each part"): a rounded frame round each lane, its name inside
+      for (const [, r0, n] of SEQ_LANE_ROWS) { const fx0 = gx0 - 58, fx1 = gx + gw + 18, fy0 = gy + seqGrid.rowY(r0) - 19, fy1 = gy + seqGrid.rowY(r0 + n - 1) + rowH0 + 9;
+        prints.push((x, ink) => { x.save(); x.globalAlpha = 0.45; x.strokeStyle = ink; x.lineWidth = 1; x.beginPath();
+          if (x.roundRect) x.roundRect(fx0, fy0, fx1 - fx0, fy1 - fy0, 6); else x.rect(fx0, fy0, fx1 - fx0, fy1 - fy0); x.stroke(); x.restore(); }); }
       makeSeqGrid();
       // v0.45.9 (Johnny's sketch): each lane's RETRIG tick (v0.43.1) is a tab on the top-left corner of its loop frame (makeSeqGrid)
       // v0.48.0 (Johnny: "make all the seq randomiser into a menu - have shortkeys for them"; "the new note seq can go on the LHS under
       // the gate seq"); v0.49.0 (Johnny: "bring play down into the bottom section - also use icons"): under the grid, left to right:
       // PLAY ▶ and RECORD ●, the NOTES window, nudge ← →, and the dice key that opens the RANDOM menu (seqMenu; shortcuts in seq.js SEQ_RND)
-      const ty = y0 + 28 + SEQ_GH + 52;   // v0.56.7: +34 -> +52, clear of the step numbers
+      const ty = y0 + 28 + SEQ_GH + 62;   // v0.56.7: +34 -> +52, clear of the step numbers
       const play = (x, ix, iy) => { x.moveTo(ix - 4, iy - 6.5); x.lineTo(ix + 6.5, iy); x.lineTo(ix - 4, iy + 6.5); x.closePath(); x.fill(); };
       const rec = (x, ix, iy) => { x.arc(ix + 1, iy, 5.5, 0, 7); x.fill(); };
       const arrow = (d) => (x, ix, iy) => { x.moveTo(ix - 6 * d, iy); x.lineTo(ix + 6 * d, iy); x.moveTo(ix + 1.5 * d, iy - 4.5); x.lineTo(ix + 6 * d, iy); x.lineTo(ix + 1.5 * d, iy + 4.5); x.stroke(); };
