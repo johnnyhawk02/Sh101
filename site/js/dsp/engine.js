@@ -249,7 +249,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
       if (nk >= 0) base = NL[nk] + this.shift + 12 * this.P.transpose - 12;   // v0.47.0: the next recorded note
       else base = this.root >= 0 ? this.root : 36 + 12 * this.P.transpose;
       const n = base + 12 * Math.max(0, Math.min(2, st.o | 0));   // v0.42.2: octave 0 = the current note, 1 and 2 above it
-      if (this.lastSlide && this.gate) { this.setPitch(n, 0.06); this.accOn = st.a ? 1 : 0; }
+      if (this.lastSlide && this.gate) { this.setPitch(n, Math.max(this.P.glide, 0.015)); this.accOn = st.a ? 1 : 0; }   // v0.56.9 (Johnny: "can slide time of seq be linked to porta time?"): was a fixed 60 ms; now PORTA, 15 ms at least
       else { this.setPitch(n, this.P.glideMode === 2 ? this.P.glide : 0); this.trigger(!!st.a); }
       this.gateOffAt = st.s ? -1 : this.t + dur * 0.5; this.lastSlide = !!st.s;
     }
