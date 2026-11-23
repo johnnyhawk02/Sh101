@@ -63,10 +63,18 @@
 
   // what the plugin says: engine messages for the page (as the worklet's port would), and MIDI from the host that
   // moved a control (the plugin has already played it; this moves the control on screen, as midi.js does)
+  // host parameters (DAW automation or a mapped controller) moved: the plugin has already played them; show and keep them
+  const fromHost = (h, live) => {
+    if (h.p) for (const id in h.p) if (id in state.params) { const v = +h.p[id]; if (ui[id]) ui[id](v); state.params[id] = v; }
+    if (h.seq) { const q = Object.assign({}, state.seq); for (const k of ['steps', 'len', 'st', 'rt', 'loop', 'adv', 'cyc', 'notes']) if (k in h.seq) q[k] = h.seq[k]; state.seq = seqTidy(q); }
+    if (live && 'run' in h && seqOn !== !!h.run) { seqOn = !!h.run; seqRec = false; if (!seqOn) { seqPos = -1; seqLanePos = null; seqNoteAt = -1; } }
+    save();
+  };
   const fromEngine = (m) => { if (theNode && theNode.port.onmessage) theNode.port.onmessage({ data: m }); };
   const onPlugin = (m) => {
     try {
       if (m.type === 'step' || m.type === 'meters') { fromEngine(m); return; }
+      if (m.type === 'host') { fromHost(m, true); return; }
       if (m.type === 'running') { seqOn = !!m.on; if (!seqOn) { seqPos = -1; seqLanePos = null; seqNoteAt = -1; } return; }
       if (m.type === 'recnote') { seqRecNote(m.n); return; }   // a host note while RECORD is on (the plugin played it only if the sequencer is stopped)
       if (m.type === 'cc') {
@@ -84,6 +92,7 @@
   addEventListener('DOMContentLoaded', () => {
     try {
       if (first(init.running)) seqOn = true;
+      try { fromHost(JSON.parse(first(init.host) || '{}'), false); } catch (e) { console.warn('shyoy plugin host', e); }   // before boot sends the sound
       boot();
       log(`page booted, localStorage ${shimmed ? 'replaced' : 'mirrored'}`);
       send({ kind: 'msg', json: JSON.stringify({ type: 'ccmap', ids: MIDI_MAP.map((x) => x.id) }) });

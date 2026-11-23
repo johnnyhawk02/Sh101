@@ -7,6 +7,7 @@ using shyoy::Cmd;
 ShyoyProcessor::ShyoyProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)) {
     loadDefaultSnapshot();
+    makeParams();
     startTimerHz (30);
 }
 ShyoyProcessor::~ShyoyProcessor() { stopTimer(); prefs->save(); }
@@ -52,6 +53,7 @@ void ShyoyProcessor::timerCallback() {
         if (inboxDone) { inbox.clear(); inboxDone = false; }
     }
     if (++saveTick % 30 == 0) prefs->save();   // at most once a second
+    hostChangesOnMessageThread();
     if (uiWake) uiWake();
 }
 
@@ -62,6 +64,11 @@ void ShyoyProcessor::postFromUi (const juce::var& m) {
         return;
     }
     snapshot (m);
+    // the host parameters follow the panel (a slider drag or a step click is a gesture, so a DAW can record it)
+    if (type == "param") { auto it = synthIdx.find (m["id"].toString().toStdString()); if (it != synthIdx.end()) setHost (it->second, shyoy::num (m["v"]), true); }
+    else if (type == "params") syncHostToSnapshot (false);
+    else if (type == "seq") { const auto q = seqVals(); for (size_t i = 0; i < pdefs.size(); i++) if (pdefs[i].kind >= shyoy::ParamDef::Step && pdefs[i].kind <= shyoy::ParamDef::SeqNum) setHost ((int) i, seqPlain (q, pdefs[i]), true); }
+    else if (type == "run" && playIdx >= 0) setHost (playIdx, shyoy::truthy (m["on"]) ? 1 : 0, true);
     std::vector<Cmd> cmds; shyoy::parse (m, cmds);
     if (! cmds.empty()) queue (std::move (cmds));
 }
@@ -135,6 +142,7 @@ void ShyoyProcessor::setStateInformation (const void* data, int size) {
     if (! v.hasProperty ("shyoy")) return;
     patchJson = v["patch"].toString();
     snapshotFromVar (v["engine"]);
+    syncHostToSnapshot (false);
     // send the whole sound to the running engine, as the web app's pushAll does
     std::vector<Cmd> cmds;
     auto snap = snapshotVar();
@@ -264,7 +272,10 @@ void ShyoyProcessor::handleMidi (const juce::MidiMessage& m) {
     if (cc < 1 || cc > (int) ccMap.size()) return;
     const double v = val / 127.0;
     e.setParam (ccMap[(size_t) cc - 1], v);
-    pushUi ({ UiEvent::CC, cc - 1, (float) v });
+    // through the host parameter, so the DAW, the saved sound and the panel all follow (as a host change does)
+    auto it = synthIdx.find (ccMap[(size_t) cc - 1]);
+    if (it != synthIdx.end()) { auto* p = prm[(size_t) it->second]; p->setValueNotifyingHost (p->convertTo0to1 ((float) v)); audioDirty[(size_t) it->second] = false; }
+    else pushUi ({ UiEvent::CC, cc - 1, (float) v });
 }
 
 // ---------------- audio ----------------
@@ -286,6 +297,8 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             inboxDone = true;
         }
     }
+    // faders the host moved (automation, a mapped controller) play at once
+    for (auto& [id, i] : synthIdx) if (audioDirty[(size_t) i].exchange (false)) e.setParam (pdefs[(size_t) i].id, (double) hostVal[(size_t) i].load());
 
     // tempo and transport: the sequencer runs at the host's tempo; while the host plays, its steps sit on the host's
     // sixteenths; when the host stops, a running sequencer stops (PLAY goes out)
@@ -322,3 +335,173 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 juce::AudioProcessorEditor* ShyoyProcessor::createEditor() { return new ShyoyEditor (*this); }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new ShyoyProcessor(); }
+
+// ---------------- host parameters ----------------
+thread_local bool ShyoyProcessor::selfSet = false;
+
+void ShyoyProcessor::makeParams() {
+    using namespace shyoy;
+    pdefs = paramDefs();
+    const auto q = seqVals();
+    hostVal.reset (new std::atomic<float>[pdefs.size()]);
+    audioDirty.reset (new std::atomic<bool>[pdefs.size()]); uiDirty.reset (new std::atomic<bool>[pdefs.size()]);
+    for (size_t i = 0; i < pdefs.size(); i++) {
+        const auto& d = pdefs[i];
+        const juce::ParameterID pid { juce::String (d.id), 1 };
+        double def = 0;
+        if (d.kind == ParamDef::Synth) { auto it = sParams.find (d.id); def = it != sParams.end() ? it->second : 0; synthIdx[d.id] = (int) i; }
+        else if (d.kind == ParamDef::Play) { def = 0; playIdx = (int) i; }
+        else def = seqPlain (q, d);
+        std::unique_ptr<juce::RangedAudioParameter> p;
+        if (d.opts.size() > 0) p = std::make_unique<juce::AudioParameterChoice> (pid, d.name, d.opts, juce::jlimit (0, d.opts.size() - 1, (int) def));
+        else if (d.kind == ParamDef::Synth) {
+            const std::string id = d.id;
+            p = std::make_unique<juce::AudioParameterFloat> (pid, d.name, juce::NormalisableRange<float> (0, 1), (float) def,
+                juce::AudioParameterFloatAttributes().withStringFromValueFunction ([id] (float v, int) { return synthText (id, v); }));
+        }
+        else if (d.kind == ParamDef::Play || d.kind == ParamDef::Step || (d.kind == ParamDef::Lane && d.field == 'r')) p = std::make_unique<juce::AudioParameterBool> (pid, d.name, def > 0.5);
+        else p = std::make_unique<juce::AudioParameterInt> (pid, d.name, d.lo, d.hi, (int) def);
+        hostVal[i] = (float) def; audioDirty[i] = false; uiDirty[i] = false;
+        prm.push_back (p.get());
+        p->addListener (this);
+        addParameter (p.release());
+    }
+}
+
+// a change from the host (any thread); our own setValueNotifyingHost calls are skipped
+void ShyoyProcessor::parameterValueChanged (int index, float norm) {
+    if (selfSet || index < 0 || index >= (int) prm.size()) return;
+    hostVal[(size_t) index] = prm[(size_t) index]->convertFrom0to1 (norm);
+    audioDirty[(size_t) index] = true; uiDirty[(size_t) index] = true;
+}
+
+void ShyoyProcessor::setHost (int i, double plain, bool gesture) {
+    if (i < 0 || i >= (int) prm.size()) return;
+    auto* p = prm[(size_t) i];
+    const float n = p->convertTo0to1 ((float) plain);
+    if (std::abs (p->getValue() - n) < 1e-7f) return;
+    if (gesture && juce::MessageManager::existsAndIsCurrentThread()) { if (! gestureAge.count (i)) p->beginChangeGesture(); gestureAge[i] = 0; }
+    selfSet = true; p->setValueNotifyingHost (n); selfSet = false;
+    hostVal[(size_t) i] = p->convertFrom0to1 (n);
+}
+
+void ShyoyProcessor::syncHostToSnapshot (bool gesture) {
+    const auto q = seqVals();
+    for (size_t i = 0; i < pdefs.size(); i++) {
+        const auto& d = pdefs[i];
+        if (d.kind == shyoy::ParamDef::Synth) { auto it = sParams.find (d.id); if (it != sParams.end()) setHost ((int) i, it->second, gesture); }
+        else if (d.kind == shyoy::ParamDef::Play) setHost ((int) i, uiRunning ? 1 : 0, gesture);
+        else setHost ((int) i, seqPlain (q, d), gesture);
+    }
+}
+
+void ShyoyProcessor::hostChangesOnMessageThread() {
+    using shyoy::ParamDef;
+    // gestures end a moment after the last change
+    for (auto it = gestureAge.begin(); it != gestureAge.end();) {
+        if (++it->second > 8) { prm[(size_t) it->first]->endChangeGesture(); it = gestureAge.erase (it); } else ++it;
+    }
+    juce::DynamicObject::Ptr page;
+    auto pageObj = [&] { if (! page) { page = new juce::DynamicObject(); page->setProperty ("type", "host"); } return page.get(); };
+    juce::DynamicObject::Ptr pp;
+    bool seqChanged = false; auto q = seqVals();
+    for (size_t i = 0; i < pdefs.size(); i++) {
+        if (! uiDirty[i].exchange (false)) continue;
+        const auto& d = pdefs[i]; const double v = hostVal[i].load();
+        if (d.kind == ParamDef::Synth) {
+            sParams[d.id] = v;
+            if (! pp) pp = new juce::DynamicObject();
+            pp->setProperty (juce::Identifier (juce::String (d.id)), v);
+        }
+        else if (d.kind == ParamDef::Play) {
+            const bool on = v > 0.5;
+            if (on != (bool) uiRunning) {
+                uiRunning = on;
+                Cmd c; c.type = Cmd::Run; c.b = on; std::vector<Cmd> cmds { c }; queue (std::move (cmds));
+            }
+            pageObj()->setProperty ("run", on);
+        }
+        else { seqSet (q, d, v); seqChanged = true; }
+    }
+    if (pp) pageObj()->setProperty ("p", juce::var (pp.get()));
+    if (seqChanged) {
+        seqValsToSnapshot (q);
+        std::vector<Cmd> cmds; shyoy::parse (seqMessage(), cmds); queue (std::move (cmds));
+        const auto t = seqVals();   // the tidied pattern: put any clamped value back on the host
+        for (size_t i = 0; i < pdefs.size(); i++) if (pdefs[i].kind >= ParamDef::Step && pdefs[i].kind <= ParamDef::SeqNum) setHost ((int) i, seqPlain (t, pdefs[i]), false);
+        pageObj()->setProperty ("seq", sSeq);
+    }
+    // the sequencer stopped with the host (or the page): PLAY follows
+    if (playIdx >= 0) setHost (playIdx, uiRunning ? 1 : 0, false);
+    if (page) {
+        if (hostForPage.getDynamicObject()) {   // the editor hasn't taken the last lot yet: merge
+            for (auto& nv : page->getProperties()) {
+                if (nv.name.toString() == "p" && hostForPage["p"].getDynamicObject()) { for (auto& x : nv.value.getDynamicObject()->getProperties()) hostForPage["p"].getDynamicObject()->setProperty (x.name, x.value); }
+                else hostForPage.getDynamicObject()->setProperty (nv.name, nv.value);
+            }
+        } else hostForPage = juce::var (page.get());
+    }
+}
+
+juce::var ShyoyProcessor::hostStateForPage() const {
+    auto* o = new juce::DynamicObject();
+    auto* p = new juce::DynamicObject();
+    for (auto& [id, i] : synthIdx) { auto it = sParams.find (id); if (it != sParams.end()) p->setProperty (juce::Identifier (juce::String (id)), it->second); }
+    o->setProperty ("p", juce::var (p));
+    if (sSeq.getDynamicObject()) o->setProperty ("seq", sSeq);
+    return juce::var (o);
+}
+
+// the pattern as seq.js seqTidy fills it in
+ShyoyProcessor::SeqVals ShyoyProcessor::seqVals() const {
+    static const bool ON0[16] = { 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1 }; static const int O0[16] = { 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1 };
+    SeqVals q {};
+    const auto s = sSeq;
+    const auto* steps = s["steps"].getArray();
+    for (int i = 0; i < 16; i++) {
+        if (steps && steps->size() == 16) { const auto st = (*steps)[i]; q.on[i] = shyoy::truthy (st["on"]); q.o[i] = juce::jlimit (0, 2, shyoy::intOf (st["o"])); q.s[i] = shyoy::truthy (st["s"]); q.a[i] = shyoy::truthy (st["a"]); }
+        else { q.on[i] = ON0[i]; q.o[i] = O0[i]; q.s[i] = i == 4 || i == 12; q.a[i] = i % 4 == 0; }
+    }
+    for (int k = 0; k < 4; k++) {
+        const auto key = shyoy::LANE_KEY[k];
+        q.st[k] = juce::jlimit (0, 15, shyoy::intOf (s["st"][key]));
+        const auto lv = s["len"][key];
+        q.len[k] = juce::jlimit (1, 16 - q.st[k], lv.isVoid() || lv.isUndefined() ? 16 : shyoy::intOf (lv));
+        q.rt[k] = shyoy::truthy (s["rt"][key]);
+    }
+    q.loop = juce::jlimit (0, 64, shyoy::intOf (s["loop"]));
+    q.cyc = juce::jlimit (0, 64, shyoy::intOf (s["cyc"]));
+    q.advStep = s["adv"].toString() == "step";
+    return q;
+}
+void ShyoyProcessor::seqValsToSnapshot (const SeqVals& q) {
+    auto* o = new juce::DynamicObject();
+    if (auto* old = sSeq.getDynamicObject()) for (auto& nv : old->getProperties()) o->setProperty (nv.name, nv.value);   // notes, bpm
+    juce::Array<juce::var> steps;
+    for (int i = 0; i < 16; i++) { auto* st = new juce::DynamicObject(); st->setProperty ("on", q.on[i]); st->setProperty ("o", q.o[i]); st->setProperty ("s", q.s[i]); st->setProperty ("a", q.a[i]); steps.add (juce::var (st)); }
+    o->setProperty ("steps", steps);
+    auto* len = new juce::DynamicObject(); auto* st = new juce::DynamicObject(); auto* rt = new juce::DynamicObject();
+    for (int k = 0; k < 4; k++) {
+        const int a = juce::jlimit (0, 15, q.st[k]);
+        st->setProperty (shyoy::LANE_KEY[k], a); len->setProperty (shyoy::LANE_KEY[k], juce::jlimit (1, 16 - a, q.len[k])); rt->setProperty (shyoy::LANE_KEY[k], q.rt[k]);
+    }
+    o->setProperty ("len", juce::var (len)); o->setProperty ("st", juce::var (st)); o->setProperty ("rt", juce::var (rt));
+    o->setProperty ("loop", q.loop); o->setProperty ("adv", q.advStep ? "step" : "gate"); o->setProperty ("cyc", q.cyc);
+    if (! o->hasProperty ("notes")) o->setProperty ("notes", juce::Array<juce::var>());
+    if (! o->hasProperty ("bpm")) o->setProperty ("bpm", 120);
+    sSeq = juce::var (o);
+}
+double ShyoyProcessor::seqPlain (const SeqVals& q, const shyoy::ParamDef& d) const {
+    using shyoy::ParamDef;
+    if (d.kind == ParamDef::Step) { const int i = d.step; return d.field == 'n' ? q.on[i] : d.field == 'o' ? q.o[i] : d.field == 's' ? q.s[i] : q.a[i]; }
+    if (d.kind == ParamDef::Lane) { const int k = d.lane; return d.field == 'l' ? q.len[k] : d.field == 's' ? q.st[k] + 1 : q.rt[k]; }
+    if (d.kind == ParamDef::SeqNum) return d.id == "loop" ? q.loop : d.id == "cyc" ? q.cyc : q.advStep;
+    return 0;
+}
+void ShyoyProcessor::seqSet (SeqVals& q, const shyoy::ParamDef& d, double v) {
+    using shyoy::ParamDef;
+    const int n = juce::roundToInt (v); const bool b = v > 0.5;
+    if (d.kind == ParamDef::Step) { const int i = d.step; if (d.field == 'n') q.on[i] = b; else if (d.field == 'o') q.o[i] = juce::jlimit (0, 2, n); else if (d.field == 's') q.s[i] = b; else q.a[i] = b; }
+    else if (d.kind == ParamDef::Lane) { const int k = d.lane; if (d.field == 'l') q.len[k] = n; else if (d.field == 's') q.st[k] = n - 1; else q.rt[k] = b; }
+    else if (d.kind == ParamDef::SeqNum) { if (d.id == "loop") q.loop = n; else if (d.id == "cyc") q.cyc = n; else q.advStep = b; }
+}

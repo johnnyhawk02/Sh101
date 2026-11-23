@@ -52,6 +52,13 @@ struct Test : juce::Timer {
         const float p = render (40, &on);
         check (p > 0.05f && p <= 1.0f, "host MIDI note plays the engine before the editor opens (peak " + juce::String (p, 3) + ")");
         juce::MidiBuffer off; off.addEvent (juce::MidiMessage::noteOff (1, 48), 0); render (200, &off);
+        // the host parameters (Ableton etc. can automate and map these)
+        {
+            const auto& ps = plugin->getParameters();
+            juce::StringArray names; for (auto* p : ps) names.add (p->getName (64));
+            check (ps.size() >= 100 && names.contains ("VCF Cutoff") && names.contains ("Step 16 Accent") && names.contains ("Seq Play"),
+                   "host parameters: " + juce::String (ps.size()) + " (" + names[0] + ", ..., " + names[names.size() - 1] + ")");
+        }
         // the editor
         auto* ed = plugin->createEditorIfNeeded();
         check (ed != nullptr, "editor created");
@@ -82,7 +89,22 @@ struct Test : juce::Timer {
                 juce::Timer::callAfterDelay (2000, [r, click] { click (r.getX() + juce::roundToInt (r.getWidth() * 0.246), r.getY() + juce::roundToInt (r.getHeight() * 0.822)); });
             }
         }
+        if (tick == 34) {   // the host moves VCF Cutoff and turns step 2's gate off
+            if (auto* p = param ("VCF Cutoff")) p->setValueNotifyingHost (0.9f);
+            if (auto* p = param ("Step 2 Gate")) p->setValueNotifyingHost (0.0f);
+        }
         if (tick == 40) {
+            {
+                const auto v = juce::JSON::parse (state()), page = juce::JSON::parse (v["patch"].toString());
+                const double ec = v["engine"]["params"]["cutoff"], pc = page["params"]["cutoff"];
+                check (std::abs (ec - 0.9) < 1e-6 && std::abs (pc - 0.9) < 1e-6, "host automation reaches the engine and the panel (cutoff " + juce::String (ec) + " / " + juce::String (pc) + ")");
+                const bool g2 = page["seq"]["steps"][1]["on"];
+                check (! g2 && ! (bool) v["engine"]["seq"]["steps"][1]["on"], "a host step change reaches the sequencer and the panel");
+                if (juce::File ("/usr/bin/xdotool").existsAsFile()) {
+                    auto* a3 = param ("Step 3 Accent");
+                    check (a3 && a3->getValue() > 0.5f, "a click on the panel moves the host parameter (Step 3 Accent)");
+                }
+            }
             const float p = render (200);
             const bool clicked = juce::File ("/usr/bin/xdotool").existsAsFile();
             if (clicked) check (p > 0.05f, "PLAY on the editor runs the sequencer (peak " + juce::String (p, 3) + ")");
@@ -104,6 +126,10 @@ struct Test : juce::Timer {
             }
             finish();
         }
+    }
+    juce::AudioProcessorParameter* param (const juce::String& name) {
+        for (auto* p : plugin->getParameters()) if (p->getName (64) == name) return p;
+        return nullptr;
     }
     void finish() {
         stopTimer();

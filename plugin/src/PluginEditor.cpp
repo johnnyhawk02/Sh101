@@ -42,6 +42,7 @@ void ShyoyEditor::makeBrowser() {
         .withInitialisationData ("store", shyoy::json::toString (proc.storeForUi()))
         .withInitialisationData ("running", proc.isSequencerRunning())
         .withInitialisationData ("version", SHYOY_VERSION)
+        .withInitialisationData ("host", shyoy::json::toString (proc.hostStateForPage()))
         .withEventListener ("shyoy", [this] (const juce::var& v) {
             const auto kind = v["kind"].toString();
             if (kind == "log") { if (juce::SystemStats::getEnvironmentVariable ("SHYOY_LOG", {}).isNotEmpty()) std::fprintf (stderr, "[shyoy page] %s\n", v["text"].toString().toRawUTF8()); return; }
@@ -58,6 +59,7 @@ void ShyoyEditor::makeBrowser() {
             }
         });
     proc.setRecording (false);   // a new page starts with RECORD off
+    { juce::var stale; proc.takeHostForPage (stale); }   // the page starts from hostStateForPage
     web = std::make_unique<WBC> (opts);
     addAndMakeVisible (*web);
     web->goToURL (WBC::getResourceProviderRoot());
@@ -98,6 +100,8 @@ void ShyoyEditor::pump() {
         }
         web->emitEventIfBrowserIsVisible ("engine", juce::var (o));
     }
+    juce::var h;
+    if (proc.takeHostForPage (h)) web->emitEventIfBrowserIsVisible ("engine", h);
     juce::var m;
     if (proc.takeMeters (m)) web->emitEventIfBrowserIsVisible ("engine", m);
 }
