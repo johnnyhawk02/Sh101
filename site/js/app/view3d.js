@@ -504,7 +504,7 @@ for (const b of BOXES) {
       at(x0 + 15, cyc); numBox(x0 + 28, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc');
       for (const [d, tag, k] of [[-1, 'nudgeL', 102], [1, 'nudgeR', 158]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNudge(d); }, tag }, arrow(d));
       // random
-      x0 += 196 + GAP; const rx = x0 + 22; frame(x0, x0 + 64, 'RANDOM');
+      x0 = gx + gw + 18 - 64; const rx = x0 + 22; frame(x0, x0 + 64, 'RANDOM');   // v0.57.5 (Johnny: "move the RANDOM island to the RHS"): right edge on the lane frames'
       key(rx, { on: () => seqMenu.isOpen(), press: () => seqMenu.toggle(), tag: 'rndMenu' }, dice);
     }
     col += w;
