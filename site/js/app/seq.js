@@ -85,6 +85,7 @@ function seqRandom(k) {
 const SEQ_RND = [['RANDOM ALL', '1', () => seqRandom('all')], ['RANDOM GATES', '2', () => seqRandom('on')], ['RANDOM ACCENTS', '3', () => seqRandom('a')],
   ['RANDOM SLIDES', '4', () => seqRandom('s')], ['RANDOM OCTAVES', '5', () => seqRandom('o')], ['RANDOM LENGTHS', '6', () => seqRandom('len')],
   ['RANDOM RETRIGS', '7', () => seqRandom('rt')], ['RANDOM NOTES', '8', () => seqNotesRandom()], ['SHUFFLE NOTES', '9', () => seqNotesShuffle()],
+  ['TONE ROW', '-', () => seqToneRow()],
   ['RESET LOOPS', '0', () => seqResetLoops()]];
 // v0.57.6 (Johnny: "add note randomiser and note shuffler to the random menu"). RANDOM NOTES: a new note list, as many notes as
 // there are now (8 when empty), in C minor from C2 to G3, often the root or fifth, mostly small steps; SHUFFLE NOTES: the same notes
@@ -99,6 +100,12 @@ function seqNotesRandom() {
     out.push(pool[at]);
   }
   state.seq.notes = out; seqSend();
+}
+// v0.57.9 (Johnny: "add generate 'tone row' schoenberg"): a twelve-tone row, all 12 pitch classes once each in a random order,
+// each in the octave from C2 or, now and then, the one above
+function seqToneRow() {
+  const pc = [...Array(12).keys()]; for (let i = 11; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [pc[i], pc[j]] = [pc[j], pc[i]]; }
+  state.seq.notes = pc.map((p) => 36 + p + (Math.random() < 0.3 ? 12 : 0)); seqSend();
 }
 function seqNotesShuffle() {
   const a = state.seq.notes.slice(); if (a.length < 2) return;
