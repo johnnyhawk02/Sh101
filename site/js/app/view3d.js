@@ -169,7 +169,7 @@ const P = (px, py, z = 0) => new THREE.Vector3(px - W / 2, H / 2 - py, z);   // 
 const panelMat = new THREE.MeshStandardMaterial({ color: 0xe4e2da, roughness: 0.6 });
 const edgeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
 let CUTOFF_KI = -1; const oddKi = () => look.oddK >= 0 ? look.oddK : CUTOFF_KI;
-const KNOB_BUMP = 4.5, PANEL_BUMP = 1.4, EDGE_BUMP = 1.5;   // wear depths (bump maps, below)
+const KNOB_BUMP = 4.5, PANEL_BUMP = 0.45, EDGE_BUMP = 0.5;   // wear depths (bump maps, below); v0.56.5 (Johnny: "the bump map needs to be a lot more subtle"): panel 1.4 -> 0.45, edge 1.5 -> 0.5
 const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H, DEPTH), [edgeMat, edgeMat, edgeMat, edgeMat, panelMat, edgeMat]);
 slab.position.z = -DEPTH / 2; slab.receiveShadow = true; scene.add(slab);
 // the synth page (the sequencer page of v0.25.0-v0.39.0 is gone)
@@ -486,7 +486,7 @@ for (const b of BOXES) {
         d.up = () => { if (g0 && !g0.moved) set(get() + (g0.top ? 1 : -1)); g0 = null; }; };
       const key = (kx, o, draw) => { makeKey(kx, ty, 24, 14, { pad: 6, ...o }); at(kx + 27, draw); };
       // v0.56.1 (Johnny: "have them left aligned rather than spread out"): packed from the left with a small gap
-      const L0 = gx0 - 72, GAP = 14;
+      const L0 = gx0 - 58, GAP = 14;   // v0.56.5 (Johnny: "add a space before play rec island"): -72 -> -58
       // transport
       let x0 = L0; frame(x0, x0 + 124, 'PLAY');
       key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
