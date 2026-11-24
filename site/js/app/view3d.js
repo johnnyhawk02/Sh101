@@ -763,7 +763,10 @@ const printSigNow = () => curInk;
 function fit() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
-  const small = Math.min(w, h) < 600, padX = small ? 4 : 10, padY = small ? 4 : 10;   // v0.43.13 (Johnny: "why do we have space above and below"): was 48 px each side
+  // v0.59.1 (Johnny: "make sure the window doesnt have black space around the synth"): in the plugin the window has the panel's
+  // shape (plugin/web/bridge.js), so the panel fills it edge to edge
+  const inPlugin = document.documentElement.classList.contains('plugin');
+  const small = Math.min(w, h) < 600, padX = inPlugin ? 0 : small ? 4 : 10, padY = inPlugin ? 0 : small ? 4 : 10;   // v0.43.13 (Johnny: "why do we have space above and below"): was 48 px each side
   const fx = (w - 2 * padX) / w, fy = (h - 2 * padY) / h, t = Math.tan(camera.fov * Math.PI / 360);
   const d = Math.max((H / 2) / (t * fy), (W / 2) / (t * camera.aspect * fx));
   camera.near = d / 20; camera.far = d * 4;
@@ -1091,7 +1094,7 @@ try {
 requestAnimationFrame(frame);
 
 window.shyoy3d = {
-  ready: true,
+  ready: true, size: [W, H],
   show() { if (!live) { live = true; fit(); dirty = printDirty = shadowDirty = true; requestAnimationFrame(frame); } },
   hide() { live = false; opt.close(); pb.close(); },
   // for headless checks: where a control is on screen

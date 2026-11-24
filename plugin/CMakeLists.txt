@@ -2,7 +2,7 @@
 # The engine is a C++ port of site/js/dsp/engine.js; the editor is the web app itself (site/) in a web view.
 #   cmake -B build -S plugin -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release
 cmake_minimum_required(VERSION 3.22)
-project(Shyoy VERSION 0.59.0 LANGUAGES C CXX)
+project(Shyoy VERSION 0.59.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS")

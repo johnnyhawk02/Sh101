@@ -94,6 +94,8 @@
       if (first(init.running)) seqOn = true;
       try { fromHost(JSON.parse(first(init.host) || '{}'), false); } catch (e) { console.warn('shyoy plugin host', e); }   // before boot sends the sound
       boot();
+      // the window takes the panel's shape (view3d.js is a module, so it may come after this)
+      const aspect = () => { if (window.shyoy3d && shyoy3d.size) send({ kind: 'aspect', w: shyoy3d.size[0], h: shyoy3d.size[1] }); else setTimeout(aspect, 200); }; aspect();
       log(`page booted, localStorage ${shimmed ? 'replaced' : 'mirrored'}`);
       send({ kind: 'msg', json: JSON.stringify({ type: 'ccmap', ids: MIDI_MAP.map((x) => x.id) }) });
       const st = document.getElementById('midi-status'); if (st) st.textContent = 'MIDI comes from the host.';
