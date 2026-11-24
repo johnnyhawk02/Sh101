@@ -1,11 +1,9 @@
 // Shyoy: The factory sounds and the saved state.
+// v0.58.0 (Johnny: "remove the presets and replace with a straight edged sound"): one factory sound, a plain saw with the
+// filter wide open, no resonance, drive, envelope, LFO, glide or accent, the VCA on the gate (about -26 dB, the randomiser's level)
 const PRESETS = {
-  'Acid line': { p: { accVcf: 0.45, saw: .85, pulse: 0, sub: .25, noise: 0, cutoff: .3, reso: .8, drive: .55, vcfEnv: .6, kybd: .5, attack: 0, decay: .38, sustain: 0, release: .22, vcaMode: 0, accent: .75, slide: .22, glideMode: 1, range: 1, swing: .12, gateLen: .5 } },
-  'Sub bass': { p: { accVcf: 0.25, saw: .3, pulse: .55, sub: .85, subType: 0, noise: 0, cutoff: .34, reso: .25, drive: .6, vcfEnv: .35, kybd: .5, attack: 0, decay: .45, sustain: .35, release: .2, vcaMode: 0, accent: .4, pw: .15, pwmSrc: 1, range: 0, swing: .08, gateLen: .6 } },
-  'PWM arp': { p: { accVcf: 0.25, saw: 0, pulse: .85, sub: .3, subType: 2, noise: 0, cutoff: .45, reso: .45, drive: .4, vcfEnv: .45, kybd: .5, attack: 0, decay: .35, sustain: .3, release: .35, vcaMode: 0, accent: .4, pw: .7, pwmSrc: 0, lfoRate: .45, lfoWave: 0, range: 1, swing: 0, gateLen: .45 } },
-  'Starved & bent': { p: { accVcf: 0.375, saw: .8, pulse: .3, sub: .4, noise: 0, cutoff: .4, reso: .7, drive: .6, vcfEnv: .45, kybd: .4, attack: 0, decay: .4, sustain: .3, release: .3, vcaMode: 0, accent: .6, lfoRate: .35, lfoWave: 1, range: 1, swing: .1, gateLen: .6 },
-    bend: { vBatt: 5.6, rBatt: 4, tReset: 0.00008, rDis: 900, cf1: 680e-12, otaOff: 0.018 },
-    br: { 'LFOTRI>VCOCV': .2, 'VCFOUT>VCOCV': .55, 'SAW>ENVCAP': .3, 'FINGER>VCFIN': .3 } },
+  'Straight': { p: { saw: .85, pulse: 0, sub: 0, noise: 0, cutoff: 1, reso: 0, drive: 0, vcfEnv: 0, vcfMod: 0, vcoMod: 0, kybd: .5, accVcf: 0,
+    attack: 0, decay: .4, sustain: 1, release: .1, trig: 0, vcaMode: 1, level: .7, glide: 0, glideMode: 0, accent: 0, range: 1, pw: .3, pwmSrc: 1 } },
 };
 
 // ---------- state ----------
@@ -22,7 +20,7 @@ function presetState(name) {
   return { params: { ...defaults, ...knownParams(P.p) }, bend, br: { ...(P.br || {}) }, preset: name };
 }
 try { state = JSON.parse(localStorage.getItem('kestrel-ms1-v2')); } catch (e) { state = null; }
-if (!state || state.v !== 2 || !state.params) state = presetState('Acid line');
+if (!state || state.v !== 2 || !state.params) state = presetState('Straight');
 // v0.40.0 (Johnny: "remove the sequencer"): a saved session's pattern, slots, tempo, scale and control sequencers are dropped
 for (const k of ['steps', 'len', 'bpm', 'slots', 'slot', 'chain', 'scale', 'cseq', 's101']) delete state[k];
 state.v = 2; state.bend = { ...stockBend(), ...(state.bend || {}) }; state.br = state.br || {};

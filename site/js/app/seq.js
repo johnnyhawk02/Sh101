@@ -30,7 +30,8 @@ function seqTidy(q) {
 }
 // v0.42.2: a v0.42.0-1 pattern (octaves -1..1) moves up one before it's tidied
 if (state.seq && Array.isArray(state.seq.steps) && state.seq.steps.some((s) => s && s.o < 0)) state.seq.steps.forEach((s) => { s.o = (s.o | 0) + 1; });
-state.seq = seqTidy(state.seq);
+// v0.58.0: a first start (no saved session) gets the Straight preset's straight pattern (SEQ_STRAIGHT, sounds.js)
+state.seq = seqTidy(state.seq || SEQ_STRAIGHT());
 // v0.46.0: a preset's pattern (sounds.js applyPreset); the playheads carry on where they are
 function seqLoad(q) { state.seq = seqTidy(q); seqSend(); }
 // v0.42.2 (Johnny: "octave should be current note +1 and +2"): octaves are 0, 1, 2 above the current note
