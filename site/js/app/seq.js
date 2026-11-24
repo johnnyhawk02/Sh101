@@ -58,6 +58,8 @@ function seqNudge(d) {
     if (d < 0) v.push(v.shift()); else v.unshift(v.pop()); v.forEach((x, i) => { S[a + i][k] = x; }); }
   seqSend();
 }
+// v0.60.0 (Johnny: "add clear notes button icon with 'are you sure ?'"): empty the note list (the panel asks first)
+function seqClearNotes() { state.seq.notes = []; state.seq.loop = 0; seqNoteAt = -1; seqSend(); }
 function seqNoteNudge(d) { const v = state.seq.notes; if (v.length < 2) return; if (d < 0) v.push(v.shift()); else v.unshift(v.pop()); seqSend(); }   // v0.57.7
 function seqLen(k, n) { n = Math.max(1, Math.min(SEQ_N - state.seq.st[k], n | 0)); if (state.seq.len[k] === n) return; state.seq.len[k] = n; seqSend(); }
 // move a lane's start, keeping its end where it is
