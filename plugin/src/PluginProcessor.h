@@ -76,7 +76,7 @@ private:
     // the sound as the engine last heard it, so a project reloads (and the engine restarts) without the editor
     std::map<std::string, double> sParams, sBend, sBridges;
     double sCf[4] {}; bool sHasCf = false, sHold = false;
-    juce::var sSeq; int sOs = 2;   // the seq object as Object.assign builds it in the engine, and the oversampling
+    juce::var sSeq; int sOs = 2; bool sClip = true;   // the seq object as Object.assign builds it in the engine, and the oversampling
     void snapshot (const juce::var& m);
     void loadDefaultSnapshot();
     juce::var snapshotVar() const;

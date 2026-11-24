@@ -48,6 +48,13 @@ static constexpr int N_NODES = 11, N_INJ = 9;
 
 inline double tanhA (double x) { if (x > 3) return 1; if (x < -3) return -1; const double x2 = x * x; return x * (27 + x2) / (27 + 9 * x2); }
 inline double clampD (double x, double a, double b) { return x < a ? a : x > b ? b : x; }
+// output stage (v0.59.0): makeup gain so Straight peaks near -6 dBFS, and a soft clipper that is straight up to SOFT_T
+constexpr double OUT_GAIN = 5.43, SOFT_T = 0.6;
+inline double softClip (double x) {
+    const double a = x < 0 ? -x : x; if (a <= SOFT_T) return x;
+    const double y = SOFT_T + (1 - SOFT_T) * jsm::tanh ((a - SOFT_T) / (1 - SOFT_T));
+    return x < 0 ? -y : y;
+}
 inline int subWave (int type, int c) {
     if (type == 0) return (c & 1) ? 0 : 1;
     if (type == 1) return (c & 2) ? 0 : 1;
@@ -118,6 +125,7 @@ public:
         wMax = std::min (fs * 0.5, fso * 0.45);
     }
     int oversampling() const { return os; }
+    bool soft = true;   // v0.59.0: the soft clipper (clip message, Options > Audio)
 
     // ---------------- messages ----------------
     void setParam (const std::string& id, double v) {
@@ -384,7 +392,8 @@ public:
 
             const double dcOut = y - dcx + 0.9995 * dcy; dcx = y; dcy = dcOut;
             out = dcOut;
-            const float o = (float) clampD (dcOut * smLevel, -1, 1); L[j] = o; if (R) R[j] = o;
+            const double og = dcOut * smLevel * OUT_GAIN;
+            const float o = (float) (soft ? softClip (og) : clampD (og, -1, 1)); L[j] = o; if (R) R[j] = o;
         }
         meterAt += n;
         if (meterAt >= 2048) {
