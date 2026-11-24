@@ -474,6 +474,8 @@ for (const b of BOXES) {
       const cyc = (x, ix, iy) => { const r = 6, a0 = -0.6 * Math.PI, a1 = 1.05 * Math.PI; x.arc(ix, iy, r, a0, a1); x.stroke();   // ↻: round, with a head where it ends
         const ex = ix + r * Math.cos(a1), ey = iy + r * Math.sin(a1), tx = -Math.sin(a1), tyy = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
         x.beginPath(); x.moveTo(ex + tx * 4.5, ey + tyy * 4.5); x.lineTo(ex - nx * 3.2, ey - ny * 3.2); x.lineTo(ex + nx * 3.2, ey + ny * 3.2); x.closePath(); x.fill(); };
+      const bin = (x, ix, iy) => { x.lineWidth = 1.4; x.moveTo(ix - 6.5, iy - 4.5); x.lineTo(ix + 6.5, iy - 4.5); x.moveTo(ix - 2, iy - 4.5); x.lineTo(ix - 2, iy - 6.5); x.lineTo(ix + 2, iy - 6.5); x.lineTo(ix + 2, iy - 4.5);
+        x.moveTo(ix - 5, iy - 2.5); x.lineTo(ix - 4, iy + 6.5); x.lineTo(ix + 4, iy + 6.5); x.lineTo(ix + 5, iy - 2.5); x.moveTo(ix - 1.6, iy - 0.5); x.lineTo(ix - 1.3, iy + 4.5); x.moveTo(ix + 1.6, iy - 0.5); x.lineTo(ix + 1.3, iy + 4.5); x.stroke(); };
       const pulse = (x, ix, iy) => { x.moveTo(ix - 8, iy + 4.5); x.lineTo(ix - 3.5, iy + 4.5); x.lineTo(ix - 3.5, iy - 4.5); x.lineTo(ix + 3.5, iy - 4.5); x.lineTo(ix + 3.5, iy + 4.5); x.lineTo(ix + 8, iy + 4.5); x.stroke(); };
       const ticks = (x, ix, iy) => { x.lineWidth = 1.4; for (let k = 0; k < 4; k++) { x.moveTo(ix - 7.5 + k * 5, iy - 4.5); x.lineTo(ix - 7.5 + k * 5, iy + 4.5); } x.stroke(); };
       // v0.56.1 (Johnny: "label the little islands logically"): each frame's name sits in a gap in its top edge
@@ -496,14 +498,16 @@ for (const b of BOXES) {
       let x0 = L0; frame(x0, x0 + 124, 'PLAY');
       key(x0 + 22, { on: () => seqOn, press: () => seqRun(), tag: 'play' }, play); key(x0 + 80, { on: () => seqRec, press: () => seqRecord(), tag: 'rec' }, rec);
       // notes
-      x0 += 124 + GAP; frame(x0, x0 + 448, 'NOTES');   // v0.56.4 (Johnny: "give the note seq more space"): 296 -> 336
+      x0 += 124 + GAP; frame(x0, x0 + 504, 'NOTES');   // v0.56.4 (Johnny: "give the note seq more space"): 296 -> 336; v0.60.0: 448 -> 504 for the bin
       at(x0 + 17, note); makeDisplay(x0 + 32, ty - 12, NW, 24, () => String(state.seq.notes.length));
       at(x0 + 102, cyc); numBox(x0 + 117, () => state.seq.notes.length ? String(seqLoopN()) : '-', seqLoopN, seqSetLoop, 'nloop');
       for (const [a, k, draw] of [['gate', 204, pulse], ['step', 276, ticks]]) key(x0 + k, { on: () => state.seq.adv === a, press: () => seqSetAdv(a), tag: 'adv:' + a }, draw);
       // v0.57.7 (Johnny: "add nudge left/right in the note seq island"): turn the note list one place left or right
       for (const [d, tag, k] of [[-1, 'nnudgeL', 348], [1, 'nnudgeR', 404]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNoteNudge(d); }, tag }, arrow(d));
+      // v0.60.0 (Johnny: "add clear notes button icon with 'are you sure ?'"): a bin that empties the note list, after ARE YOU SURE ?
+      key(x0 + 460, { on: () => false, press: () => { if (state.seq.notes.length) clrAsk.open(); }, tag: 'nclear' }, bin);
       // steps
-      x0 += 448 + GAP; frame(x0, x0 + 196, 'STEPS');
+      x0 += 504 + GAP; frame(x0, x0 + 196, 'STEPS');
       at(x0 + 15, cyc); numBox(x0 + 28, () => state.seq.cyc ? String(state.seq.cyc) : 'OFF', () => state.seq.cyc, seqSetCyc, 'scyc');
       for (const [d, tag, k] of [[-1, 'nudgeL', 102], [1, 'nudgeR', 158]]) key(x0 + k, { on: () => false, press: () => { boot(); seqNudge(d); }, tag }, arrow(d));
       // random
@@ -862,6 +866,10 @@ html[data-view="2d"] #v3d, html[data-view="2d"] .v3d-sheet { display: none !impo
 .v3d-sheet .list h3 { margin: 10px 0 4px; font-size: 10px; letter-spacing: .1em; font-weight: 600; opacity: .7; }
 .v3d-sheet .list button { width: 100%; justify-content: flex-start; margin: 0 0 4px; }
 .v3d-sheet .list button.lit { box-shadow: inset 3px 0 0 #ff2a14; }
+.v3d-sheet.ask .win { width: 300px; height: 150px; max-height: none; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 34px 22px 16px; }
+.v3d-sheet.ask .q { margin: 8px 0 18px; text-align: center; font: 400 20px/1 ${DISPLAY}; letter-spacing: .06em; }
+.v3d-sheet.ask .row { justify-content: center; gap: 14px; flex-wrap: nowrap; } .v3d-sheet.ask .row button { width: 92px; justify-content: center; height: 30px; }
+.v3d-sheet.ask #ca-yes { box-shadow: inset 0 -3px 0 #ff2a14; }
 /* v0.57.6 (Johnny: "improve this, it looks thrown together"): the preset browser laid out properly. Name + save on top, the list
    filling the middle (thin rows, the chosen one inverted with the spot colour along its edge), the preset and file keys in a footer */
 .v3d-sheet.pbs .win { width: min(660px, 94vw); display: flex; flex-direction: column; overflow: hidden; padding: 46px 20px 16px; }
@@ -1004,6 +1012,11 @@ function openTaper(id) { tpId = id; tpDraw(); tp.open(); }
 const sm = sheet('RANDOM');
 sm.body.innerHTML = `<div class="f sm-list">${SEQ_RND.map(([label, key], i) => `<button data-i="${i}" style="display:flex;justify-content:space-between;gap:28px;width:100%;margin:0 0 6px"><span>${label}</span><b style="opacity:.6">${key === ' ' ? 'SPACE' : key.toUpperCase()}</b></button>`).join('')}</div>`;
 sm.body.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; boot(); SEQ_RND[+b.dataset.i][2](); dirty = true; });
+// v0.60.0: CLEAR NOTES asks first, in a small fixed-size sheet (Johnny hates windows that change size): YES empties the list, NO / ✕ / Esc keeps it
+const clrAsk = sheet('CLEAR NOTES'); clrAsk.el.classList.add('ask');
+clrAsk.body.innerHTML = `<p class="q">ARE YOU SURE ?</p><div class="row"><button id="ca-no">NO</button><button id="ca-yes">YES</button></div>`;
+clrAsk.body.querySelector('#ca-no').onclick = () => { clrAsk.close(); dirty = true; };
+clrAsk.body.querySelector('#ca-yes').onclick = () => { seqClearNotes(); clrAsk.close(); dirty = true; };
 const seqMenu = { isOpen: () => sm.el.classList.contains('open'), toggle() { if (this.isOpen()) sm.close(); else sm.open(); dirty = true; } };
 
 // the preset browser: the app's own preset list (the hidden select), its prev/next and its save bar
