@@ -48,6 +48,14 @@ const INJ = ['VCOCAP', 'VCOCV', 'PWREF', 'VCFCV', 'VCFIN', 'VCFC2', 'ENVCAP', 'L
 
 function tanh(x) { if (x > 3) return 1; if (x < -3) return -1; const x2 = x * x; return x * (27 + x2) / (27 + 9 * x2); }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+// output stage (v0.59.0): makeup gain so Straight peaks near -6 dBFS, and a soft clipper that is straight up to SOFT_T
+const OUT_GAIN = 5.43;            // +14.7 dB
+const SOFT_T = 0.6;               // knee at -4.4 dBFS: a -6 dBFS peak passes untouched
+function softClip(x) {
+  const a = x < 0 ? -x : x; if (a <= SOFT_T) return x;
+  const y = SOFT_T + (1 - SOFT_T) * Math.tanh((a - SOFT_T) / (1 - SOFT_T));
+  return x < 0 ? -y : y;
+}
 function subWave(type, c) {
   if (type === 0) return (c & 1) ? 0 : 1;
   if (type === 1) return (c & 2) ? 0 : 1;
@@ -62,7 +70,7 @@ function bq(f, x) { const y = f.b0 * x + f.z1; f.z1 = f.b1 * x - f.a1 * y + f.z2
 class KestrelProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    const fs = sampleRate; this.fs = fs; this.setOS(2);
+    const fs = sampleRate; this.fs = fs; this.setOS(2); this.soft = true;
     this.t = 0;
     // panel (mapped) targets
     this.P = {
@@ -155,6 +163,7 @@ class KestrelProcessor extends AudioWorkletProcessor {
         break;
       case 'panic': this.keys = []; this.gateOff(); break;
       case 'os': this.setOS(m.n | 0); break;
+      case 'clip': this.soft = !!m.on; break;
       case 'reset': this.vc = 0; this.s.fill(0); this.tl.fill(1); this.ve = 0; this.ltri = 0; break;
     }
   }
@@ -485,7 +494,12 @@ class KestrelProcessor extends AudioWorkletProcessor {
       // output coupling cap + level
       const dcOut = y - this.dcx + 0.9995 * this.dcy; this.dcx = y; this.dcy = dcOut;
       this.out = dcOut;
-      const o = clamp(dcOut * sm.level, -1, 1); L[j] = o; if (R) R[j] = o;
+      // v0.59.0 (Johnny: "the sound output should be around -6 / add a soft clipper to the output"): OUT_GAIN lifts the
+      // whole synth so the stock Straight sound peaks near -6 dBFS (it was about -21), then the soft clipper (on by
+      // default, Options › Audio) leaves everything under SOFT_T alone and bends louder peaks smoothly towards 0 dBFS
+      // (same slope at the knee, never past 1). Off = the old hard clamp at ±1.
+      const og = dcOut * sm.level * OUT_GAIN;
+      const o = this.soft ? softClip(og) : clamp(og, -1, 1); L[j] = o; if (R) R[j] = o;
     }
     this.meterAt += n;
     if (this.meterAt >= 2048) {

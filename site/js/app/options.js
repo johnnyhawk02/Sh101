@@ -91,4 +91,9 @@ showLook(); applyLook();
 const osSeg = document.getElementById('os-seg');
 const showOS = () => { const n = osFactor(); for (const b of osSeg.children) b.setAttribute('aria-pressed', +b.dataset.os === n); };
 osSeg.addEventListener('click', (e) => { const b = e.target.closest('[data-os]'); if (!b) return; store.set('os', +b.dataset.os); post({ type: 'os', n: osFactor() }); showOS(); });
+// v0.59.0: the soft clipper at the very output, on by default, saved as kestrel.clip
+const clipSeg = document.getElementById('clip-seg');
+const showClip = () => { const on = softClipOn(); for (const b of clipSeg.children) b.setAttribute('aria-pressed', (b.dataset.clip === 'on') === on); };
+clipSeg.addEventListener('click', (e) => { const b = e.target.closest('[data-clip]'); if (!b) return; store.set('clip', b.dataset.clip === 'on'); post({ type: 'clip', on: softClipOn() }); showClip(); });
+showClip();
 showOS();

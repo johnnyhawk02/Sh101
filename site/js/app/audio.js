@@ -25,4 +25,5 @@ async function boot() {
 }
 const post = (m) => { if (node) node.port.postMessage(m); };
 const osFactor = () => { const n = typeof store === 'object' ? store.get('os', 2) : 2; return n === 1 || n === 4 ? n : 2; };   // Options › Audio
-function pushAll() { post({ type: 'os', n: osFactor() }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); if (typeof seqMsg === 'function') post(seqMsg()); }
+const softClipOn = () => (typeof store === 'object' ? store.get('clip', true) : true) !== false;   // Options › Audio, on by default
+function pushAll() { post({ type: 'os', n: osFactor() }); post({ type: 'clip', on: softClipOn() }); post({ type: 'params', p: state.params }); post({ type: 'bend', b: bendPhysical(state.bend) }); post({ type: 'bridges', br: state.br }); if (typeof seqMsg === 'function') post(seqMsg()); }

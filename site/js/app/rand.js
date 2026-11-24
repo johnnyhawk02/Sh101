@@ -47,7 +47,8 @@ const shyoyRand = (() => {
     - 20.30 * p.reso + 10.95 * p.reso * p.reso + 24.56 * p.drive - 11.51 * p.drive * p.drive
     - 7.35 * p.cutoff + 4.78 * p.cutoff * p.cutoff + 11.42 * p.decay + 3.09 * p.sustain + 4.43 * p.release + 1.89 * (p.vcaMode | 0);
   // the level a plain saw + sub patch plays at, +7 dB (v0.41.2: so a typical sound lands near Level 0.4-0.8)
-  const TARGET_DB = -33.87 + 7;
+  // v0.59.0: -2.2 dB more, so a typical random sound peaks where Straight does (near -6 dBFS after the engine's OUT_GAIN)
+  const TARGET_DB = -33.87 + 7 - 2.2;
   function levelled(snap) {
     const p = snap.params, est = estDb(p);
     p.level = Math.max(0.1, Math.min(1, 0.7 * 10 ** ((TARGET_DB - est) / 20)));

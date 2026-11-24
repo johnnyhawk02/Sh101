@@ -74,6 +74,20 @@ const peak = (b) => b.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
   const b = render(p, 3);
   assert.ok(finite(b), 'bent circuit produced NaN'); assert.ok(peak(b) <= 1);
 }
+// v0.59.0: the Straight sound peaks near -6 dBFS; the soft clipper keeps a hot sound under 0 dBFS and leaves quiet audio alone
+{
+  const S = { saw: .85, pulse: 0, sub: 0, noise: 0, cutoff: 1, reso: 0, drive: 0, vcfEnv: 0, kybd: .5, attack: 0, decay: .4, sustain: 1, release: .1, vcaMode: 1, level: .7, range: 1 };
+  const [p, send] = make(); send({ type: 'params', p: S }); send({ type: 'noteOn', n: 60 });
+  const db = 20 * Math.log10(peak(render(p, 1).subarray(4800)));
+  assert.ok(db > -8 && db < -4, `Straight peak ${db.toFixed(1)} dBFS`);
+  const hot = (on) => { const [q, s2] = make(); s2({ type: 'clip', on }); s2({ type: 'params', p: { ...S, saw: 1, sub: 1, pulse: 1, drive: 1, level: 1 } }); s2({ type: 'noteOn', n: 48 }); return render(q, 1).subarray(4800); };
+  const soft = hot(true), hard = hot(false);
+  assert.ok(peak(soft) <= 1 && soft.some((v, i) => v !== hard[i]) && finite(soft), `soft clip peak ${peak(soft)}`);
+  assert.ok(peak(hard) === 1, `hard clip peak ${peak(hard)}`);
+  const [q, s3] = make(); s3({ type: 'params', p: { ...S, level: .3 } }); s3({ type: 'noteOn', n: 60 }); const a = render(q, .5);
+  const [r, s4] = make(); s4({ type: 'clip', on: false }); s4({ type: 'params', p: { ...S, level: .3 } }); s4({ type: 'noteOn', n: 60 }); const b = render(r, .5);
+  assert.ok(a.subarray(4800).every((v, i) => v === b[i + 4800]), 'soft clip is transparent below the knee');
+}
 console.log('engine tests passed');
 // last-note priority: letting go of an older key under a newer one changes nothing
 {
