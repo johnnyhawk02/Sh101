@@ -7,8 +7,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const site = new URL('../../site/', import.meta.url), out = new URL('../src/DefaultPatch.h', import.meta.url);
 const ctx = { console, localStorage: { getItem: () => null, setItem() {} }, window: { addEventListener() {} }, document: { getElementById: () => ({}) } };
 vm.createContext(ctx);
-const src = ['defs', 'state', 'seq'].map((f) => readFileSync(new URL(`js/app/${f}.js`, site), 'utf8')).join('\n') + `
-;globalThis.__out = { boot: [{ type: 'os', n: 2 }, { type: 'params', p: state.params }, { type: 'bend', b: bendPhysical(state.bend) }, { type: 'bridges', br: state.br }, seqMsg()],
+const sounds = readFileSync(new URL('js/app/sounds.js', site), 'utf8'), straight = sounds.match(/const SEQ_STRAIGHT = [\s\S]*?\}\);\n/);   // seq.js's first-start pattern
+const src = [readFileSync(new URL('js/app/defs.js', site), 'utf8'), readFileSync(new URL('js/app/state.js', site), 'utf8'), straight ? straight[0] : '', readFileSync(new URL('js/app/seq.js', site), 'utf8')].join('\n') + `
+;globalThis.__out = { boot: [{ type: 'os', n: 2 }, { type: 'clip', on: true }, { type: 'params', p: state.params }, { type: 'bend', b: bendPhysical(state.bend) }, { type: 'bridges', br: state.br }, seqMsg()],
   ccmap: [...RACK.flatMap((m) => m.items.filter((it) => it.f).map((it) => it.f)), ...BENDER.map((b) => b.f)] };`;
 vm.runInContext(src, ctx);
 const json = JSON.stringify(ctx.__out);

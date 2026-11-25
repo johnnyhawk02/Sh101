@@ -57,7 +57,7 @@ jobs:
           node plugin/tools/match.mjs "$R"
       - name: Test the VST3 in a host (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run -a -s "-screen 0 1280x720x24" build/shyoy_host_test_artefacts/Release/shyoy_host_test build/Shyoy_artefacts/Release/VST3/Shyoy.vst3 shyoy-linux.png
+        run: xvfb-run -a -s "-screen 0 1400x900x24" build/shyoy_host_test_artefacts/Release/shyoy_host_test build/Shyoy_artefacts/Release/VST3/Shyoy.vst3 shyoy-linux.png
       - name: Package
         shell: bash
         run: |

@@ -10,10 +10,13 @@ public:
     ~ShyoyEditor() override;
     void resized() override;
     void paint (juce::Graphics& g) override { g.fillAll (juce::Colour (0xff0b0b0b)); }
-    void reloadPage();   // the host loaded another state: start the page again with it
+    void reloadPage();
+    void setPanelAspect (double a);
+    static constexpr double PANEL_ASPECT = 1270.0 / 740.0;   // view3d.js W x H   // the host loaded another state: start the page again with it
 
 private:
     ShyoyProcessor& proc;
+    double aspect = PANEL_ASPECT; bool initialised = false;
     std::unique_ptr<juce::WebBrowserComponent> web;
     std::unique_ptr<juce::ZipFile> zip;
     std::unique_ptr<juce::MemoryInputStream> zipStream;

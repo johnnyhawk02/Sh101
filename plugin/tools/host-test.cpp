@@ -80,13 +80,13 @@ struct Test : juce::Timer {
             if (juce::File ("/usr/bin/xdotool").existsAsFile()) {
                 auto* ed = plugin->getActiveEditor();
                 const auto r = ed->getScreenBounds();
-                const int x = r.getX() + juce::roundToInt (r.getWidth() * 0.0695), y = r.getY() + juce::roundToInt (r.getHeight() * 0.925);
+                const int x = r.getX() + juce::roundToInt (r.getWidth() * 0.0406), y = r.getY() + juce::roundToInt (r.getHeight() * 0.938);
                 // run in the background: the message loop has to keep turning while the click is delivered
                 auto click = [] (int cx, int cy) { std::system (("(sleep 0.5; xdotool mousemove " + juce::String (cx) + " " + juce::String (cy) + "; sleep 0.5; xdotool click 1) &").toRawUTF8()); };
                 std::printf ("     editor at %s, clicking PLAY at %d,%d\n", r.toString().toRawUTF8(), x, y);
                 click (x, y);
                 // and step 3's accent cell (27.9% across, 85.6% down), so the page has a change to save
-                juce::Timer::callAfterDelay (2000, [r, click] { click (r.getX() + juce::roundToInt (r.getWidth() * 0.246), r.getY() + juce::roundToInt (r.getHeight() * 0.822)); });
+                juce::Timer::callAfterDelay (2000, [r, click] { click (r.getX() + juce::roundToInt (r.getWidth() * 0.2297), r.getY() + juce::roundToInt (r.getHeight() * 0.831)); });
             }
         }
         if (tick == 34) {   // the host moves VCF Cutoff and turns step 2's gate off
@@ -113,6 +113,7 @@ struct Test : juce::Timer {
             }
             const auto s = state();
             check (s.contains ("kestrel-ms1-v2") || s.contains ("\"patch\":\"{"), "the page saved its sound into the plugin state");
+            if (juce::File ("/usr/bin/xdotool").existsAsFile()) check (s.contains ("\"running\":true"), "PLAY is saved with the project");
             // a second instance restores it
             juce::MemoryBlock mb; plugin->getStateInformation (mb);
             juce::AudioPluginFormatManager fm; fm.addFormat (new juce::VST3PluginFormat());
@@ -122,6 +123,21 @@ struct Test : juce::Timer {
                 p2->enableAllBuses(); p2->setStateInformation (mb.getData(), (int) mb.getSize()); p2->prepareToPlay (fs, 512);
                 juce::MemoryBlock mb2; p2->getStateInformation (mb2);
                 check (unwrap (mb2) == unwrap (mb) && unwrap (mb).contains ("\"patch\""), "a saved state loads into a new instance unchanged");
+                // the loaded project had PLAY lit: the sequencer waits for the host's transport, plays with it, and
+                // stops (still lit) when it stops
+                struct Head : juce::AudioPlayHead {
+                    bool playing = false; double ppq = 0;
+                    juce::Optional<PositionInfo> getPosition() const override { PositionInfo p; p.setIsPlaying (playing); p.setBpm (120.0); p.setPpqPosition (ppq); return p; }
+                } head;
+                p2->setPlayHead (&head);
+                juce::AudioBuffer<float> b2 { 2, 512 };
+                auto run2 = [&] (int blocks) { float pk = 0; for (int i = 0; i < blocks; i++) { juce::MidiBuffer m; b2.clear(); p2->processBlock (b2, m); pk = std::max (pk, b2.getMagnitude (0, 0, 512)); if (head.playing) head.ppq += 512 / fs * 2; } return pk; };
+                const float stopped = run2 (100);
+                head.playing = true; const float rolling = run2 (200);
+                head.playing = false; run2 (100); const float after = run2 (50);
+                check (stopped < 1e-4f && rolling > 0.05f && after < 1e-3f, "a loaded project's PLAY follows the host transport (stopped " + juce::String (stopped, 6) + ", playing " + juce::String (rolling, 3) + ", stopped again " + juce::String (after, 6) + ")");
+                juce::MemoryBlock mb3; p2->getStateInformation (mb3);
+                check (unwrap (mb3).contains ("\"running\":true"), "PLAY stays lit after the host stops");
                 p2->releaseResources();
             }
             finish();

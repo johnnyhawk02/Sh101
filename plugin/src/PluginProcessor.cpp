@@ -24,7 +24,7 @@ void ShyoyProcessor::prepareToPlay (double sampleRate, int) {
     fs = sampleRate;
     auto e = std::make_unique<shyoy::Engine> (sampleRate);
     replaySnapshot (*e);
-    if (uiRunning) e->run (true);
+    // a lit PLAY starts the engine in processBlock (with the host's transport, or free if it was pressed while stopped)
     e->listener = this;
     engine = std::move (e);
     pending.clear(); inbox.clear(); inboxDone = false;   // the snapshot already holds everything queued
@@ -37,7 +37,7 @@ void ShyoyProcessor::replaySnapshot (shyoy::Engine& e) {
     e.clearBridges();
     for (auto& [k, v] : sBridges) e.addBridge (k, v);
     { std::vector<Cmd> c; shyoy::parse (seqMessage(), c); for (auto& x : c) shyoy::apply (e, x, false); }
-    e.setOS (sOs);
+    e.setOS (sOs); e.soft = sClip;
     e.setHold (sHold);
 }
 
@@ -88,13 +88,14 @@ void ShyoyProcessor::snapshot (const juce::var& m) {
     else if (type == "seq") {
         seqMerge (m["seq"]);
     }
+    else if (type == "clip") sClip = shyoy::truthy (m["on"]);
     else if (type == "os") { const int n = shyoy::intOf (m["n"]); sOs = n == 1 || n == 4 ? n : 2; }
     else if (type == "mode") { if (m.hasProperty ("hold")) sHold = shyoy::truthy (m["hold"]); }
     else if (type == "run") uiRunning = shyoy::truthy (m["on"]);
 }
 
 void ShyoyProcessor::loadDefaultSnapshot() {
-    sParams.clear(); sBend.clear(); sBridges.clear(); sHasCf = false; sSeq = juce::var(); sOs = 2; sHold = false;
+    sParams.clear(); sBend.clear(); sBridges.clear(); sHasCf = false; sSeq = juce::var(); sOs = 2; sClip = true; sHold = false;
     const auto d = shyoy::json::parse (shyoy::DEFAULT_PATCH_JSON);
     if (auto* a = d["boot"].getArray()) for (auto& m : *a) snapshot (m);
     ccMap.clear();
@@ -110,7 +111,9 @@ juce::var ShyoyProcessor::snapshotVar() const {
     if (sHasCf) { juce::Array<juce::var> cf; for (double c : sCf) cf.add (c); o->setProperty ("cf", cf); }
     o->setProperty ("seq", sSeq.getDynamicObject() ? sSeq : juce::var (new juce::DynamicObject()));
     o->setProperty ("os", sOs);
+    o->setProperty ("clip", sClip);
     o->setProperty ("hold", sHold);
+    o->setProperty ("running", (bool) uiRunning);
     juce::Array<juce::var> cc; for (auto& c : ccMap) cc.add (juce::String (c));
     o->setProperty ("ccmap", cc);
     return juce::var (o);
@@ -122,7 +125,9 @@ void ShyoyProcessor::snapshotFromVar (const juce::var& v) {
     sHasCf = false; if (auto* a = v["cf"].getArray()) { sHasCf = true; for (int i = 0; i < 4; i++) sCf[i] = i < a->size() ? shyoy::num ((*a)[i]) : 0; }
     sSeq = juce::var(); seqMerge (v["seq"]);
     { const int n = shyoy::intOf (v["os"]); sOs = n == 1 || n == 4 ? n : 2; }
+    sClip = ! v.hasProperty ("clip") || shyoy::truthy (v["clip"]);
     sHold = shyoy::truthy (v["hold"]);
+    uiRunning = shyoy::truthy (v["running"]); freeRun = false;
     if (auto* a = v["ccmap"].getArray()) { ccMap.clear(); for (auto& x : *a) ccMap.push_back (x.toString().toStdString()); }
 }
 
@@ -157,6 +162,7 @@ void ShyoyProcessor::setStateInformation (const void* data, int size) {
     shyoy::parse (msg ("bridges", "br", br), cmds);
     shyoy::parse (seqMessage(), cmds);
     { auto* om = new juce::DynamicObject(); om->setProperty ("type", "os"); om->setProperty ("n", sOs); shyoy::parse (juce::var (om), cmds); }
+    { auto* cm = new juce::DynamicObject(); cm->setProperty ("type", "clip"); cm->setProperty ("on", sClip); shyoy::parse (juce::var (cm), cmds); }
     auto* md = new juce::DynamicObject(); md->setProperty ("type", "mode"); md->setProperty ("hold", sHold);
     shyoy::parse (juce::var (md), cmds);
     queue (std::move (cmds));
@@ -285,23 +291,7 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     if (! engine) { buffer.clear(); return; }
     auto& e = *engine;
 
-    // messages from the editor
-    if (! inboxDone) {
-        const juce::ScopedTryLock tl (cmdLock);
-        if (tl.isLocked() && ! pending.empty()) {
-            std::swap (pending, inbox);
-            for (auto& c : inbox) {
-                shyoy::apply (e, c, false);   // the host sets the tempo, not the page
-                if (c.type == Cmd::Run) uiRunning = c.b;
-            }
-            inboxDone = true;
-        }
-    }
-    // faders the host moved (automation, a mapped controller) play at once
-    for (auto& [id, i] : synthIdx) if (audioDirty[(size_t) i].exchange (false)) e.setParam (pdefs[(size_t) i].id, (double) hostVal[(size_t) i].load());
-
-    // tempo and transport: the sequencer runs at the host's tempo; while the host plays, its steps sit on the host's
-    // sixteenths; when the host stops, a running sequencer stops (PLAY goes out)
+    // tempo and transport (read first: PLAY pressed while the host is stopped runs free)
     double bpm = 120; bool playing = false; double ppq = 0; bool havePpq = false;
     if (auto* ph = getPlayHead())
         if (auto pos = ph->getPosition()) {
@@ -309,9 +299,31 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             playing = pos->getIsPlaying();
             if (auto q = pos->getPpqPosition()) { ppq = *q; havePpq = true; }
         }
+
+    // messages from the editor
+    if (! inboxDone) {
+        const juce::ScopedTryLock tl (cmdLock);
+        if (tl.isLocked() && ! pending.empty()) {
+            std::swap (pending, inbox);
+            for (auto& c : inbox) {
+                shyoy::apply (e, c, false);   // the host sets the tempo, not the page
+                if (c.type == Cmd::Run) { uiRunning = c.b; freeRun = c.b && ! playing; }
+            }
+            inboxDone = true;
+        }
+    }
+    // faders the host moved (automation, a mapped controller) play at once
+    for (auto& [id, i] : synthIdx) if (audioDirty[(size_t) i].exchange (false)) e.setParam (pdefs[(size_t) i].id, (double) hostVal[(size_t) i].load());
+
+    // the sequencer runs at the host's tempo. PLAY (uiRunning) is an arm that the project saves (Johnny: "play mode isnt
+    // saved with ableton projects"): while it's lit the sequencer plays whenever the host plays, its steps on the host's
+    // sixteenths, and stops (still lit) when the host stops. PLAY pressed while the host is stopped runs free until the
+    // host starts or stops.
     if (bpm > 0 && bpm < 1000) e.seq.bpm = bpm;
-    if (hostWasPlaying && ! playing && e.running) { e.run (false); uiRunning = false; pushUi ({ UiEvent::Running, 0, 0 }); }
+    if (playing != hostWasPlaying) freeRun = false;
     hostWasPlaying = playing;
+    const bool want = uiRunning && (playing || freeRun);
+    if (want != e.running) e.run (want);
     if (playing && havePpq && e.running) {
         const double spStep = fs * 60 / e.seq.bpm / 4, q = ppq * 4, nextQ = std::ceil (q - 1e-7);
         const int idx = (int) (((int64_t) nextQ % 720720 + 720720) % 720720);   // the engine's step count (every lane length divides it)
@@ -454,13 +466,13 @@ juce::var ShyoyProcessor::hostStateForPage() const {
 
 // the pattern as seq.js seqTidy fills it in
 ShyoyProcessor::SeqVals ShyoyProcessor::seqVals() const {
-    static const bool ON0[16] = { 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1 }; static const int O0[16] = { 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1 };
+    
     SeqVals q {};
     const auto s = sSeq;
     const auto* steps = s["steps"].getArray();
     for (int i = 0; i < 16; i++) {
         if (steps && steps->size() == 16) { const auto st = (*steps)[i]; q.on[i] = shyoy::truthy (st["on"]); q.o[i] = juce::jlimit (0, 2, shyoy::intOf (st["o"])); q.s[i] = shyoy::truthy (st["s"]); q.a[i] = shyoy::truthy (st["a"]); }
-        else { q.on[i] = ON0[i]; q.o[i] = O0[i]; q.s[i] = i == 4 || i == 12; q.a[i] = i % 4 == 0; }
+        else { q.on[i] = true; q.o[i] = 0; q.s[i] = false; q.a[i] = false; }   // SEQ_STRAIGHT
     }
     for (int k = 0; k < 4; k++) {
         const auto key = shyoy::LANE_KEY[k];

@@ -9,7 +9,7 @@
 namespace shyoy {
 
 struct Cmd {
-    enum Type { Param, Bend, BendCf, BridgesClear, Bridge, NoteOn, NoteOff, Hold, Seq, Run, Panic, Reset, Os } type = Param;
+    enum Type { Param, Bend, BendCf, BridgesClear, Bridge, NoteOn, NoteOff, Hold, Seq, Run, Panic, Reset, Os, Clip } type = Param;
     std::string id;
     double v = 0;
     bool b = false;
@@ -84,6 +84,7 @@ inline void parse (const juce::var& m, std::vector<Cmd>& out) {
     else if (type == "run") { Cmd c; c.type = Cmd::Run; c.b = truthy (m["on"]); add (c); }
     else if (type == "panic") { Cmd c; c.type = Cmd::Panic; add (c); }
     else if (type == "reset") { Cmd c; c.type = Cmd::Reset; add (c); }
+    else if (type == "clip") { Cmd c; c.type = Cmd::Clip; c.b = truthy (m["on"]); add (c); }
     else if (type == "os") { Cmd c; c.type = Cmd::Os; c.v = intOf (m["n"]); add (c); }
 }
 
@@ -111,6 +112,7 @@ inline void apply (Engine& e, const Cmd& c, bool useBpm = true) {
             break;
         }
         case Cmd::Os: e.setOS ((int) c.v); break;
+        case Cmd::Clip: e.soft = c.b; break;
         case Cmd::Run: e.run (c.b); break;
         case Cmd::Panic: e.panic(); break;
         case Cmd::Reset: e.reset(); break;

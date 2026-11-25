@@ -24,11 +24,26 @@ ShyoyEditor::ShyoyEditor (ShyoyProcessor& p) : AudioProcessorEditor (p), proc (p
     // the page scales its panel to fit whatever size the window is (as in a browser)
     setResizable (true, true);
     setResizeLimits (640, 360, 3840, 2160);
-    setSize (1280, 720);
+    setPanelAspect (PANEL_ASPECT);
     proc.uiWake = [this] { pump(); };
 }
 
 ShyoyEditor::~ShyoyEditor() { proc.uiWake = nullptr; }
+
+// the window keeps the 3D panel's shape, so the panel fills it with no black round it (the page says its size once it
+// has booted; PANEL_ASPECT is the same, view3d.js W x H, so the window opens at the right shape)
+void ShyoyEditor::setPanelAspect (double a) {
+    if (! (a > 0.5 && a < 4)) return;
+    aspect = a;
+    if (auto* c = getConstrainer()) {
+        c->setFixedAspectRatio (a);
+        c->setSizeLimits (juce::roundToInt (360 * a), 360, juce::roundToInt (2160 * a), 2160);
+    }
+    const int w = initialised ? getWidth() : 1280;   // the first time: the default size
+    initialised = true;
+    if (juce::SystemStats::getEnvironmentVariable ("SHYOY_LOG", {}).isNotEmpty()) std::fprintf (stderr, "[shyoy] aspect %f, %d x %d\n", a, getWidth(), getHeight());
+    setSize (w, juce::roundToInt (w / a));
+}
 
 void ShyoyEditor::makeBrowser() {
     using WBC = juce::WebBrowserComponent;
@@ -52,6 +67,7 @@ void ShyoyEditor::makeBrowser() {
                 proc.postFromUi (m);
             }
             else if (kind == "rec") proc.setRecording ((bool) v["on"]);
+            else if (kind == "aspect") setPanelAspect ((double) v["w"] / (double) v["h"]);
             else if (kind == "store") {
                 const auto key = v["k"].toString();
                 if (v.hasProperty ("v")) { const auto val = v["v"].toString(); proc.storeFromUi (key, &val); }
