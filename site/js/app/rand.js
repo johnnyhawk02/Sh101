@@ -38,20 +38,21 @@ const shyoyRand = (() => {
   }
   // ---- loudness ----
   // v0.43.2 (Johnny: "do we need the auto leveller? ... surely you can work out roughly what the level should be"):
-  // with the effects gone, a sound's loudness follows a handful of controls, so Level is worked out from them straight
-  // away instead of playing each sound in a hidden copy of the engine first (v0.34.1-v0.43.1). The formula was fitted to
-  // 400 random sounds measured that way (a riff of eighth notes, Level 0.7): it comes within about 2 dB for 9 in 10.
-  // Each term is the change in output level, in dB: the mixer, resonance (which thins the sound, then rings),
-  // the filter's drive, cutoff, and how long the envelope holds the note up.
-  const estDb = (p) => -38.63 + 2.81 * p.saw + 6.43 * p.pulse + 4.57 * p.sub - 0.93 * p.noise
-    - 20.30 * p.reso + 10.95 * p.reso * p.reso + 24.56 * p.drive - 11.51 * p.drive * p.drive
-    - 7.35 * p.cutoff + 4.78 * p.cutoff * p.cutoff + 11.42 * p.decay + 3.09 * p.sustain + 4.43 * p.release + 1.89 * (p.vcaMode | 0);
-  // the level a plain saw + sub patch plays at, +7 dB (v0.41.2: so a typical sound lands near Level 0.4-0.8)
-  // v0.59.0: -2.2 dB more, so a typical random sound peaks where Straight does (near -6 dBFS after the engine's OUT_GAIN)
-  const TARGET_DB = -33.87 + 7 - 2.2;
+  // a sound's loudness follows a handful of controls, so Level is worked out from them straight away, no measuring.
+  // v0.61.0 (Johnny: "make sure randomiser makes sounds around -6 at most"): the formula now gives the PEAK, in dBFS
+  // at Level 0.7, before the soft clipper. Fitted to 2,400 random sounds played through the engine (test/randpeak.mjs:
+  // the straight pattern at 120 bpm, a key held on 8 notes from C2 to G5): within 1.2 dB typically, 3 dB for 199 in 200.
+  const estDb = (p) => -21.51 + 7.04 * p.saw + 8.41 * p.pulse + 9.49 * p.sub + 0.55 * p.noise
+    - 2.88 * p.saw * p.pulse - 3.67 * p.sub * p.saw - 5.81 * p.sub * p.pulse
+    - 0.98 * p.reso + 7.95 * p.reso ** 2 - 0.22 * p.reso ** 3 + 26.31 * p.drive - 15.08 * p.drive ** 2 - 1.27 * p.drive * p.reso
+    + 26.57 * p.cutoff - 12.31 * p.cutoff ** 2 - 13.62 * p.cutoff * p.reso + 11.43 * p.vcfEnv - 5.53 * p.vcfEnv * p.reso - 16.21 * p.cutoff * p.vcfEnv
+    + 2.20 * p.decay + 0.76 * p.sustain + 0.16 * p.release + 0.24 * p.attack + 1.01 * (p.vcaMode | 0)
+    - 0.13 * p.kybd - 0.43 * p.pw - 0.36 * p.range - 0.24 * p.accVcf;
+  // aim 3 dB under -6 dBFS, the formula's error for 199 in 200, so a random sound peaks at -6 at most (a typical one near -9)
+  const PEAK_MAX = -6, MARGIN = 3, TARGET_DB = PEAK_MAX - MARGIN;
   function levelled(snap) {
     const p = snap.params, est = estDb(p);
-    p.level = Math.max(0.1, Math.min(1, 0.7 * 10 ** ((TARGET_DB - est) / 20)));
+    p.level = Math.max(0.03, Math.min(1, 0.7 * 10 ** ((TARGET_DB - est) / 20)));
     last = { est, level: p.level };
     return snap;
   }
@@ -102,6 +103,7 @@ const shyoyRand = (() => {
     get spinning() { return pend; },   // from the click until the audio is running
     get reel() { return null; },
     // for tests: a whole new sound, drawn but not played
+    levelled,
     sample() { const t = draw(), p = clone(state.params); Object.assign(p, t.f, t.s); return { params: p, bend: clone(state.bend), br: clone(state.br), strip: clone(state.strip) }; },
     estDb,
   };
