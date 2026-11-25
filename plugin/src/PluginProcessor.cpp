@@ -24,7 +24,7 @@ void ShyoyProcessor::prepareToPlay (double sampleRate, int) {
     fs = sampleRate;
     auto e = std::make_unique<shyoy::Engine> (sampleRate);
     replaySnapshot (*e);
-    if (uiRunning) e->run (true);
+    // a lit PLAY starts the engine in processBlock (with the host's transport, or free if it was pressed while stopped)
     e->listener = this;
     engine = std::move (e);
     pending.clear(); inbox.clear(); inboxDone = false;   // the snapshot already holds everything queued
@@ -113,6 +113,7 @@ juce::var ShyoyProcessor::snapshotVar() const {
     o->setProperty ("os", sOs);
     o->setProperty ("clip", sClip);
     o->setProperty ("hold", sHold);
+    o->setProperty ("running", (bool) uiRunning);
     juce::Array<juce::var> cc; for (auto& c : ccMap) cc.add (juce::String (c));
     o->setProperty ("ccmap", cc);
     return juce::var (o);
@@ -126,6 +127,7 @@ void ShyoyProcessor::snapshotFromVar (const juce::var& v) {
     { const int n = shyoy::intOf (v["os"]); sOs = n == 1 || n == 4 ? n : 2; }
     sClip = ! v.hasProperty ("clip") || shyoy::truthy (v["clip"]);
     sHold = shyoy::truthy (v["hold"]);
+    uiRunning = shyoy::truthy (v["running"]); freeRun = false;
     if (auto* a = v["ccmap"].getArray()) { ccMap.clear(); for (auto& x : *a) ccMap.push_back (x.toString().toStdString()); }
 }
 
@@ -289,23 +291,7 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     if (! engine) { buffer.clear(); return; }
     auto& e = *engine;
 
-    // messages from the editor
-    if (! inboxDone) {
-        const juce::ScopedTryLock tl (cmdLock);
-        if (tl.isLocked() && ! pending.empty()) {
-            std::swap (pending, inbox);
-            for (auto& c : inbox) {
-                shyoy::apply (e, c, false);   // the host sets the tempo, not the page
-                if (c.type == Cmd::Run) uiRunning = c.b;
-            }
-            inboxDone = true;
-        }
-    }
-    // faders the host moved (automation, a mapped controller) play at once
-    for (auto& [id, i] : synthIdx) if (audioDirty[(size_t) i].exchange (false)) e.setParam (pdefs[(size_t) i].id, (double) hostVal[(size_t) i].load());
-
-    // tempo and transport: the sequencer runs at the host's tempo; while the host plays, its steps sit on the host's
-    // sixteenths; when the host stops, a running sequencer stops (PLAY goes out)
+    // tempo and transport (read first: PLAY pressed while the host is stopped runs free)
     double bpm = 120; bool playing = false; double ppq = 0; bool havePpq = false;
     if (auto* ph = getPlayHead())
         if (auto pos = ph->getPosition()) {
@@ -313,9 +299,31 @@ void ShyoyProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             playing = pos->getIsPlaying();
             if (auto q = pos->getPpqPosition()) { ppq = *q; havePpq = true; }
         }
+
+    // messages from the editor
+    if (! inboxDone) {
+        const juce::ScopedTryLock tl (cmdLock);
+        if (tl.isLocked() && ! pending.empty()) {
+            std::swap (pending, inbox);
+            for (auto& c : inbox) {
+                shyoy::apply (e, c, false);   // the host sets the tempo, not the page
+                if (c.type == Cmd::Run) { uiRunning = c.b; freeRun = c.b && ! playing; }
+            }
+            inboxDone = true;
+        }
+    }
+    // faders the host moved (automation, a mapped controller) play at once
+    for (auto& [id, i] : synthIdx) if (audioDirty[(size_t) i].exchange (false)) e.setParam (pdefs[(size_t) i].id, (double) hostVal[(size_t) i].load());
+
+    // the sequencer runs at the host's tempo. PLAY (uiRunning) is an arm that the project saves (Johnny: "play mode isnt
+    // saved with ableton projects"): while it's lit the sequencer plays whenever the host plays, its steps on the host's
+    // sixteenths, and stops (still lit) when the host stops. PLAY pressed while the host is stopped runs free until the
+    // host starts or stops.
     if (bpm > 0 && bpm < 1000) e.seq.bpm = bpm;
-    if (hostWasPlaying && ! playing && e.running) { e.run (false); uiRunning = false; pushUi ({ UiEvent::Running, 0, 0 }); }
+    if (playing != hostWasPlaying) freeRun = false;
     hostWasPlaying = playing;
+    const bool want = uiRunning && (playing || freeRun);
+    if (want != e.running) e.run (want);
     if (playing && havePpq && e.running) {
         const double spStep = fs * 60 / e.seq.bpm / 4, q = ppq * 4, nextQ = std::ceil (q - 1e-7);
         const int idx = (int) (((int64_t) nextQ % 720720 + 720720) % 720720);   // the engine's step count (every lane length divides it)

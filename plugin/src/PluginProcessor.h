@@ -120,6 +120,7 @@ private:
 
     // host tempo and transport
     bool hostWasPlaying = false;
+    std::atomic<bool> freeRun { false };   // PLAY was pressed while the host was stopped
 
     // audio thread -> editor
     juce::AbstractFifo uiFifo { 512 };
